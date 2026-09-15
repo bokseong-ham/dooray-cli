@@ -188,7 +188,7 @@ export const postEditCommand = new Command("edit")
       await client.updatePost(projectId, postId, {
         subject: title ?? post.subject,
         body: {
-          mimeType: "text/x-markdown",
+          mimeType: post.body.mimeType,
           content: newBody ?? post.body.content,
         },
         priority: post.priority,
@@ -252,7 +252,7 @@ export const postEditCommand = new Command("edit")
 
       await client.updatePost(projectId, postId, {
         subject: parsed.subject,
-        body: { mimeType: "text/x-markdown", content: parsed.body },
+        body: { mimeType: post.body.mimeType, content: parsed.body },
         priority: parsed.priority,
         dueDate: parsed.due_date ?? undefined,
         dueDateFlag: parsed.due_date != null,

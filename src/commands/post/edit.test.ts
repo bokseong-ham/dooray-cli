@@ -229,3 +229,87 @@ describe("post edit 참여자 단독 호출", () => {
     stdout.mockRestore();
   });
 });
+
+describe("post edit mimeType 보존", () => {
+  const htmlPost: PostDetail = {
+    ...post,
+    body: { mimeType: "text/html", content: "<p>기존 본문</p>" },
+    users: {
+      from: { type: "member", member: { organizationMemberId: "member-from" } },
+      to: [],
+      cc: [],
+    },
+  };
+
+  it("비대화형 수정에서 text/html 업무의 mimeType을 유지한다", async () => {
+    mocks.client.getPost.mockResolvedValue({ result: htmlPost });
+    mocks.readBodyInputOrNull.mockResolvedValue("<p>새 본문</p>");
+    const program = await createCommandTree();
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await program.parseAsync([
+      "node",
+      "dooray",
+      "post",
+      "edit",
+      "--id",
+      "post-1",
+      "--body",
+      "<p>새 본문</p>",
+    ]);
+
+    expect(mocks.client.updatePost).toHaveBeenCalledWith(
+      "project-1",
+      "post-1",
+      expect.objectContaining({
+        body: { mimeType: "text/html", content: "<p>새 본문</p>" },
+      }),
+    );
+    stdout.mockRestore();
+  });
+
+  it("$EDITOR 수정에서 text/html 업무의 mimeType을 유지한다", async () => {
+    mocks.client.getPost.mockResolvedValue({ result: htmlPost });
+    mocks.openInEditor.mockImplementation(async (original: string) => original + "\n추가");
+    const program = await createCommandTree();
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await program.parseAsync(["node", "dooray", "post", "edit", "--id", "post-1"]);
+
+    expect(mocks.openInEditor).toHaveBeenCalledOnce();
+    expect(mocks.client.updatePost).toHaveBeenCalledWith(
+      "project-1",
+      "post-1",
+      expect.objectContaining({
+        body: { mimeType: "text/html", content: "<p>기존 본문</p>\n추가" },
+      }),
+    );
+    stdout.mockRestore();
+  });
+
+  it("markdown 업무는 그대로 text/x-markdown으로 나간다", async () => {
+    mocks.readBodyInputOrNull.mockResolvedValue("새 본문");
+    const program = await createCommandTree();
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await program.parseAsync([
+      "node",
+      "dooray",
+      "post",
+      "edit",
+      "--id",
+      "post-1",
+      "--body",
+      "새 본문",
+    ]);
+
+    expect(mocks.client.updatePost).toHaveBeenCalledWith(
+      "project-1",
+      "post-1",
+      expect.objectContaining({
+        body: { mimeType: "text/x-markdown", content: "새 본문" },
+      }),
+    );
+    stdout.mockRestore();
+  });
+});

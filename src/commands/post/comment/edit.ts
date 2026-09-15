@@ -172,7 +172,7 @@ export const commentEditCommand = new Command("edit")
 
     startSpinner("댓글 수정 중...");
     await client.updatePostComment(projectId, postId, commentId, {
-      body: { mimeType: "text/x-markdown", content: edited },
+      body: { mimeType: comment.body.mimeType, content: edited },
     });
     stopSpinner(true, "댓글 수정 완료");
 

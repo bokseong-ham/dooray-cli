@@ -10,6 +10,8 @@ import {
 import { readBodyInput } from "../../utils/body-input.js";
 import { startSpinner, stopSpinner } from "../../utils/spinner.js";
 
+const MARKDOWN_MIME = "text/x-markdown";
+
 export const wikiPageEditCommand = new Command("edit")
   .description("위키 페이지 수정 (플래그 없으면 $EDITOR)")
   .argument("<project>", "프로젝트 코드 또는 ID")
@@ -48,7 +50,7 @@ export const wikiPageEditCommand = new Command("edit")
       startSpinner("위키 페이지 수정 중...");
       await client.updateWikiPage(wikiId, pageId, {
         subject: parsed.title,
-        body: { mimeType: "text/x-markdown", content: parsed.body },
+        body: { mimeType: page.body?.mimeType ?? MARKDOWN_MIME, content: parsed.body },
       });
       stopSpinner(true, "위키 페이지 수정 완료");
       process.stdout.write(`위키 페이지가 수정되었습니다: ${pageId}\n`);
@@ -58,12 +60,22 @@ export const wikiPageEditCommand = new Command("edit")
     // 비대화형 분기
     stopSpinner(true, "위키 정보 조회 완료");
 
+    // 기존 mimeType 보존용 조회. $EDITOR flow 와 달리 원본을 들고 있지 않아
+    // 본문을 바꿀 때만 한 번 더 조회한다 (제목만 수정하면 조회 없음).
+    let bodyMimeType = MARKDOWN_MIME;
+    if (hasBody) {
+      startSpinner("위키 페이지 조회 중...");
+      const res = await client.getWikiPage(wikiId, pageId);
+      bodyMimeType = res.result.body?.mimeType ?? MARKDOWN_MIME;
+      stopSpinner(true, "위키 페이지 조회 완료");
+    }
+
     if (hasTitle && hasBody) {
       const bodyContent = await readBodyInput(opts);
       startSpinner("위키 페이지 수정 중...");
       await client.updateWikiPage(wikiId, pageId, {
         subject: opts.title,
-        body: { mimeType: "text/x-markdown", content: bodyContent },
+        body: { mimeType: bodyMimeType, content: bodyContent },
       });
     } else if (hasTitle) {
       startSpinner("위키 페이지 제목 수정 중...");
@@ -73,7 +85,7 @@ export const wikiPageEditCommand = new Command("edit")
       const bodyContent = await readBodyInput(opts);
       startSpinner("위키 페이지 본문 수정 중...");
       await client.updateWikiPageContent(wikiId, pageId, {
-        body: { mimeType: "text/x-markdown", content: bodyContent },
+        body: { mimeType: bodyMimeType, content: bodyContent },
       });
     }
 

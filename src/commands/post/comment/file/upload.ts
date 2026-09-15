@@ -49,7 +49,7 @@ export const uploadCommentFileCommand = new Command("upload")
       const currentBody = commentRes.result.body.content;
       const newBody = appendFileReference(currentBody, fileName, fileId);
       await client.updatePostComment(projectId, postId, commentId, {
-        body: { mimeType: "text/x-markdown", content: newBody },
+        body: { mimeType: commentRes.result.body.mimeType, content: newBody },
       });
       stopSpinner(true, "reference 추가 완료");
     } catch {

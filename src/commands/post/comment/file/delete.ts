@@ -60,7 +60,7 @@ export const deleteCommentFileCommand = new Command("delete")
       const currentBody = commentRes.result.body.content;
       const newBody = removeFileReference(currentBody, fileId);
       await client.updatePostComment(projectId, postId, commentId, {
-        body: { mimeType: "text/x-markdown", content: newBody },
+        body: { mimeType: commentRes.result.body.mimeType, content: newBody },
       });
       stopSpinner(true, "reference 제거 완료");
     } catch {
