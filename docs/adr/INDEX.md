@@ -61,3 +61,4 @@ ADR-NNN 내용은 `docs/adr/NNN-*.md` (번호 glob) 또는 아래 목록 링크�
 - [ADR-050](050-agent-overlay-boundary.md) — 전용 agent 를 두지 않고 저장소 고유 지침은 오버레이가 문서 경로로 실어 코어 역할 계약에 얹는다
 - [ADR-051](051-json-large-integer-precision.md) — 응답 JSON 의 큰 정수를 `ky` 의 `parseJson` 공통 파서로 문자열 보존 (`direct-send` 의 log-id 손실)
 - [ADR-052](052-messenger-thread-send.md) — 메신저 스레드 생성을 `thread-send` 한 명령에 `--log` 분기로 둔다 (`threadChannelId` 필드 부재 실측)
+- [ADR-053](053-body-mimetype-preservation.md) — 본문 수정 시 기존 mimeType 을 보존하고 `--mime-type` 으로 덮어쓴다 (신규 작성은 markdown 기본 유지)

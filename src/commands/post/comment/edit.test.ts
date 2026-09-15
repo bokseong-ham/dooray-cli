@@ -29,9 +29,10 @@ vi.mock("../../../resolvers/post-input.js", () => ({
   resolvePostInput: mocks.resolvePostInput,
 }));
 
-vi.mock("../../../utils/body-input.js", () => ({
-  readBodyInputOrNull: mocks.readBodyInputOrNull,
-}));
+vi.mock("../../../utils/body-input.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../utils/body-input.js")>();
+  return { ...actual, readBodyInputOrNull: mocks.readBodyInputOrNull };
+});
 
 vi.mock("../../../editor/index.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../editor/index.js")>();
@@ -54,6 +55,12 @@ function comment(mimeType: string) {
     body: { mimeType, content: "기존 댓글" },
     files: [],
   };
+}
+
+function exitOverrideAll(cmd: Command): void {
+  cmd.exitOverride();
+  cmd.configureOutput({ writeErr: () => {} });
+  cmd.commands.forEach(exitOverrideAll);
 }
 
 async function createCommandTree(): Promise<Command> {
@@ -119,6 +126,111 @@ describe("post comment edit mimeType 보존", () => {
 
   it("markdown 댓글은 그대로 text/x-markdown 으로 나간다", async () => {
     mocks.client.getPostComments.mockResolvedValue({ result: [comment("text/x-markdown")] });
+    const program = await createCommandTree();
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await program.parseAsync([
+      "node",
+      "dooray",
+      "post",
+      "comment",
+      "edit",
+      "--id",
+      "post-1",
+      "--comment-id",
+      "comment-1",
+      "--body",
+      "수정된 댓글",
+    ]);
+
+    expect(mocks.client.updatePostComment).toHaveBeenCalledWith(
+      "project-1",
+      "post-1",
+      "comment-1",
+      { body: { mimeType: "text/x-markdown", content: "수정된 댓글" } },
+    );
+    stdout.mockRestore();
+  });
+});
+
+describe("post comment edit --mime-type", () => {
+  const baseArgs = [
+    "node",
+    "dooray",
+    "post",
+    "comment",
+    "edit",
+    "--id",
+    "post-1",
+    "--comment-id",
+    "comment-1",
+  ];
+
+  it("지정하면 기존 형식 대신 그 값으로 나간다", async () => {
+    mocks.client.getPostComments.mockResolvedValue({ result: [comment("text/html")] });
+    const program = await createCommandTree();
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await program.parseAsync([...baseArgs, "--body", "수정된 댓글", "--mime-type", "text/x-markdown"]);
+
+    expect(mocks.client.updatePostComment).toHaveBeenCalledWith(
+      "project-1",
+      "post-1",
+      "comment-1",
+      { body: { mimeType: "text/x-markdown", content: "수정된 댓글" } },
+    );
+    stdout.mockRestore();
+  });
+
+  it("--dry-run 미리보기에 지정한 형식이 나온다", async () => {
+    mocks.client.getPostComments.mockResolvedValue({ result: [comment("text/x-markdown")] });
+    const program = await createCommandTree();
+    let output = "";
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+      output += String(chunk);
+      return true;
+    });
+
+    await program.parseAsync([
+      "node",
+      "dooray",
+      "--json",
+      "post",
+      "comment",
+      "edit",
+      "--id",
+      "post-1",
+      "--comment-id",
+      "comment-1",
+      "--body",
+      "<p>수정된 댓글</p>",
+      "--mime-type",
+      "text/html",
+      "--dry-run",
+    ]);
+
+    expect(JSON.parse(output).mimeType).toBe("text/html");
+    expect(mocks.client.updatePostComment).not.toHaveBeenCalled();
+    stdout.mockRestore();
+  });
+
+  it("허용하지 않는 값이면 Commander 가 거부한다", async () => {
+    mocks.client.getPostComments.mockResolvedValue({ result: [comment("text/html")] });
+    const program = await createCommandTree();
+    exitOverrideAll(program);
+
+    await expect(
+      program.parseAsync([...baseArgs, "--body", "수정된 댓글", "--mime-type", "html"]),
+    ).rejects.toThrow(/Allowed choices/);
+    expect(mocks.client.updatePostComment).not.toHaveBeenCalled();
+  });
+});
+
+describe("post comment edit mimeType 폴백", () => {
+  it("body.mimeType 이 없으면 text/x-markdown 으로 나간다", async () => {
+    mocks.client.getPostComments.mockResolvedValue({
+      result: [{ id: "comment-1", body: { content: "기존 댓글" }, files: [] }],
+    });
     const program = await createCommandTree();
     const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
 

@@ -36,9 +36,10 @@ vi.mock("../../editor/index.js", async (importOriginal) => {
   return { ...actual, openInEditor: mocks.openInEditor };
 });
 
-vi.mock("../../utils/body-input.js", () => ({
-  readBodyInput: mocks.readBodyInput,
-}));
+vi.mock("../../utils/body-input.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../utils/body-input.js")>();
+  return { ...actual, readBodyInput: mocks.readBodyInput };
+});
 
 vi.mock("../../utils/spinner.js", () => ({
   startSpinner: mocks.startSpinner,
@@ -57,6 +58,12 @@ function page(mimeType?: string) {
       ...(mimeType != null && { body: { mimeType, content: "기존 본문" } }),
     },
   };
+}
+
+function exitOverrideAll(cmd: Command): void {
+  cmd.exitOverride();
+  cmd.configureOutput({ writeErr: () => {} });
+  cmd.commands.forEach(exitOverrideAll);
 }
 
 async function createCommandTree(): Promise<Command> {
@@ -187,5 +194,102 @@ describe("wiki page edit mimeType 보존", () => {
     const request = mocks.client.updateWikiPage.mock.calls[0]?.[2];
     expect(request.body.mimeType).toBe("text/html");
     stdout.mockRestore();
+  });
+});
+
+describe("wiki page edit --mime-type", () => {
+  it("지정하면 기존 형식 대신 그 값으로 나가고 원본을 조회하지 않는다", async () => {
+    mocks.readBodyInput.mockResolvedValue("새 본문");
+    const program = await createCommandTree();
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await program.parseAsync([
+      "node",
+      "dooray",
+      "wiki",
+      "edit",
+      "my-wiki",
+      "page-1",
+      "--body",
+      "새 본문",
+      "--mime-type",
+      "text/x-markdown",
+    ]);
+
+    expect(mocks.client.getWikiPage).not.toHaveBeenCalled();
+    expect(mocks.client.updateWikiPageContent).toHaveBeenCalledWith("wiki-1", "page-1", {
+      body: { mimeType: "text/x-markdown", content: "새 본문" },
+    });
+    stdout.mockRestore();
+  });
+
+  it("--title 과 함께 지정해도 조회 없이 그 값으로 나간다", async () => {
+    const program = await createCommandTree();
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await program.parseAsync([
+      "node",
+      "dooray",
+      "wiki",
+      "edit",
+      "my-wiki",
+      "page-1",
+      "--title",
+      "새 제목",
+      "--body",
+      "<p>새 본문</p>",
+      "--mime-type",
+      "text/html",
+    ]);
+
+    expect(mocks.client.getWikiPage).not.toHaveBeenCalled();
+    expect(mocks.client.updateWikiPage).toHaveBeenCalledWith("wiki-1", "page-1", {
+      subject: "새 제목",
+      body: { mimeType: "text/html", content: "<p>새 본문</p>" },
+    });
+    stdout.mockRestore();
+  });
+
+  it("$EDITOR 경로에서도 지정한 값이 기존 형식을 덮어쓴다", async () => {
+    mocks.client.getWikiPage.mockResolvedValue(page("text/html"));
+    mocks.openInEditor.mockImplementation(async (original: string) => original + "\n추가");
+    const program = await createCommandTree();
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await program.parseAsync([
+      "node",
+      "dooray",
+      "wiki",
+      "edit",
+      "my-wiki",
+      "page-1",
+      "--mime-type",
+      "text/x-markdown",
+    ]);
+
+    const request = mocks.client.updateWikiPage.mock.calls[0]?.[2];
+    expect(request.body.mimeType).toBe("text/x-markdown");
+    stdout.mockRestore();
+  });
+
+  it("허용하지 않는 값이면 Commander 가 거부한다", async () => {
+    const program = await createCommandTree();
+    exitOverrideAll(program);
+
+    await expect(
+      program.parseAsync([
+        "node",
+        "dooray",
+        "wiki",
+        "edit",
+        "my-wiki",
+        "page-1",
+        "--body",
+        "새 본문",
+        "--mime-type",
+        "markdown",
+      ]),
+    ).rejects.toThrow(/Allowed choices/);
+    expect(mocks.client.updateWikiPageContent).not.toHaveBeenCalled();
   });
 });

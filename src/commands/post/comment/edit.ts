@@ -1,10 +1,10 @@
-import { Command } from "commander";
+import { Command, Option } from "commander";
 import { getConfigOrThrow } from "../../../config/store.js";
 import { DoorayApiClient } from "../../../api/client.js";
 import { resolvePostInput } from "../../../resolvers/post-input.js";
 import { openInEditor } from "../../../editor/index.js";
 import { startSpinner, stopSpinner } from "../../../utils/spinner.js";
-import { readBodyInputOrNull } from "../../../utils/body-input.js";
+import { readBodyInputOrNull, BODY_MIME_TYPES, resolveBodyMimeType } from "../../../utils/body-input.js";
 import { DoorayCliError } from "../../../utils/errors.js";
 import { EXIT_PARAM_ERROR } from "../../../utils/exit-codes.js";
 import type { OutputOptions } from "../../../formatters/table.js";
@@ -40,6 +40,10 @@ export const commentEditCommand = new Command("edit")
     [] as string[],
   )
   .option("--link-task <ref>", "다른 업무 링크 추가 (<project>/<number> 또는 postId, 반복 가능)", (v, prev: string[]) => [...prev, v], [] as string[])
+  .addOption(
+    new Option("--mime-type <type>", "본문 형식 (미지정 시 기존 댓글의 형식 유지)")
+      .choices(BODY_MIME_TYPES),
+  )
   .option("--dry-run", "API 호출 없이 합성된 본문만 stdout 출력 (mention/link-task 적용 결과 미리보기)")
   .action(async (arg1, arg2, arg3, opts) => {
     const config = await getConfigOrThrow();
@@ -160,7 +164,10 @@ export const commentEditCommand = new Command("edit")
       stopSpinner(false);
       const globalOpts = commentEditCommand.optsWithGlobals() as OutputOptions;
       if (globalOpts.json) {
-        process.stdout.write(JSON.stringify({ body: edited }) + "\n");
+        process.stdout.write(JSON.stringify({
+          body: edited,
+          mimeType: resolveBodyMimeType(comment.body.mimeType, opts.mimeType),
+        }) + "\n");
       } else {
         process.stdout.write(edited + "\n");
       }
@@ -172,7 +179,7 @@ export const commentEditCommand = new Command("edit")
 
     startSpinner("댓글 수정 중...");
     await client.updatePostComment(projectId, postId, commentId, {
-      body: { mimeType: comment.body.mimeType, content: edited },
+      body: { mimeType: resolveBodyMimeType(comment.body.mimeType, opts.mimeType), content: edited },
     });
     stopSpinner(true, "댓글 수정 완료");
 

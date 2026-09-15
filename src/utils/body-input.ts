@@ -7,6 +7,27 @@ export interface BodyInputOptions {
   bodyFile?: string;
 }
 
+/** 두레이 본문 mimeType — API 값 그대로 사용한다 (별칭 매핑 없음). */
+export const MARKDOWN_MIME = "text/x-markdown";
+export const HTML_MIME = "text/html";
+
+/** `--mime-type` 옵션이 받는 값 목록. */
+export const BODY_MIME_TYPES = [MARKDOWN_MIME, HTML_MIME];
+
+/**
+ * 수정 요청에 실을 본문 mimeType 을 고른다.
+ *
+ * - `override`(`--mime-type`)가 있으면 그 값
+ * - 없으면 기존 글의 mimeType 보존
+ * - 기존 값도 없으면 markdown 폴백 (목록 엔드포인트 응답 등 누락 대비)
+ */
+export function resolveBodyMimeType(
+  existing: string | undefined,
+  override?: string,
+): string {
+  return override ?? existing ?? MARKDOWN_MIME;
+}
+
 /**
  * `--body` / `--body-file` 옵션을 받아 본문 문자열을 돌려준다.
  *

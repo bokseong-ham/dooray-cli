@@ -1,4 +1,4 @@
-import { Command } from "commander";
+import { Command, Option } from "commander";
 import { getConfigOrThrow } from "../../config/store.js";
 import { DoorayApiClient } from "../../api/client.js";
 import { resolveWiki } from "../../resolvers/wiki.js";
@@ -7,10 +7,8 @@ import {
   serializeWikiFrontmatter,
   parseWikiFrontmatter,
 } from "../../editor/index.js";
-import { readBodyInput } from "../../utils/body-input.js";
+import { readBodyInput, BODY_MIME_TYPES, resolveBodyMimeType } from "../../utils/body-input.js";
 import { startSpinner, stopSpinner } from "../../utils/spinner.js";
-
-const MARKDOWN_MIME = "text/x-markdown";
 
 export const wikiPageEditCommand = new Command("edit")
   .description("위키 페이지 수정 (플래그 없으면 $EDITOR)")
@@ -19,6 +17,10 @@ export const wikiPageEditCommand = new Command("edit")
   .option("--title <title>", "페이지 제목 (지정 시 $EDITOR 생략)")
   .option("--body <text>", "본문 텍스트 (- 입력 시 stdin에서 읽기)")
   .option("--body-file <path>", "본문 파일 경로 (- 입력 시 stdin에서 읽기)")
+  .addOption(
+    new Option("--mime-type <type>", "본문 형식 (미지정 시 기존 페이지의 형식 유지)")
+      .choices(BODY_MIME_TYPES),
+  )
   .action(async (project, pageId, opts) => {
     const config = await getConfigOrThrow();
     const client = new DoorayApiClient(config.apiKey, config.baseUrl);
@@ -50,7 +52,10 @@ export const wikiPageEditCommand = new Command("edit")
       startSpinner("위키 페이지 수정 중...");
       await client.updateWikiPage(wikiId, pageId, {
         subject: parsed.title,
-        body: { mimeType: page.body?.mimeType ?? MARKDOWN_MIME, content: parsed.body },
+        body: {
+          mimeType: resolveBodyMimeType(page.body?.mimeType, opts.mimeType),
+          content: parsed.body,
+        },
       });
       stopSpinner(true, "위키 페이지 수정 완료");
       process.stdout.write(`위키 페이지가 수정되었습니다: ${pageId}\n`);
@@ -61,12 +66,13 @@ export const wikiPageEditCommand = new Command("edit")
     stopSpinner(true, "위키 정보 조회 완료");
 
     // 기존 mimeType 보존용 조회. $EDITOR flow 와 달리 원본을 들고 있지 않아
-    // 본문을 바꿀 때만 한 번 더 조회한다 (제목만 수정하면 조회 없음).
-    let bodyMimeType = MARKDOWN_MIME;
-    if (hasBody) {
+    // 본문을 바꿀 때만 한 번 더 조회한다 (제목만 수정하거나 --mime-type 으로
+    // 형식을 직접 지정하면 조회 불요).
+    let bodyMimeType = resolveBodyMimeType(undefined, opts.mimeType);
+    if (hasBody && opts.mimeType == null) {
       startSpinner("위키 페이지 조회 중...");
       const res = await client.getWikiPage(wikiId, pageId);
-      bodyMimeType = res.result.body?.mimeType ?? MARKDOWN_MIME;
+      bodyMimeType = resolveBodyMimeType(res.result.body?.mimeType);
       stopSpinner(true, "위키 페이지 조회 완료");
     }
 

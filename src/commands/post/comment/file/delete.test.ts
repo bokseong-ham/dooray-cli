@@ -113,3 +113,19 @@ describe("post comment file delete mimeType 보존", () => {
     stdout.mockRestore();
   });
 });
+
+describe("post comment file delete mimeType 폴백", () => {
+  it("body.mimeType 이 없으면 text/x-markdown 으로 나간다", async () => {
+    mocks.client.getPostComment.mockResolvedValue({
+      result: { id: "comment-1", body: { content: "기존" } },
+    });
+    const program = await createCommandTree();
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await program.parseAsync(args);
+
+    const request = mocks.client.updatePostComment.mock.calls[0]?.[3];
+    expect(request.body.mimeType).toBe("text/x-markdown");
+    stdout.mockRestore();
+  });
+});

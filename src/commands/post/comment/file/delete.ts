@@ -9,6 +9,7 @@ import { startSpinner, stopSpinner } from "../../../../utils/spinner.js";
 import { DoorayCliError } from "../../../../utils/errors.js";
 import { EXIT_API_ERROR } from "../../../../utils/exit-codes.js";
 import { removeFileReference } from "../../../../utils/comment-files.js";
+import { resolveBodyMimeType } from "../../../../utils/body-input.js";
 import {
   authorizeDeletion,
   promptDeletion,
@@ -60,7 +61,7 @@ export const deleteCommentFileCommand = new Command("delete")
       const currentBody = commentRes.result.body.content;
       const newBody = removeFileReference(currentBody, fileId);
       await client.updatePostComment(projectId, postId, commentId, {
-        body: { mimeType: commentRes.result.body.mimeType, content: newBody },
+        body: { mimeType: resolveBodyMimeType(commentRes.result.body.mimeType), content: newBody },
       });
       stopSpinner(true, "reference 제거 완료");
     } catch {
