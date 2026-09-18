@@ -19,7 +19,7 @@ import {
   parsePostFrontmatter,
 } from "../../editor/index.js";
 import { startSpinner, stopSpinner } from "../../utils/spinner.js";
-import { readBodyInputOrNull, BODY_MIME_TYPES, resolveBodyMimeType } from "../../utils/body-input.js";
+import { readBodyInputOrNull, BODY_MIME_TYPES, resolveBodyMimeType, warnUnconvertedBody } from "../../utils/body-input.js";
 import { checkAndGuardDropped } from "../../utils/attachment-check.js";
 import type { CreatePostUser } from "../../api/types.js";
 
@@ -176,6 +176,8 @@ export const postEditCommand = new Command("edit")
         finalTagIds = mergeTagIds(existingTagIds, additionIds, removalIds, !!opts.tagClear);
         await validateMandatoryCoverage(client, projectId, finalTagIds);
       }
+
+      warnUnconvertedBody(post.body.mimeType, opts.mimeType, newBody != null);
 
       if (opts.dryRun) {
         stopSpinner(false);

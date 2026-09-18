@@ -4,7 +4,7 @@ import { DoorayApiClient } from "../../../api/client.js";
 import { resolvePostInput } from "../../../resolvers/post-input.js";
 import { openInEditor } from "../../../editor/index.js";
 import { startSpinner, stopSpinner } from "../../../utils/spinner.js";
-import { readBodyInputOrNull, BODY_MIME_TYPES, resolveBodyMimeType } from "../../../utils/body-input.js";
+import { readBodyInputOrNull, BODY_MIME_TYPES, resolveBodyMimeType, warnUnconvertedBody } from "../../../utils/body-input.js";
 import { DoorayCliError } from "../../../utils/errors.js";
 import { EXIT_PARAM_ERROR } from "../../../utils/exit-codes.js";
 import type { OutputOptions } from "../../../formatters/table.js";
@@ -139,6 +139,7 @@ export const commentEditCommand = new Command("edit")
     }
 
     let edited = await readBodyInputOrNull(opts);
+    warnUnconvertedBody(comment.body.mimeType, opts.mimeType, edited != null);
 
     if (edited == null && opts.mimeType != null) {
       // --mime-type 단독 지정: 본문은 그대로 두고 형식만 바꾼다.

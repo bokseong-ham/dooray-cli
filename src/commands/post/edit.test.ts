@@ -405,6 +405,62 @@ describe("post edit --mime-type", () => {
     stdout.mockRestore();
   });
 
+  it("본문을 바꾸지 않고 형식만 바꾸면 stderr 로 경고한다", async () => {
+    mocks.client.getPost.mockResolvedValue({ result: htmlPost });
+    mocks.readBodyInputOrNull.mockResolvedValue(null);
+    const program = await createCommandTree();
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    let stderrOutput = "";
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+      stderrOutput += String(chunk);
+      return true;
+    });
+
+    await program.parseAsync([
+      "node",
+      "dooray",
+      "post",
+      "edit",
+      "--id",
+      "post-1",
+      "--mime-type",
+      "text/x-markdown",
+    ]);
+
+    expect(stderrOutput).toContain("본문을 변환하지 않으므로");
+    stdout.mockRestore();
+    stderr.mockRestore();
+  });
+
+  it("본문을 함께 바꾸면 경고하지 않는다", async () => {
+    mocks.client.getPost.mockResolvedValue({ result: htmlPost });
+    mocks.readBodyInputOrNull.mockResolvedValue("# 마크다운 본문");
+    const program = await createCommandTree();
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    let stderrOutput = "";
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+      stderrOutput += String(chunk);
+      return true;
+    });
+
+    await program.parseAsync([
+      "node",
+      "dooray",
+      "post",
+      "edit",
+      "--id",
+      "post-1",
+      "--body",
+      "# 마크다운 본문",
+      "--mime-type",
+      "text/x-markdown",
+    ]);
+
+    expect(stderrOutput).toBe("");
+    stdout.mockRestore();
+    stderr.mockRestore();
+  });
+
   it("단독 지정하면 $EDITOR 없이 기존 본문을 그대로 두고 형식만 바꾼다", async () => {
     mocks.client.getPost.mockResolvedValue({ result: htmlPost });
     mocks.readBodyInputOrNull.mockResolvedValue(null);

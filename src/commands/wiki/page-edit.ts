@@ -7,7 +7,7 @@ import {
   serializeWikiFrontmatter,
   parseWikiFrontmatter,
 } from "../../editor/index.js";
-import { readBodyInput, BODY_MIME_TYPES, resolveBodyMimeType } from "../../utils/body-input.js";
+import { readBodyInput, BODY_MIME_TYPES, resolveBodyMimeType, warnUnconvertedBody } from "../../utils/body-input.js";
 import { startSpinner, stopSpinner } from "../../utils/spinner.js";
 import { DoorayCliError } from "../../utils/errors.js";
 import { EXIT_PARAM_ERROR } from "../../utils/exit-codes.js";
@@ -86,6 +86,7 @@ export const wikiPageEditCommand = new Command("edit")
     }
 
     const bodyMimeType = resolveBodyMimeType(existingMimeType, opts.mimeType);
+    warnUnconvertedBody(existingMimeType, opts.mimeType, hasBody);
     // --mime-type 단독일 때는 기존 본문을 그대로 다시 보낸다.
     const bodyContent = hasBody ? await readBodyInput(opts) : existingContent;
 

@@ -33,6 +33,25 @@ export function resolveBodyMimeType(
 }
 
 /**
+ * 본문은 그대로인데 `--mime-type` 이 형식만 바꾸는 경우 stderr 로 알린다.
+ *
+ * CLI 는 본문을 변환하지 않는다. 마크다운 본문을 `text/html` 로만 바꾸면
+ * 웹에서 `## 제목` 과 표 구분자가 문자 그대로 보인다.
+ * 형식만 되돌리려는 의도일 수도 있어 막지 않고 알리기만 한다.
+ */
+export function warnUnconvertedBody(
+  existing: string | undefined,
+  override: string | undefined,
+  bodyChanged: boolean,
+): void {
+  if (override == null || bodyChanged) return;
+  if (resolveBodyMimeType(existing) === override) return;
+  process.stderr.write(
+    `⚠  본문은 그대로 두고 형식만 ${override} 으로 바꿉니다. CLI 는 본문을 변환하지 않으므로 내용이 새 형식에 맞지 않으면 렌더링이 깨집니다.\n`,
+  );
+}
+
+/**
  * `--body` / `--body-file` 옵션을 받아 본문 문자열을 돌려준다.
  *
  * - 둘 중 하나만 지정 가능. 동시 지정 시 에러.
