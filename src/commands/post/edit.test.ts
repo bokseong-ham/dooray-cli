@@ -381,9 +381,33 @@ describe("post edit --mime-type", () => {
     stdout.mockRestore();
   });
 
-  it("$EDITOR 경로에서도 지정한 값이 나간다", async () => {
+  it("$EDITOR 경로에서 본문을 고치면 지정한 값이 나간다", async () => {
     mocks.client.getPost.mockResolvedValue({ result: htmlPost });
     mocks.openInEditor.mockImplementation(async (original: string) => original + "\n추가");
+    const program = await createCommandTree();
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await program.parseAsync([
+      "node",
+      "dooray",
+      "post",
+      "edit",
+      "--id",
+      "post-1",
+      "--body",
+      "새 본문",
+      "--mime-type",
+      "text/x-markdown",
+    ]);
+
+    const request = mocks.client.updatePost.mock.calls[0]?.[2];
+    expect(request.body.mimeType).toBe("text/x-markdown");
+    stdout.mockRestore();
+  });
+
+  it("단독 지정하면 $EDITOR 없이 기존 본문을 그대로 두고 형식만 바꾼다", async () => {
+    mocks.client.getPost.mockResolvedValue({ result: htmlPost });
+    mocks.readBodyInputOrNull.mockResolvedValue(null);
     const program = await createCommandTree();
     const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
 
@@ -398,8 +422,12 @@ describe("post edit --mime-type", () => {
       "text/x-markdown",
     ]);
 
+    expect(mocks.openInEditor).not.toHaveBeenCalled();
     const request = mocks.client.updatePost.mock.calls[0]?.[2];
-    expect(request.body.mimeType).toBe("text/x-markdown");
+    expect(request.body).toEqual({
+      mimeType: "text/x-markdown",
+      content: "<p>기존 본문</p>",
+    });
     stdout.mockRestore();
   });
 

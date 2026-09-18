@@ -140,6 +140,13 @@ export const commentEditCommand = new Command("edit")
 
     let edited = await readBodyInputOrNull(opts);
 
+    if (edited == null && opts.mimeType != null) {
+      // --mime-type 단독 지정: 본문은 그대로 두고 형식만 바꾼다.
+      // $EDITOR 를 열면 비대화형 환경에서 쓸 수 없고, 열려도 본문이 그대로면
+      // "변경사항 없음" 으로 끝나 형식을 되돌릴 수단이 없다.
+      edited = comment.body.content;
+    }
+
     if (edited == null) {
       // Interactive mode: $EDITOR
       const rawContent = comment.body.content;

@@ -182,6 +182,24 @@ describe("post comment edit --mime-type", () => {
     stdout.mockRestore();
   });
 
+  it("단독 지정하면 $EDITOR 없이 기존 본문을 그대로 두고 형식만 바꾼다", async () => {
+    mocks.client.getPostComments.mockResolvedValue({ result: [comment("text/html")] });
+    mocks.readBodyInputOrNull.mockResolvedValue(null);
+    const program = await createCommandTree();
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await program.parseAsync([...baseArgs, "--mime-type", "text/x-markdown"]);
+
+    expect(mocks.openInEditor).not.toHaveBeenCalled();
+    expect(mocks.client.updatePostComment).toHaveBeenCalledWith(
+      "project-1",
+      "post-1",
+      "comment-1",
+      { body: { mimeType: "text/x-markdown", content: "기존 댓글" } },
+    );
+    stdout.mockRestore();
+  });
+
   it("--dry-run 미리보기에 지정한 형식이 나온다", async () => {
     mocks.client.getPostComments.mockResolvedValue({ result: [comment("text/x-markdown")] });
     const program = await createCommandTree();

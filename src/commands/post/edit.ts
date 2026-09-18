@@ -104,7 +104,11 @@ export const postEditCommand = new Command("edit")
 
     const bodyMimeType = resolveBodyMimeType(post.body.mimeType, opts.mimeType);
 
-    const nonInteractive = title || opts.body || opts.bodyFile || hasTagChange || hasParticipantChange;
+    // --mime-type 단독도 비대화형이다. $EDITOR 를 열면 비대화형 환경에서 쓸 수
+    // 없고, 열려도 본문이 그대로면 "변경사항 없음" 으로 끝나 형식을 되돌릴
+    // 수단이 없다. 본문은 기존 content 를 그대로 다시 보낸다.
+    const nonInteractive = title || opts.body || opts.bodyFile || hasTagChange
+      || hasParticipantChange || opts.mimeType != null;
 
     if (nonInteractive) {
       // Non-interactive mode: apply only specified changes
