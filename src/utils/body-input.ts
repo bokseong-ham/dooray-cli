@@ -19,13 +19,17 @@ export const BODY_MIME_TYPES = [MARKDOWN_MIME, HTML_MIME];
  *
  * - `override`(`--mime-type`)가 있으면 그 값
  * - 없으면 기존 글의 mimeType 보존
- * - 기존 값도 없으면 markdown 폴백 (목록 엔드포인트 응답 등 누락 대비)
+ * - 기존 값이 없거나 빈 문자열이면 markdown 폴백
+ *
+ * 빈 문자열을 폴백으로 넘기는 이유는, 그대로 채택하면 `mimeType: ""` 이
+ * 요청에 실려 나가기 때문이다. 타입상 `mimeType` 은 필수 `string` 이라
+ * 이 폴백이 발동하는 것은 응답이 타입 선언과 어긋났다는 뜻이다.
  */
 export function resolveBodyMimeType(
   existing: string | undefined,
   override?: string,
 ): string {
-  return override ?? existing ?? MARKDOWN_MIME;
+  return override ?? (existing || undefined) ?? MARKDOWN_MIME;
 }
 
 /**
