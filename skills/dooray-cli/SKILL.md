@@ -112,9 +112,31 @@ NHN Dooray REST API 를 래핑한 CLI 다. 이 파일은 라우터이므로, 작
 | 업무 상세 | `dooray post get <project> <number>` 또는 `dooray post get --id <postId>` |
 | 업무 생성 | `dooray post create <project> --title "..." [--body "..." \| --body-file <path>]` — 담당자는 `--to <name\|email>`, 참조자는 `--cc`, 둘 다 여러 명 가능 |
 | 템플릿으로 생성 | `dooray post create <project> --template <name\|id>` — 본문·담당자·태그가 채워지고 사용자 옵션이 우선한다 |
-| 제목·본문 수정 | `dooray post edit <project> <number> --title "..." --body "..."` |
+| 제목·본문 수정 | `dooray post edit <project> <number> --title "..." --body "..."` — 본문 형식이 기존과 다르면 `--mime-type` 을 함께 준다 |
 | 완료 처리 | `dooray post done <project> <number>` |
 | 워크플로우 변경 | `dooray post workflow <project> <number> <workflow>` |
+
+## 본문 형식
+
+업무와 댓글과 위키 페이지는 본문 형식이 `text/x-markdown` 이거나 `text/html` 이다.
+`dooray post get ... --json` 의 `body.mimeType` 으로 확인한다.
+
+`post edit`, `post comment edit`, `wiki page edit` 는 수정할 때 기존 형식을 그대로 유지한다.
+그래서 **주는 본문의 형식이 기존과 다르면 `--mime-type` 을 반드시 함께 준다.**
+빠뜨리면 마크다운 본문이 `text/html` 로 저장되어 웹에서 `## 제목` 과 표 구분자가 문자 그대로 보인다.
+
+```bash
+dooray post get <project> 42 --json | jq .body.mimeType    # "text/html"
+
+# HTML 글에 마크다운 본문을 넣을 때
+dooray post edit <project> 42 --body-file notes.md --mime-type text/x-markdown
+
+# 본문은 그대로 두고 형식만 되돌릴 때
+dooray post edit <project> 42 --mime-type text/html
+```
+
+값은 `text/x-markdown` 과 `text/html` 둘뿐이고 다른 값은 거부된다.
+본문을 바꾸지 않고 형식만 바꾸면 CLI 가 본문을 변환하지 않는다는 경고를 stderr 로 낸다.
 
 ## 업무 메타 변경
 
@@ -142,7 +164,7 @@ NHN Dooray REST API 를 래핑한 CLI 다. 이 파일은 라우터이므로, 작
 | 최신 댓글 | `dooray post comment latest <project> <number>` (`-n <N>` 으로 개수 지정) |
 | 단일 댓글 | `dooray post comment get <project> <number> <comment-id>` |
 | 댓글 추가 | `dooray post comment add <project> <number> --body "..."` |
-| 댓글 수정 | `dooray post comment edit <project> <number> <comment-id> --body "..."` |
+| 댓글 수정 | `dooray post comment edit <project> <number> <comment-id> --body "..."` — 본문 형식이 기존과 다르면 `--mime-type` 을 함께 준다 |
 | 댓글 삭제 | `dooray post comment delete <project> <number> <comment-id>` — 확인 있음, `-y`/`--yes`로 생략 |
 
 내부 ID 를 positional 자리에 넣으면 입력 오류가 나지만, 그 오류가 `--id` 를 쓴 완성 명령을 그대로 보여준다.
@@ -185,7 +207,7 @@ NHN Dooray REST API 를 래핑한 CLI 다. 이 파일은 라우터이므로, 작
 | 페이지 ID 로 바로 조회 | `wiki page file`, `wiki page comment`, `wiki page delete` 도 `--id` 만으로 동작한다 |
 | 페이지 생성 | `dooray wiki page create <project> --title "..." [--parent <page-id>] [--body "..."]` — `--parent` 를 생략하면 위키 home 아래에 만든다 |
 | 페이지 제목 수정 | `dooray wiki page edit <project> <page-id> --title "..."` |
-| 페이지 본문 수정 | `dooray wiki page edit <project> <page-id> --body "..."` 또는 `--body-file ./new.md` |
+| 페이지 본문 수정 | `dooray wiki page edit <project> <page-id> --body "..."` 또는 `--body-file ./new.md` — 본문 형식이 기존과 다르면 `--mime-type` 을 함께 준다 |
 | 페이지 에디터로 수정 | `dooray wiki page edit <project> <page-id>` — 플래그가 없으면 `$EDITOR` 가 열린다 |
 | 페이지 이동 | `dooray wiki page move <project> <page-id> --parent <parent-page-id>` — `--parent` 는 필수다. 하위 페이지는 기본으로 함께 이동하고, `--no-children` 으로 페이지 하나만 옮긴다. `--to-wiki <project-or-wiki-id>` 로 다른 위키로 옮기며, `--first` 와 `--before <page-id>` 로 형제 사이 정렬을 바꾼다 |
 | 페이지 삭제 | `dooray wiki page delete <project> <page-id>` — 확인 있음, `-y`/`--yes`로 생략. 하위 페이지는 삭제한 페이지의 부모 아래로 재부착되어 orphan 이 생기지 않는다 |
