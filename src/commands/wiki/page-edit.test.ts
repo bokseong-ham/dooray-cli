@@ -250,9 +250,8 @@ describe("wiki page edit --mime-type", () => {
     stdout.mockRestore();
   });
 
-  it("$EDITOR 경로에서도 지정한 값이 기존 형식을 덮어쓴다", async () => {
+  it("단독 지정하면 $EDITOR 없이 기존 본문을 그대로 두고 형식만 바꾼다", async () => {
     mocks.client.getWikiPage.mockResolvedValue(page("text/html"));
-    mocks.openInEditor.mockImplementation(async (original: string) => original + "\n추가");
     const program = await createCommandTree();
     const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
 
@@ -267,8 +266,61 @@ describe("wiki page edit --mime-type", () => {
       "text/x-markdown",
     ]);
 
-    const request = mocks.client.updateWikiPage.mock.calls[0]?.[2];
-    expect(request.body.mimeType).toBe("text/x-markdown");
+    expect(mocks.openInEditor).not.toHaveBeenCalled();
+    expect(mocks.readBodyInput).not.toHaveBeenCalled();
+    expect(mocks.client.updateWikiPageContent).toHaveBeenCalledWith("wiki-1", "page-1", {
+      body: { mimeType: "text/x-markdown", content: "기존 본문" },
+    });
+    stdout.mockRestore();
+  });
+
+  it("--title 과 함께 단독 지정하면 제목과 형식을 함께 바꾸고 본문은 유지한다", async () => {
+    mocks.client.getWikiPage.mockResolvedValue(page("text/x-markdown"));
+    const program = await createCommandTree();
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await program.parseAsync([
+      "node",
+      "dooray",
+      "wiki",
+      "edit",
+      "my-wiki",
+      "page-1",
+      "--title",
+      "새 제목",
+      "--mime-type",
+      "text/html",
+    ]);
+
+    expect(mocks.openInEditor).not.toHaveBeenCalled();
+    expect(mocks.client.updateWikiPageTitle).not.toHaveBeenCalled();
+    expect(mocks.client.updateWikiPage).toHaveBeenCalledWith("wiki-1", "page-1", {
+      subject: "새 제목",
+      body: { mimeType: "text/html", content: "기존 본문" },
+    });
+    stdout.mockRestore();
+  });
+
+  it("본문이 없는 페이지에 단독 지정하면 파라미터 오류로 중단한다", async () => {
+    mocks.client.getWikiPage.mockResolvedValue(page());
+    const program = await createCommandTree();
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await expect(
+      program.parseAsync([
+        "node",
+        "dooray",
+        "wiki",
+        "edit",
+        "my-wiki",
+        "page-1",
+        "--mime-type",
+        "text/html",
+      ]),
+    ).rejects.toThrow(/본문이 없는 페이지/);
+
+    expect(mocks.client.updateWikiPage).not.toHaveBeenCalled();
+    expect(mocks.client.updateWikiPageContent).not.toHaveBeenCalled();
     stdout.mockRestore();
   });
 

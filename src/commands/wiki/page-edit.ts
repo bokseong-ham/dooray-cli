@@ -9,6 +9,8 @@ import {
 } from "../../editor/index.js";
 import { readBodyInput, BODY_MIME_TYPES, resolveBodyMimeType } from "../../utils/body-input.js";
 import { startSpinner, stopSpinner } from "../../utils/spinner.js";
+import { DoorayCliError } from "../../utils/errors.js";
+import { EXIT_PARAM_ERROR } from "../../utils/exit-codes.js";
 
 export const wikiPageEditCommand = new Command("edit")
   .description("위키 페이지 수정 (플래그 없으면 $EDITOR)")
@@ -18,7 +20,7 @@ export const wikiPageEditCommand = new Command("edit")
   .option("--body <text>", "본문 텍스트 (- 입력 시 stdin에서 읽기)")
   .option("--body-file <path>", "본문 파일 경로 (- 입력 시 stdin에서 읽기)")
   .addOption(
-    new Option("--mime-type <type>", "본문 형식 (미지정 시 기존 페이지의 형식 유지)")
+    new Option("--mime-type <type>", "본문 형식 (미지정 시 기존 페이지의 형식 유지, 단독 지정 시 본문은 그대로 두고 형식만 변경)")
       .choices(BODY_MIME_TYPES),
   )
   .action(async (project, pageId, opts) => {
@@ -27,7 +29,8 @@ export const wikiPageEditCommand = new Command("edit")
 
     const hasTitle = opts.title != null;
     const hasBody = opts.body != null || opts.bodyFile != null;
-    const nonInteractive = hasTitle || hasBody;
+    const hasMimeType = opts.mimeType != null;
+    const nonInteractive = hasTitle || hasBody || hasMimeType;
 
     // resolveWiki 먼저 호출 — $EDITOR flow와 순서 통일 (page-create와 비대칭은 의도적)
     startSpinner("위키 정보 조회 중...");
@@ -65,34 +68,48 @@ export const wikiPageEditCommand = new Command("edit")
     // 비대화형 분기
     stopSpinner(true, "위키 정보 조회 완료");
 
-    // 기존 mimeType 보존용 조회. $EDITOR flow 와 달리 원본을 들고 있지 않아
-    // 본문을 바꿀 때만 한 번 더 조회한다 (제목만 수정하거나 --mime-type 으로
-    // 형식을 직접 지정하면 조회 불요).
-    let bodyMimeType = resolveBodyMimeType(undefined, opts.mimeType);
-    if (hasBody && opts.mimeType == null) {
+    // $EDITOR flow 와 달리 원본을 들고 있지 않아 필요할 때만 한 번 더 조회한다.
+    // 조회가 필요한 경우는 둘이다.
+    // - 본문을 바꾸는데 --mime-type 이 없으면 보존할 형식을 알아야 한다
+    // - --mime-type 만 주면 함께 보낼 기존 본문을 알아야 한다. 형식만 바꾸는
+    //   엔드포인트가 없어 content 를 같이 실어야 하기 때문이다
+    // 제목만 수정하거나 본문과 --mime-type 을 함께 주면 조회하지 않는다.
+    const needsFetch = hasBody !== hasMimeType;
+    let existingMimeType: string | undefined;
+    let existingContent: string | undefined;
+    if (needsFetch) {
       startSpinner("위키 페이지 조회 중...");
       const res = await client.getWikiPage(wikiId, pageId);
-      bodyMimeType = resolveBodyMimeType(res.result.body?.mimeType);
+      existingMimeType = res.result.body?.mimeType;
+      existingContent = res.result.body?.content;
       stopSpinner(true, "위키 페이지 조회 완료");
     }
 
-    if (hasTitle && hasBody) {
-      const bodyContent = await readBodyInput(opts);
+    const bodyMimeType = resolveBodyMimeType(existingMimeType, opts.mimeType);
+    // --mime-type 단독일 때는 기존 본문을 그대로 다시 보낸다.
+    const bodyContent = hasBody ? await readBodyInput(opts) : existingContent;
+
+    if (hasMimeType && !hasBody && bodyContent == null) {
+      throw new DoorayCliError(
+        "본문이 없는 페이지는 --mime-type 만으로 형식을 바꿀 수 없습니다. --body 또는 --body-file 과 함께 사용해주세요.",
+        EXIT_PARAM_ERROR,
+      );
+    }
+
+    if (bodyContent != null && hasTitle) {
       startSpinner("위키 페이지 수정 중...");
       await client.updateWikiPage(wikiId, pageId, {
         subject: opts.title,
         body: { mimeType: bodyMimeType, content: bodyContent },
       });
-    } else if (hasTitle) {
-      startSpinner("위키 페이지 제목 수정 중...");
-      await client.updateWikiPageTitle(wikiId, pageId, { subject: opts.title });
-    } else {
-      // hasBody only
-      const bodyContent = await readBodyInput(opts);
+    } else if (bodyContent != null) {
       startSpinner("위키 페이지 본문 수정 중...");
       await client.updateWikiPageContent(wikiId, pageId, {
         body: { mimeType: bodyMimeType, content: bodyContent },
       });
+    } else {
+      startSpinner("위키 페이지 제목 수정 중...");
+      await client.updateWikiPageTitle(wikiId, pageId, { subject: opts.title });
     }
 
     stopSpinner(true, "위키 페이지 수정 완료");
