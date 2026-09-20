@@ -32,6 +32,7 @@ export const OK_DOMAINS = [
   "api.gov-dooray.co.kr",
   "api.gov-dooray.com",
   "b.example.com",
+  "blog.fosworld.co.kr",
   "claude.com",
   "cli.github.com",
   "dooray.com",
