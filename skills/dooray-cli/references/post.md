@@ -76,9 +76,11 @@ stderr 에 경고만 나가고 **종료 코드는 0** 이다. 워크플로우 �
 dooray post edit <project> <number> --cc-group dev-team        # 기존 유지 + 추가 (중복 제거)
 dooray post edit <project> <number> --cc-clear --cc 홍길동      # 기존 비우고 신규만
 dooray post edit <project> <number> --to 김철수 --to-group qa-team
+dooray post edit <project> <number> --to-clear --to 김철수          # 담당자를 비우고 신규만
 ```
 
 `--dry-run --json` 으로 API 호출 없이 결과를 먼저 볼 수 있다.
+미리보기에는 요청에 실릴 `mimeType` 도 들어 있다.
 
 ```bash
 dooray post edit --id "$POST_ID" --cc-group qa-team --dry-run --json | jq '.users.cc'
@@ -103,6 +105,11 @@ dooray post comment get <project> <number> <comment-id> --json | jq -r '.body.co
 ```
 
 첨부를 정말 떼려는 것이면 `--no-confirm` 으로 진행한다.
+
+본문 형식은 기존 값을 그대로 유지한다.
+`text/html` 업무에 마크다운을 주면 마크다운 원문이 그대로 저장되므로,
+주는 본문의 형식이 기존과 다르면 `--mime-type text/x-markdown` 처럼 함께 준다.
+`--mime-type` 만 단독으로 주면 본문은 그대로 두고 형식만 바꾼다.
 
 `comment file list`는 웹 UI 첨부와 CLI 업로드 링크를 함께 보여주고 `출처` 열로 구분한다.
 

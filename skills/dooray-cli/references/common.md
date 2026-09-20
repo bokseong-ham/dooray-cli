@@ -24,6 +24,8 @@ dooray doctor                                 # 설정 검증
 
 값 자리에 `-` 를 주면 stdin 에서 읽는다. 토큰을 명령 인자로 넘기지 않을 때 쓴다.
 
+저장된 값은 `dooray config get <key>` 로 확인한다. 키를 생략하면 전체를 낸다.
+
 ```bash
 printf '%s' "$TOKEN" | dooray config set api-key -
 ```
@@ -157,7 +159,8 @@ ls -R ~/.dooray/cache/
 캐시가 오래된 것 같으면:
 
 ```bash
-dooray cache clear   # 전체 캐시 삭제 (다음 실행 시 자동 갱신)
+dooray cache clear     # 전체 캐시 삭제 (다음 실행 시 자동 갱신)
+dooray cache refresh   # 같은 삭제를 하고 자동 갱신 예정임을 알린다
 ```
 
 지울 캐시가 없어도 종료 코드 0 으로 끝난다. 삭제에 실패하면 종료 코드 5 로 끝나므로

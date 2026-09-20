@@ -291,7 +291,7 @@ dooray post comment file delete my-project 42 <comment-id> <file-id>    # 삭제
 
 기존 업무의 참조자·담당자에 멤버 또는 그룹 추가/제거.
 자동화 시나리오: 신규 업무 생성 후 후속으로 특정 그룹을 참조에 첨부.
-참여자 옵션 하나만 지정해도 비대화형 수정으로 실행하며 `$EDITOR` 를 열지 않는다.
+참여자 옵션이나 `--mime-type` 하나만 지정해도 비대화형 수정으로 실행하며 `$EDITOR` 를 열지 않는다.
 이때 조회한 기존 제목과 본문을 `updatePost` 요청에 다시 사용하고, 태그 변경 옵션이 없으면 `tagIds` 를 보내지 않아 기존 태그를 보존한다.
 
 ```
@@ -633,6 +633,8 @@ dooray mail get <uid>                                   # 메일 상세
 
 dooray mail send --to "recipient@example.com" --subject "제목" --body "본문"
 dooray mail reply <uid> --body "답장 내용"              # 스레드 유지
+
+dooray mail logout                                      # 저장된 IMAP·SMTP 인증정보 제거
 ```
 
 `mail get` 과 `mail reply` 는 세 가지 입력을 받는다.

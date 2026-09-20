@@ -141,7 +141,7 @@ interface CachedMe {
 }
 ```
 
-### projects.json
+### projects.json / projects-private.json
 
 ```typescript
 interface CacheEntry<CachedProject[]> {
@@ -155,6 +155,8 @@ interface CachedProject {
   wikiId?: string; // project.wiki.id — WikiResolver에서 사용
 }
 ```
+
+개인 프로젝트 목록을 담는 `projects-private.json` 도 같은 shape 과 같은 TTL 을 쓴다.
 
 ### members/{projectId}.json
 
