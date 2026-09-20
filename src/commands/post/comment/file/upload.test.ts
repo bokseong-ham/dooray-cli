@@ -68,34 +68,54 @@ beforeEach(() => {
   mocks.client.updatePostComment.mockResolvedValue({});
 });
 
-describe("post comment file upload mimeType 보존", () => {
-  it("text/html 댓글에 업로드해도 본문 갱신이 text/html 로 나간다", async () => {
+const args = [
+  "node",
+  "dooray",
+  "post",
+  "comment",
+  "file",
+  "upload",
+  "--id",
+  "post-1",
+  "--comment-id",
+  "comment-1",
+  "--file",
+  "/tmp/report.txt",
+];
+
+describe("post comment file upload 본문 형식 판정", () => {
+  it("text/html 댓글은 파일을 올리기 전에 EXIT_PARAM_ERROR 로 거절한다", async () => {
     mocks.client.getPostComment.mockResolvedValue({
       result: { id: "comment-1", body: { mimeType: "text/html", content: "<p>기존</p>" } },
     });
     const program = await createCommandTree();
     const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
 
-    await program.parseAsync([
-      "node",
-      "dooray",
-      "post",
-      "comment",
-      "file",
-      "upload",
-      "--id",
-      "post-1",
-      "--comment-id",
-      "comment-1",
-      "--file",
-      "/tmp/report.txt",
-    ]);
+    await expect(program.parseAsync(args)).rejects.toMatchObject({ exitCode: 3 });
 
-    const request = mocks.client.updatePostComment.mock.calls[0]?.[3];
-    expect(request.body.mimeType).toBe("text/html");
+    expect(mocks.client.uploadPostFile).not.toHaveBeenCalled();
+    expect(mocks.client.updatePostComment).not.toHaveBeenCalled();
     stdout.mockRestore();
   });
 
+  it("댓글 조회는 업로드보다 앞서고 한 번만 부른다", async () => {
+    mocks.client.getPostComment.mockResolvedValue({
+      result: { id: "comment-1", body: { mimeType: "text/x-markdown", content: "기존" } },
+    });
+    const program = await createCommandTree();
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await program.parseAsync(args);
+
+    expect(mocks.client.getPostComment).toHaveBeenCalledOnce();
+    expect(
+      mocks.client.getPostComment.mock.invocationCallOrder[0],
+    ).toBeLessThan(mocks.client.uploadPostFile.mock.invocationCallOrder[0]);
+    stdout.mockRestore();
+  });
+});
+
+describe("post comment file upload mimeType 보존", () => {
   it("markdown 댓글은 그대로 text/x-markdown 으로 나간다", async () => {
     mocks.client.getPostComment.mockResolvedValue({
       result: { id: "comment-1", body: { mimeType: "text/x-markdown", content: "기존" } },

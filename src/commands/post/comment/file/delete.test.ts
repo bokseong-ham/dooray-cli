@@ -87,7 +87,7 @@ const args = [
 describe("post comment file delete mimeType 보존", () => {
   it("text/html 댓글의 reference 제거도 text/html 로 나간다", async () => {
     mocks.client.getPostComment.mockResolvedValue({
-      result: { id: "comment-1", body: { mimeType: "text/html", content: "<p>기존</p>" } },
+      result: { id: "comment-1", body: { mimeType: "text/html", content: "<p>기존</p>\n[x.pdf](/files/file-1)" } },
     });
     const program = await createCommandTree();
     const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
@@ -101,7 +101,7 @@ describe("post comment file delete mimeType 보존", () => {
 
   it("markdown 댓글은 그대로 text/x-markdown 으로 나간다", async () => {
     mocks.client.getPostComment.mockResolvedValue({
-      result: { id: "comment-1", body: { mimeType: "text/x-markdown", content: "기존" } },
+      result: { id: "comment-1", body: { mimeType: "text/x-markdown", content: "기존\n[x.pdf](/files/file-1)" } },
     });
     const program = await createCommandTree();
     const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
@@ -117,7 +117,7 @@ describe("post comment file delete mimeType 보존", () => {
 describe("post comment file delete mimeType 폴백", () => {
   it("body.mimeType 이 없으면 text/x-markdown 으로 나간다", async () => {
     mocks.client.getPostComment.mockResolvedValue({
-      result: { id: "comment-1", body: { content: "기존" } },
+      result: { id: "comment-1", body: { content: "기존\n[x.pdf](/files/file-1)" } },
     });
     const program = await createCommandTree();
     const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
@@ -126,6 +126,40 @@ describe("post comment file delete mimeType 폴백", () => {
 
     const request = mocks.client.updatePostComment.mock.calls[0]?.[3];
     expect(request.body.mimeType).toBe("text/x-markdown");
+    stdout.mockRestore();
+  });
+});
+
+describe("post comment file delete reference 를 찾지 못했을 때", () => {
+  it("파일을 지우지 않고 EXIT_PARAM_ERROR 로 멈춘다", async () => {
+    mocks.client.getPostComment.mockResolvedValue({
+      result: { id: "comment-1", body: { mimeType: "text/x-markdown", content: "참조 없음" } },
+    });
+    const program = await createCommandTree();
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await expect(program.parseAsync(args)).rejects.toMatchObject({ exitCode: 3 });
+
+    expect(mocks.client.updatePostComment).not.toHaveBeenCalled();
+    expect(mocks.client.deletePostFile).not.toHaveBeenCalled();
+    stdout.mockRestore();
+  });
+
+  it("찾으면 본문을 갱신하고 파일을 한 번 지운다", async () => {
+    mocks.client.getPostComment.mockResolvedValue({
+      result: {
+        id: "comment-1",
+        body: { mimeType: "text/x-markdown", content: "기존\n[x.pdf](/files/file-1)" },
+      },
+    });
+    const program = await createCommandTree();
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await program.parseAsync(args);
+
+    const request = mocks.client.updatePostComment.mock.calls[0]?.[3];
+    expect(request.body.content).toBe("기존\n");
+    expect(mocks.client.deletePostFile).toHaveBeenCalledOnce();
     stdout.mockRestore();
   });
 });
