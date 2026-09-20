@@ -67,12 +67,16 @@
 - [`docs/adr/`](https://github.com/jon890/dooray-cli/tree/main/docs/adr) — 기술적 결정 기록 (ADR, 파일 1개 = ADR 1개)
 
 **하네스 구조**
-- [`.claude/skills/planning/task-create.md`](https://github.com/jon890/dooray-cli/blob/main.claude/skills/planning/task-create.md) — Task/Phase 생성 가이드
-- [`.claude/skills/plan-and-build/run-phases.py`](https://github.com/jon890/dooray-cli/blob/main/.claude/skills/plan-and-build/run-phases.py) — Phase 순차 실행 스크립트
-- [`tasks/implement-dooray-cli/`](https://github.com/jon890/dooray-cli/tree/main/tasks/implement-dooray-cli) — v0.1.0 구현 시 실제 사용된 8개 Phase 파일
 
-**스킬**
-- [`.claude/skills/plan-and-build/SKILL.md`](https://github.com/jon890/dooray-cli/blob/main/.claude/skills/plan-and-build/SKILL.md) — 컨텍스트 빌딩 → 하네스 실행까지의 자동화 스킬
+아래 넷은 이 글이 다루는 시점의 하네스다.
+지금 저장소에는 없으므로 당시 커밋(`26260a4`) 으로 연결한다.
+스킬은 그 뒤 공용 저장소로 옮겼고 `plan-and-build` 는 쓰지 않게 되어 지웠으며,
+계획서는 구현이 끝난 뒤 정리했다.
+
+- [`.claude/skills/planning/task-create.md`](https://github.com/jon890/dooray-cli/blob/26260a4765cd7ac042c204a41b4875c540d9b31d/.claude/skills/planning/task-create.md) — Task/Phase 생성 가이드
+- [`.claude/skills/plan-and-build/run-phases.py`](https://github.com/jon890/dooray-cli/blob/26260a4765cd7ac042c204a41b4875c540d9b31d/.claude/skills/plan-and-build/run-phases.py) — Phase 순차 실행 스크립트
+- [`.claude/skills/plan-and-build/SKILL.md`](https://github.com/jon890/dooray-cli/blob/26260a4765cd7ac042c204a41b4875c540d9b31d/.claude/skills/plan-and-build/SKILL.md) — 컨텍스트 빌딩부터 하네스 실행까지의 자동화 스킬
+- [`tasks/implement-dooray-cli/`](https://github.com/jon890/dooray-cli/tree/26260a4765cd7ac042c204a41b4875c540d9b31d/tasks/implement-dooray-cli) — v0.1.0 구현에 실제로 쓴 8개 Phase 파일
 
 ---
 
