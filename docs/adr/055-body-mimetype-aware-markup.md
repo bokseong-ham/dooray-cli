@@ -58,3 +58,30 @@
 - **적용 범위**: `src/utils/mention.ts`, `src/utils/task-link.ts`, `src/utils/comment-files.ts` 와
   그 셋을 부르는 `src/commands/post/edit.ts`, `src/commands/post/comment/edit.ts`,
   `src/commands/post/comment/file/upload.ts`, `src/commands/post/comment/file/delete.ts`.
+
+**실측으로 확인한 것 (Issue #173, 2026-09):**
+
+| 무엇 | `text/html` 표기 | 근거 |
+| --- | --- | --- |
+| 멤버 멘션 | 확인하지 못했다 | 확인 못함 |
+| 그룹 멘션 | 확인하지 못했다 | 확인 못함 |
+| 업무 링크 | 확인하지 못했다 | 확인 못함 |
+| 첨부 reference | 확인하지 못했다 | 확인 못함 |
+
+공식 API 문서를 `browser-driver` 로 열어 본문 179215자를 검색했다.
+문서가 정의하는 것은 본문 `mimeType` 이 받는 값 둘(`text/html` 과 `text/x-markdown`)뿐이다.
+`dooray://` 와 `멘션` 과 `mention` 은 문서 전문에서 한 건도 나오지 않았다.
+`text/x-markdown` 쪽 표기도 문서에는 없다. 지금 CLI 가 쓰는 마크다운 표기는 실동작으로 굳은 것이다.
+
+웹 화면 실측은 하지 않았다. 실측하려면 실제 업무나 댓글에 멘션과 첨부를 넣어야 하는데,
+이 변경을 구현한 실행 환경이 실제 Dooray 업무를 수정하지 않는 조건이었다.
+표기를 다시 찾을 때는 `text/html` 본문을 가진 업무의 댓글을 웹 화면에서 만들고
+`dooray post comment list <project> <number> --json` 으로 `body.content` 를 읽는다.
+
+**넷이 모두 `확인 못함` 이므로 `text/html` 본문의 네 경로는 모두 거절한다.**
+`src/utils/body-markup.ts` 의 `HTML_SUPPORTED_KINDS` 가 그 목록을 코드에서 소유한다.
+표기를 확인하면 이 표를 고치고 그 목록에 종류를 더한다.
+
+**빼는 쪽은 거절하지 않는다.** `post comment file delete` 는 `text/html` 본문에서도
+마크다운 정규식으로 참조를 찾아 지운다. 이 결정 전의 CLI 가 `text/html` 댓글에
+마크다운 참조를 평문으로 남겼고, 거절하면 그것을 지울 방법이 CLI 에 없어진다.
