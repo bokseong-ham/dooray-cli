@@ -4,13 +4,13 @@ category: plan
 title: 통과할 수 없는 grep 검증 기대값
 triggers: [grep -c, grep -rl, 검증 기대값, wc -l, 사전 점검, critic REVISE]
 tool_catchable: false
-source: [plan059, Issue #154]
+source: [Issue #154]
 related: [numeric-guess-without-measurement]
 ---
 
 **증상**: phase 「검증」 절의 grep 기대값이 구조적으로 달성 불가라 executor 가 코드를 비틀거나 불일치를 보고하고 끝난다.
 
-plan059 에서 한 plan 안에 세 번 나왔다.
+Issue #154 의 계획서 하나에서 세 번 나왔다.
 
 - `grep -c "fetchAllWikis" src/commands/wiki/list.ts # = 1` — named import 한 줄과 호출부 한 줄이 있어 항상 2 다.
 `grep -c` 는 매칭된 **줄 수**를 센다. 등장 횟수가 아니다.
@@ -49,5 +49,5 @@ grep -nE '# *= *1$' tasks/*/phase-*.md
 - grep 둘 이상의 대상 경로가 겹치는가. 겹치면 합산 결과를 따로 적는다.
 - 호출부 수를 셀 때 import 만 있고 호출이 없는 파일을 세지 않았는가.
 
-**Why**: plan059 에서 critic 이 하나를 REVISE 사유로 잡았고, executor 둘이 나머지를 불일치로 보고했다.
+**Why**: Issue #154 에서 critic 이 하나를 REVISE 사유로 잡았고, executor 둘이 나머지를 불일치로 보고했다.
 기대값이 틀리면 executor 가 통과시키려고 자연스럽지 않은 코드를 쓰거나, 판정 근거 없이 phase 를 끝낸다.

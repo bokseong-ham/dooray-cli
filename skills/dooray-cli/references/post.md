@@ -76,9 +76,11 @@ stderr 에 경고만 나가고 **종료 코드는 0** 이다. 워크플로우 �
 dooray post edit <project> <number> --cc-group dev-team        # 기존 유지 + 추가 (중복 제거)
 dooray post edit <project> <number> --cc-clear --cc 홍길동      # 기존 비우고 신규만
 dooray post edit <project> <number> --to 김철수 --to-group qa-team
+dooray post edit <project> <number> --to-clear --to 김철수          # 담당자를 비우고 신규만
 ```
 
 `--dry-run --json` 으로 API 호출 없이 결과를 먼저 볼 수 있다.
+미리보기에는 요청에 실릴 `mimeType` 도 들어 있다.
 
 ```bash
 dooray post edit --id "$POST_ID" --cc-group qa-team --dry-run --json | jq '.users.cc'
@@ -103,6 +105,11 @@ dooray post comment get <project> <number> <comment-id> --json | jq -r '.body.co
 ```
 
 첨부를 정말 떼려는 것이면 `--no-confirm` 으로 진행한다.
+
+본문 형식은 기존 값을 그대로 유지한다.
+`text/html` 업무에 마크다운을 주면 마크다운 원문이 그대로 저장되므로,
+주는 본문의 형식이 기존과 다르면 `--mime-type text/x-markdown` 처럼 함께 준다.
+`--mime-type` 만 단독으로 주면 본문은 그대로 두고 형식만 바꾼다.
 
 `comment file list`는 웹 UI 첨부와 CLI 업로드 링크를 함께 보여주고 `출처` 열로 구분한다.
 
@@ -151,7 +158,9 @@ CHILD_ID=$(dooray post create <project> --title "subtask A" --json | jq -r '.id'
 dooray post edit --id "$CHILD_ID" --title "subtask A" --parent <project>/<parent-number>
 ```
 
-`--parent` 를 쓸 때 `--title` 이 필수다. 제목을 바꾸지 않으려면 원래 제목을 그대로 넣는다.
+`--parent` 는 단독으로 동작하지 않는다. `--title`, `--body`, `--body-file`, `--tag` 계열,
+참조자와 담당자 변경 옵션, `--mime-type` 중 하나를 함께 줘야 비대화형 수정으로 들어간다.
+아무것도 바꾸지 않으려면 원래 제목을 `--title` 에 그대로 넣는다.
 parent 해제는 API 가 지원하지 않아 CLI 로 할 수 없다. 웹 UI 에서 처리한다.
 계층 구조는 두 단계를 넘지 못한다. 상위업무를 가진 하위업무를 상위 업무로 설정할 수 없고,
 그 조건에서 `--parent` 를 쓰면 실패한다.

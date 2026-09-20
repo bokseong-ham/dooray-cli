@@ -242,7 +242,8 @@ THREAD=$(dooray messenger thread-send --channel "배포알림" --body "v1.2.3 �
 dooray messenger channel-send --channel "$THREAD" --body "테스트 통과"
 ```
 
-`--thread-body` 로 스레드 첫 메시지를 함께 보낼 수 있고, 생략하면 스레드만 열린다.
+`--thread-body` 로 스레드 첫 메시지를 함께 보낼 수 있고, 파일로 주려면 `--thread-body-file <path>` 를 쓴다.
+둘 다 생략하면 스레드만 열린다.
 
 이미 올라간 메시지에 스레드를 열려면 그 메시지의 log-id 를 `--log` 로 준다.
 
@@ -280,6 +281,9 @@ src/
 | [docs/data-schema.md](docs/data-schema.md) | 캐시 구조와 TTL |
 | [docs/adr/INDEX.md](docs/adr/INDEX.md) | 기술 의사결정 기록 |
 
+이 저장소를 AI 에이전트로 만든 과정은
+[AI 에이전트와 함께 MVP 만들기](https://blog.fosworld.co.kr/posts/AI/practice/mvp-with-ai-agent.md) 에 있다.
+
 ## 기여하기
 
 이슈와 PR 모두 환영한다.
@@ -313,7 +317,7 @@ npm link                    # dooray 명령으로 실행
 새 설정 값이 필요하면 `src/config/` 의 스키마와 `config set` 처리에 키를 추가한다.
 
 Dooray API 의 동작이 문서와 다르거나 직관에 반하면 [docs/adr/](docs/adr/) 에 기록한다.
-파일 업로드의 307 리다이렉트나 multipart 필드 순서처럼, 모르고 접근하면 다시 막히는 것들이 이미 32건 쌓여 있다.
+파일 업로드의 307 리다이렉트나 multipart 필드 순서처럼, 모르고 접근하면 다시 막히는 것들이 여러 건 쌓여 있다.
 
 ### PR 을 낼 때
 

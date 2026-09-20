@@ -51,9 +51,9 @@
 
 ### 공개 문서 내부 참조 제거
 
-규칙은 `CLAUDE.md` "공개 문서(README · 공개 SKILL)" 절이 소유한다.
+규칙은 `CLAUDE.md` "공개 문서의 내부 참조 번호 제외" 절이 소유한다.
 검사는 `scripts/check-public-refs.mjs` 가 소유한다.
-planning 에서는 README 와 `skills/` 를 손대는 phase 마다 그 grep 을 통과시킨다.
+planning 에서는 README 와 `skills/` 를 손대는 phase 마다 그 스크립트를 통과시킨다.
 
 ## 검증
 

@@ -4,7 +4,7 @@ category: code-review
 title: src/ 테스트 fixture·에러 메시지의 사내 식별자
 triggers: [PII, 사내 식별자, 테스트 fixture, placeholder]
 tool_catchable: false
-source: [code-review 8-1, PR #84, plan041]
+source: [code-review 8-1, PR #84]
 related: []
 ---
 
@@ -27,4 +27,4 @@ grep -rnE "[0-9]{15,}" src/ | grep -vE "1234567890123456789|9876543210987654321"
 
 **Self-check**: 새 테스트/에러 메시지에 식별자를 넣을 때 실제 사내 값 대신 placeholder/dummy 를 썼는가? src 도 PII 대상임을 인지했는가?
 
-**Why**: PR #84 (plan041) — claude bot 이 🔴 로 지적. 우리 code-reviewer 는 src 를 PII 범위 밖으로 PASS. CLAUDE.md PII 정책 대상에 src 가 빠져 있던 게 원인 (이후 정책에 src 테스트 fixture 추가).
+**Why**: PR #84 — claude bot 이 🔴 로 지적. 우리 code-reviewer 는 src 를 PII 범위 밖으로 PASS. CLAUDE.md PII 정책 대상에 src 가 빠져 있던 게 원인 (이후 정책에 src 테스트 fixture 추가).

@@ -4,7 +4,7 @@ category: code-review
 title: validation 전에 spinner 시작 (param 에러 시 spinner leak)
 triggers: [startSpinner, resolve*Input, spinner 순서, param 검증]
 tool_catchable: false
-source: [code-review 1-1, PR #47, plan025]
+source: [code-review 1-1, PR #47]
 related: []
 ---
 
@@ -20,4 +20,4 @@ for f in src/commands/<scope>/*.ts; do
 done
 ```
 
-**Why**: plan025 PR #47 — `comment/file/list.ts` 만 4 명령 중 spinner 가 헬퍼 앞에 있어 회귀.
+**Why**: PR #47 — `comment/file/list.ts` 만 4 명령 중 spinner 가 헬퍼 앞에 있어 회귀.

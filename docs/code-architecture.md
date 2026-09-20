@@ -4,7 +4,7 @@
 
 | 역할            | 선택                                  |
 | --------------- | ------------------------------------- |
-| 언어            | TypeScript (Node 18+)                 |
+| 언어            | TypeScript (Node 20+)                 |
 | CLI 프레임워크  | Commander.js                          |
 | HTTP 클라이언트 | ky (fetch 기반, 경량)                 |
 | 빌드            | tsup (esbuild, 단일 번들)             |
@@ -22,12 +22,14 @@
 ```
 src/
   index.ts                  # CLI entrypoint, Commander 루트 설정
+  version.ts                # CLI_VERSION — tsup 이 빌드 때 주입하는 `__DOORAY_CLI_VERSION__` 를 읽고, 없으면 "0.0.0-dev"
 
   api/
     client.ts               # DoorayApiClient — ky 기반 HTTP 래퍼
     rate-limiter.ts         # 요청 토큰 버킷. 응답 헤더로 서버 잔량과 동기화 (ADR-039)
     imapClient.ts           # IMAP 메일 조회 (imapflow + mailparser). resolveUidByMailId — 도착 시각으로 UID 이분 탐색 (ADR-040)
     smtpClient.ts           # SMTP 메일 발송 (nodemailer)
+    mailErrors.ts           # IMAP·SMTP 예외를 DoorayCliError 로 변환. 인증 실패는 exitCode 2, 연결 실패는 exitCode 1
     messenger-thread-request.ts # 스레드 생성 요청 경로·body 를 만드는 순수 함수. --log 유무로 channels/{id}/threads/create-and-send 와 logs/{log-id}/threads/create-and-send 를 가른다 (ADR-052)
     types.ts                # 모든 API 요청/응답 타입
     json-large-integer.ts   # 응답 JSON 의 19자리 식별자가 손실되는 정수 리터럴만 문자열로 보존해 파싱 (ADR-051)
@@ -70,6 +72,7 @@ src/
     types.ts                # Config 인터페이스
 
   skill/
+    context.ts              # dataRoot 결정 — 절대 경로 XDG_DATA_HOME 우선, 없으면 homeDir/.local/share/dooray-cli
     manager.ts              # 설치 상태 판정 + 안전한 install/update + 활성 링크 전환
     manifest.ts             # 관리형 저장소 매니페스트 타입 가드 + 콘텐츠 SHA-256
 
@@ -89,7 +92,7 @@ src/
     errors.ts               # DoorayCliError (message + exitCode)
     spinner.ts              # ora 래퍼 + setQuiet (--json/--quiet 시 noop proxy 반환, Issue #35 item 1)
     exit-codes.ts           # 0 성공 / 1 API오류 / 2 인증실패 / 3 파라미터오류 / 4 설정오류
-    body-input.ts           # --body / --body-file → string (stdin "-" + 충돌 가드)
+    body-input.ts           # --body / --body-file → string (stdin "-" + 충돌 가드) + BODY_MIME_TYPES / resolveBodyMimeType / warnUnconvertedBody — --mime-type 의 우선순위와 경고를 한 곳에 둔다 (ADR-053)
     dooray-url.ts           # task URL (/task/to/<postId> + /task/<projectId>/<postId> + /project/tasks/<postId>) + wiki URL (/wiki/<wikiId>/<pageId>) parser (ADR-020)
     comment-enrich.ts       # PostComment[] Creator 이름 채우기 (ADR-021, immutable)
     mention.ts              # 멤버·그룹 멘션 마크업 빌더 + prependMentions (Issue #25)
@@ -104,6 +107,8 @@ src/
     format-size.ts          # 바이트 → B/KB/MB 표기, 값 없으면 "-" (file list 3 명령 공용)
     comment-file-merge.ts   # 댓글 files 와 본문 참조 합집합 + 업무 첨부 목록으로 이름·크기 보강 (ADR-024)
     delete-confirmation.ts  # 삭제 공통 확인 정책: -y/--yes 우회, TTY 기본 아니오, non-TTY 선차단 (ADR-036)
+    config-value.ts         # `config set <key> <value>` 의 값 확정 — "-" 는 stdin 에서 읽고 양끝 공백을 제거하며 빈 값은 에러
+    dooray-id.ts            # Dooray 식별자의 상위 비트에 담긴 생성 시각을 밀리초로 푼다 (BigInt, mail id → UID 조회에 사용)
 
   commands/
     setup.ts                # dooray setup — 대화형 초기 설정 마법사 (스킬 설치 포함)
@@ -111,6 +116,7 @@ src/
     config.ts               # dooray config set|get
     doctor.ts               # dooray doctor
     cache.ts                # dooray cache clear|refresh
+    feedback.ts             # dooray feedback — gh CLI 로 GitHub 이슈 생성 (ADR-022, --last 는 ADR-023)
     messenger/              # dooray messenger (ADR-033)
       index.ts              # messengerCommand 조립
       send.ts               # 1:1 DM — direct-send (--to id/email + body, resolveMember id/email 공유)
@@ -126,6 +132,7 @@ src/
       tags.ts                 # dooray project tags — 그룹 명령 조립 + list 동작 (인자 있는 기존 호출 호환)
       tags-create.ts          # dooray project tags create — 이름·color 정규화 후 services/tag 의 createTag 호출 (ADR-041, ADR-042)
       tags-group.ts           # dooray project tags group — mandatory/selectOne 현재값 병합 후 services/tag 의 updateTagGroup 호출 (ADR-041, ADR-042)
+      templates.ts            # dooray project templates — 프로젝트 템플릿 목록 조회 (resolvers/template 의 캐시 활용, ADR-027)
 
     member/
       index.ts              # member 서브커맨드 등록
@@ -138,7 +145,7 @@ src/
       search.ts
       get.ts
       create.ts
-      edit.ts               # $EDITOR 또는 제목·본문·태그·참조자·담당자 옵션 기반 비대화형 수정
+      edit.ts               # $EDITOR 또는 제목·본문·태그·참조자·담당자·--mime-type 옵션 기반 비대화형 수정
       done.ts
       workflow.ts
       comment/
@@ -146,7 +153,7 @@ src/
         latest.ts             # 최신 댓글 N개 단축 조회
         get.ts                # 단일 댓글 상세 (positional 3 / --id / --url + --comment-id, Issue #45)
         add.ts
-        edit.ts
+        edit.ts               # 댓글 수정 — --body / --body-file / $EDITOR fallback, --mime-type 단독 지정은 본문을 유지한 채 비대화형 수정
         delete.ts             # 댓글 삭제 (공통 confirm ADR-036)
         file/
           index.ts            # commentFileCommand 조립
@@ -167,7 +174,7 @@ src/
       tree.ts               # 페이지 계층 트리 (root 부터 레벨별 재귀 drill-down, --depth 상한, ADR-034) — text 트리 / --json flat(parentPageId)
       page-get.ts
       page-create.ts
-      page-edit.ts          # $EDITOR + 비대화형 플래그(--title/--body/--body-file)
+      page-edit.ts          # $EDITOR + 비대화형 플래그(--title/--body/--body-file/--mime-type)
       page-move.ts          # 부모 변경, 정렬 변경, 위키 간 이동을 공식 move endpoint 로 호출 (ADR-047)
       page-delete.ts        # 페이지 삭제 (공식 DELETE endpoint, ADR-032) — 공통 confirm ADR-036, resolveWikiPageInput
       page-file/
@@ -185,12 +192,14 @@ src/
         add.ts              # 댓글 추가 — --body / --body-file / $EDITOR fallback (post comment add mirror, mention 없음)
         edit.ts             # 댓글 수정 — --body / --body-file / $EDITOR fallback
         delete.ts           # 댓글 삭제 (공통 confirm ADR-036)
+        parse-args.ts       # page-comment 7 명령 공용 인자 분류 — positional 과 --id/--url 을 {wikiId, pageId, commentId} 로 나눈다
 
     mail/
       list.ts               # 메일 목록 (--unread, --search)
       get.ts                # 메일 상세 조회 (UID / 웹 주소 / mail id 입력 분기)
       send.ts               # 메일 발송 (--to, --cc, --bcc, --html)
       reply.ts              # 메일 답장 (In-Reply-To 스레드 유지, get.ts 와 입력 분기 공유)
+      logout.ts             # 저장된 메일 인증정보 제거 (공통 confirm ADR-036)
 ```
 
 ## 모듈 의존 관계
@@ -275,25 +284,34 @@ class DoorayApiClient {
 
 - vitest (코로케이션 `*.test.ts` 패턴 — 소스 옆에 테스트 배치)
 - `pnpm test` (단발) / `pnpm test:watch` (개발 중)
-- 현재 커버:
-  - `src/utils/dooray-url.ts` (URL parser)
-  - `src/resolvers/post-input.ts` (7-branch 분기, ADR-020)
-  - `src/resolvers/comment-file-input.ts` (option-mode/positional-mode 분기와 secondaryLabel 메시지 customization, plan025)
+- `pnpm test` 가 도는 테스트 파일은 68개다. 세 곳에 나뉘어 있다.
+  - `src/` 의 `*.test.ts` 62개. `api`, `cache`, `config`, `editor`, `formatters`, `resolvers`,
+    `services`, `skill`, `utils` 와 `commands` 의 mail·messenger·post·project·wiki 계열이 대상이다.
+  - `scripts/` 의 `*.test.mjs` 3개. 문서 검사 스크립트와 endpoint 목록 스크립트를 본다 (ADR-048).
+  - `skills/dooray-persona/scripts/lib/` 의 `*.test.mjs` 3개.
+- `vitest.config.ts` 가 `worktrees/**` 를 대상에서 뺀다. 그 아래는 git worktree 라 같은 테스트가 중복 수집된다.
 - 신규 도메인 헬퍼·복잡 분기는 vitest 단위 테스트 동반 권장 (ADR-020 도입 근거)
 
 ## 빌드·배포
 
 CLI 버전은 `package.json`을 단일 원천으로 삼고 `tsup` 빌드 시 번들에 주입한다.
-소스에 별도 버전 문자열을 두지 않으며, 빌드 검증에서 `dist/index.js --version`과 `package.json` 일치를 확인한다.
+`tsup.config.ts` 의 `define` 이 `package.json` 의 `version` 을 `__DOORAY_CLI_VERSION__` 로 심고,
+`src/version.ts` 가 그 값을 읽어 `CLI_VERSION` 으로 내보낸다.
+빌드하지 않고 소스를 직접 실행하면 그 값이 없으므로 `"0.0.0-dev"` 가 된다.
+빌드 검증에서 `dist/index.js --version` 과 `package.json` 일치를 확인한다.
+
+빌드 옵션은 `package.json` 의 스크립트 문자열이 아니라 `tsup.config.ts` 가 소유한다.
+`entry`, `format: ["cjs"]`, `target: "node18"`, `clean`, shebang banner,
+그리고 `imapflow`·`mailparser`·`nodemailer` 를 번들에서 빼는 `external` 이 거기 있다.
 
 ```json
 // package.json 핵심
 {
   "name": "@bifos/dooray-cli",
-  "bin": { "dooray": "./dist/index.js" },
-  "engines": { "node": ">=18" },
+  "bin": { "dooray": "dist/index.js" },
+  "engines": { "node": ">=20" },
   "scripts": {
-    "build": "tsup src/index.ts --format cjs --target node18 --banner.js '#!/usr/bin/env node'"
+    "build": "tsup"
   }
 }
 ```

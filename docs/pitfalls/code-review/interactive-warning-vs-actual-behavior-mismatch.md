@@ -4,7 +4,7 @@ category: code-review
 title: interactive 경고 vs 실제 동작 mismatch
 triggers: [무시됩니다, ignored, nonInteractive, 경고 텍스트]
 tool_catchable: false
-source: [code-review 4-1, PR #55, plan028]
+source: [code-review 4-1, PR #55]
 related: []
 ---
 
@@ -19,7 +19,7 @@ grep -B 3 -A 10 "무시됩니다\|ignored" src/commands/
 # 같은 옵션 grep 으로 nonInteractive 조건 외에서 사용되는지 확인
 ```
 
-**Why**: PR #55 (plan028) 🔴 — cc/to 옵션 경고와 실제 동작 불일치.
+**Why**: PR #55 🔴 — cc/to 옵션 경고와 실제 동작 불일치.
 
 **Self-check**: 경고 문구와 실제 코드 경로가 일치하는가?
 경고 옵션 이름이 `nonInteractive` 조건 안에만 있는지 grep 으로 확인했는가?

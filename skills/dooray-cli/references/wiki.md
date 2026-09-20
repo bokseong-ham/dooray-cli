@@ -8,8 +8,8 @@
 dooray wiki page get --id <page-id>
 ```
 
-같은 방식이 `wiki page` 하위 명령 전체에 통한다.
-`wiki page file`, `wiki page comment`, `wiki page delete` 도 `--id` 만으로 동작한다.
+`wiki page get`, `wiki page delete`, `wiki page move`, `wiki page file`, `wiki page comment` 가 `--id` 만으로 동작한다.
+`wiki page create` 와 `wiki page edit` 은 `--id` 를 받지 않고 `<project>` 가 필수다.
 
 `--project` 는 선택이다. 함께 주면 wikiId 를 해석하는 호출을 한 번 아낀다.
 반복 실행하는 자동화라면 함께 주는 편이 빠르다.
@@ -69,6 +69,7 @@ ${SNIPPET}"
 ```
 
 기존 본문을 먼저 받아 뒤에 이어 붙인다. `--body` 는 전체 교체이므로 snippet 만 넣으면 본문이 사라진다.
+`wiki page edit` 은 기존 본문 형식을 그대로 유지하므로, 주는 본문의 형식이 기존과 다르면 `--mime-type` 을 함께 준다.
 
 ## 첨부 일괄 내려받기
 

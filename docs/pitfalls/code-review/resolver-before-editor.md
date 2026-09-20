@@ -20,7 +20,7 @@ grep -B 5 "openInEditor\|readBodyInputOrNull" src/commands/ | grep -B 5 -A 1 "re
 # resolver 호출이 뒤에 있으면 의심
 ```
 
-**Why**: PR #74 (plan036) 와 PR #64 (plan031) 2회 반복.
+**Why**: PR #74 와 PR #64 2회 반복.
 add 명령군에서 특히 발생.
 
 **Self-check**: add / edit 명령 작성 시 resolver 호출 순서가 body 수집보다 앞인지 grep 으로 확인했는가?

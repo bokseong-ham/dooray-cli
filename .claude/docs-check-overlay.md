@@ -11,11 +11,12 @@ dooray-cli 의 6축 검증은 [.claude/docs-audit-axes.md](docs-audit-axes.md)�
 검토가 파일을 고치지 않는 것은 지시로 지키고, 실행 뒤 `git status` 로 확인한다.
 agent 파일은 없으므로 코어 `docs-check` 의 6축 절차와 `.claude/docs-audit-axes.md` 가 기본 경로다.
 
-## docs 구조 + 문서 목록
+## docs 구조와 문서 목록
 
 ```bash
 # cwd: <repo root>
-ls docs/*.md docs/adr/*.md .claude/skills/*/SKILL.md skills/*/SKILL.md skills/*/references/*.md
+ls docs/*.md docs/adr/*.md docs/api/* docs/pitfalls/**/*.md docs/retrospectives/*.md \
+   .claude/skills/*/SKILL.md skills/*/SKILL.md skills/*/references/*.md
 ```
 
 | 문서                                                         | 담당                                      |
@@ -25,6 +26,9 @@ ls docs/*.md docs/adr/*.md .claude/skills/*/SKILL.md skills/*/SKILL.md skills/*/
 | `docs/adr/` (ADR 1개 = 파일 1개, 목록은 `docs/adr/INDEX.md`) | 기술 의사결정·왜·대안 기각                |
 | `docs/data-schema.md`                                        | `~/.dooray/cache/` 구조·TTL·resolver 로직 |
 | `docs/code-architecture.md`                                  | 디렉터리 트리·레이어·API 전략             |
+| `docs/pitfalls/` (라우터는 `INDEX.md`)                          | 반복 실패 패턴 카탈로그                   |
+| `docs/retrospectives/` (색인은 `INDEX.md`, 실행 기록은 `RUNS.md`)  | plan 실행 회고                            |
+| `docs/api/official-endpoints.txt`                            | 공식 API endpoint 목록 (`pnpm api:inventory` 의 대조 기준) |
 | `CLAUDE.md`                                                  | 코드 작업 지침, 전 명령 공통 규약, 노출 금지 정책 |
 | `README.md` / `skills/dooray-cli/`                           | 사용자 가이드 (외부 facing)               |
 | `skills/dooray-persona/`                                     | 문체 페르소나 워크플로우 (외부 facing)    |

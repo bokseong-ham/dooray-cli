@@ -4,7 +4,7 @@ category: code-review
 title: 테스트 mock 의 reject value 가 production path 를 mirror 안 함
 triggers: [mockRejectedValue, DoorayCliError, production path, 테스트 mock]
 tool_catchable: false
-source: [code-review 2-3, PR #63, plan029]
+source: [code-review 2-3, PR #63]
 related: [exitcode-mapping-mismatch]
 ---
 
@@ -25,4 +25,4 @@ grep -rnE "mockRejectedValue\(new DoorayCliError" src/ test/
 
 **Self-check**: mock 의 reject value 를 작성할 때, "이 mock 이 흉내내려는 production 호출 경로에서 실제로 어떤 형태의 Error 가 던져지는가?" 를 코드로 직접 확인했는가 — 아니면 "에러면 그냥 Error 든 DoorayCliError 든 통과하니까" 로 임시값 넣었는가?
 
-**Why**: PR #63 (plan029) — 7/7 테스트 PASS 였지만 mock 이 production 동작 mirror 안 함. mock 만 보면 분기 코드 검증된 것처럼 보이지만 실제 path 는 dead. code-reviewer 가 production path (`toDoorayCliError`) 와 mock 의 exitCode 대조로 잡음. 2-2 와 짝 — 같은 사고가 코드와 테스트 양쪽에서 동시 발생.
+**Why**: PR #63 — 7/7 테스트 PASS 였지만 mock 이 production 동작 mirror 안 함. mock 만 보면 분기 코드 검증된 것처럼 보이지만 실제 path 는 dead. code-reviewer 가 production path (`toDoorayCliError`) 와 mock 의 exitCode 대조로 잡음. 2-2 와 짝 — 같은 사고가 코드와 테스트 양쪽에서 동시 발생.
