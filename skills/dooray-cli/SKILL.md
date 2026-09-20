@@ -108,8 +108,10 @@ NHN Dooray REST API 를 래핑한 CLI 다. 이 파일은 라우터이므로, 작
 | 의도 | 커맨드 |
 | --- | --- |
 | 업무 목록 | `dooray post list <project>` — `--all` 로 모든 페이지를 이어 받는다 |
+| 태그로 거르기 | `dooray post list <project> --tag "<이름>"` — 반복 가능하고, 여러 번 주면 그 태그를 모두 가진 업무만 온다 |
 | 업무 검색 | `dooray post search <project> "<keyword>"` — projectId(15자리 이상 numeric) 를 넣으면 캐시를 우회한다 |
-| 업무 상세 | `dooray post get <project> <number>` 또는 `dooray post get --id <postId>` |
+| 업무 상세 | `dooray post get <project> <number>` 또는 `dooray post get --id <postId>` — 일반 출력에는 태그가 이름으로 나온다 |
+| 태그 이름까지 받기 | `dooray post get <project> <number> --json --with-tag-names` — `--json` 의 `tags[]` 에 `name` 을 채운다. 하나라도 못 채우면 멈춘다 |
 | 업무 생성 | `dooray post create <project> --title "..." [--body "..." \| --body-file <path>]` — 담당자는 `--to <name\|email>`, 참조자는 `--cc`, 둘 다 여러 명 가능 |
 | 템플릿으로 생성 | `dooray post create <project> --template <name\|id>` — 본문·담당자·태그가 채워지고 사용자 옵션이 우선한다 |
 | 제목·본문 수정 | `dooray post edit <project> <number> --title "..." --body "..."` — 본문 형식이 기존과 다르면 `--mime-type` 을 함께 준다 |
@@ -152,6 +154,15 @@ dooray post edit <project> 42 --mime-type text/html
 | 태그 추가 | `dooray post edit --id <postId> --tag <name>` (반복 가능, 중복 제거) |
 | 태그 전체 교체 | `dooray post edit --id <postId> --tag-clear --tag <name>` |
 | 태그 제거 | `dooray post edit --id <postId> --tag-remove <name>` |
+
+태그를 붙인 뒤 들어갔는지 확인하려면 두 명령을 잇는다.
+
+```bash
+dooray post edit <project> <number> --tag "<이름>"
+dooray post get <project> <number> --json --with-tag-names
+```
+
+`--with-tag-names` 없이 `--json` 만 주면 응답이 그대로 나와 태그에 `id` 만 들어 있다.
 
 참조자·담당자 옵션만 지정하면 `$EDITOR`를 열지 않고 기존 제목·본문·태그를 보존한 채 참여자만 바꾼다.
 

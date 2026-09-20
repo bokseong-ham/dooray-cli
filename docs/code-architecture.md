@@ -42,7 +42,7 @@ src/
     post.ts                 # postNumber → postId (API 호출)
     wiki.ts                 # projectCode → wikiId / wikiId → homePageId (캐시). fetchAllWikis 가 size 100 씩 totalCount 까지 순회 (ADR-043)
     postRef.ts              # "code/number" 또는 raw postId → postId (post create / post edit --parent 공용)
-    tag.ts                  # name[] → tagIds + mandatory/selectOne 검증, 그룹 이름 → groupId (태그 목록의 tagGroup 에서 파생, ADR-041)
+    tag.ts                  # name[] → tagIds + mandatory/selectOne 검증, 그룹 이름 → groupId (태그 목록의 tagGroup 에서 파생, ADR-041). attachTagNames 로 업무 응답의 태그 id 에 캐시의 이름을 붙임 (ADR-056)
     milestone.ts            # name → milestoneId
     match.ts                # 공용 매칭: 정확일치 → 부분일치 → 모호 시 에러. helpHint 옵션 + name 가드 (ADR-028)
     post-input.ts           # --id / --url / positional / Dooray URL → {projectId, postId, ...} 단일 헬퍼 (ADR-020). 입력 토큰 타입 판별 (classifyPostInputToken) + 진입점별 검증 (ADR-020 보강)
@@ -141,9 +141,9 @@ src/
       search.ts             # dooray member search (org-wide, ad-hoc, 캐시 미사용)
 
     post/
-      list.ts
+      list.ts               # --tag <name> 반복 지정 → tagIds 필터 (여러 개면 모두 가진 업무, ADR-056)
       search.ts
-      get.ts
+      get.ts                # --with-tag-names 로 --json 의 tags[] 에 name 을 채움 (ADR-056)
       create.ts
       edit.ts               # $EDITOR 또는 제목·본문·태그·참조자·담당자·--mime-type 옵션 기반 비대화형 수정
       done.ts

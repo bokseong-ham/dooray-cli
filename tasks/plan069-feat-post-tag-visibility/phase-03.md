@@ -133,7 +133,7 @@ ADR 은 공개 문서가 아니므로 내부 참조 번호를 그대로 쓴다.
 
 ```bash
 # cwd: <repo root>
-bash ~/personal/fos-skills/korean-check/scripts/check.sh CLAUDE.md README.md docs/prd.md skills/dooray-cli/SKILL.md docs/flow.md docs/code-architecture.md
+bash ~/personal/fos-skills/korean-check/scripts/check.sh CLAUDE.md README.md docs/prd.md skills/dooray-cli/SKILL.md docs/code-architecture.md docs/adr/056-json-enrichment-behind-option.md
 ```
 
 지금 이 검사는 아래 하나로 종료 코드 1 이다.
@@ -154,6 +154,19 @@ grep -rn "PRD — dooray-cli" docs/ README.md CLAUDE.md .claude/
 
 범위 밖 파일을 고치려 하거나 검사를 건너뛰지 않는다.
 검사가 다른 위반을 새로 내면 그것은 이 plan 이 만든 것이므로 그 자리에서 고친다.
+
+`docs/flow.md` 는 이 검사에서 뺀다. 그 파일에는 엠대시 위반 12 건이 이미 있고
+모두 이 plan 이 손대기 전부터 있던 것이다. 아래로 확인할 수 있다.
+
+```bash
+# cwd: <repo root>
+git show HEAD:docs/flow.md > /tmp/flow-head.md
+bash ~/personal/fos-skills/korean-check/scripts/check.sh /tmp/flow-head.md
+```
+
+`docs/prd.md` 는 이 plan 이 MVP 범위 줄을 고치는 파일이라 함께 고쳤지만,
+`docs/flow.md` 는 예시 두 줄만 더하므로 12 건을 함께 고치면 이 plan 의 검토 단위가 흐려진다.
+더한 두 줄 자체에는 위반이 없다.
 
 ## 검증
 
@@ -179,7 +192,7 @@ node scripts/check-pii.mjs
 
 ```bash
 # cwd: <repo root>
-bash ~/personal/fos-skills/korean-check/scripts/check.sh CLAUDE.md README.md docs/prd.md skills/dooray-cli/SKILL.md docs/flow.md docs/code-architecture.md
+bash ~/personal/fos-skills/korean-check/scripts/check.sh CLAUDE.md README.md docs/prd.md skills/dooray-cli/SKILL.md docs/code-architecture.md docs/adr/056-json-enrichment-behind-option.md
 ```
 
 종료 코드 0 이어야 한다.
