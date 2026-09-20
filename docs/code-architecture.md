@@ -21,7 +21,7 @@
 
 ```
 src/
-  index.ts                  # CLI entrypoint, Commander 루트 설정
+  index.ts                  # CLI entrypoint, Commander 루트 설정 + 등록이 끝난 명령 나무에 오류 안내 후크 걸기 (ADR-058)
   version.ts                # CLI_VERSION — tsup 이 빌드 때 주입하는 `__DOORAY_CLI_VERSION__` 를 읽고, 없으면 "0.0.0-dev"
 
   api/
@@ -109,6 +109,8 @@ src/
     delete-confirmation.ts  # 삭제 공통 확인 정책: -y/--yes 우회, TTY 기본 아니오, non-TTY 선차단 (ADR-036)
     config-value.ts         # `config set <key> <value>` 의 값 확정 — "-" 는 stdin 에서 읽고 양끝 공백을 제거하며 빈 값은 에러
     dooray-id.ts            # Dooray 식별자의 상위 비트에 담긴 생성 시각을 밀리초로 푼다 (BigInt, mail id → UID 조회에 사용)
+    inline-file-refs.ts     # 본문에서 /files/<id> 참조를 뽑는다 — 순서 유지, 중복 제거 (ADR-057)
+    unknown-option-hint.ts  # 알 수 없는 옵션 오류에 인자 사용법을 붙이고, 명령 나무 전체에 그 후크를 건다 (ADR-058)
 
   commands/
     setup.ts                # dooray setup — 대화형 초기 설정 마법사 (스킬 설치 포함)

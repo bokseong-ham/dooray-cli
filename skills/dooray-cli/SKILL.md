@@ -46,11 +46,12 @@ NHN Dooray REST API 를 래핑한 CLI 다. 이 파일은 라우터이므로, 작
 
 ## 파일 명령의 `--json` 스키마
 
-`post file` 과 `wiki page file` 이 같은 스키마를 쓴다. 한쪽 파싱 코드를 다른 쪽에 그대로 쓸 수 있다.
+`post file` 과 `wiki page file` 은 출력 처리 방식이 같고, 서버가 돌려주는 필드는 다를 수 있다.
+한쪽 파싱 코드를 다른 쪽에 옮길 때 필드가 그대로인지 확인한다.
 
 | 명령 | `--json` | `--quiet` |
 | --- | --- | --- |
-| `upload` | API 응답의 `result` 원형 | `id` |
+| `upload` | `post file upload` 는 `{"id": "<file-id>"}` 하나다.<br>`wiki page file upload` 는 이름과 크기를 함께 내려준다 | `id` |
 | `download` | `{outputPath, fileName, size}` | `outputPath` |
 | `download-all` | `{count, succeeded: [{path, fileName}], failed: [{fileId, error}]}` | — |
 | `delete` | `{fileId, status: "deleted"}` | `fileId` |
@@ -166,7 +167,7 @@ dooray post edit <project> 42 --mime-type text/html
 | 단일 댓글 | `dooray post comment get <project> <number> <comment-id>` |
 | 댓글 추가 | `dooray post comment add <project> <number> --body "..."` |
 | 댓글 수정 | `dooray post comment edit <project> <number> <comment-id> --body "..."` — 본문 형식이 기존과 다르면 `--mime-type` 을 함께 준다 |
-| 댓글 삭제 | `dooray post comment delete <project> <number> <comment-id>` — 확인 있음, `-y`/`--yes`로 생략 |
+| 댓글 삭제 | `dooray post comment delete <project> <number> <comment-id>` — 확인 있음, `-y`/`--yes`로 생략. `--json` 은 `{"commentId": "...", "status": "deleted"}` |
 
 내부 ID 를 positional 자리에 넣으면 입력 오류가 나지만, 그 오류가 `--id` 를 쓴 완성 명령을 그대로 보여준다.
 그 줄을 그대로 복사해 실행하면 되고, 자동화는 오류 출력을 읽어 재시도할 수 있다.
@@ -179,7 +180,7 @@ dooray post edit <project> 42 --mime-type text/html
 | --- | --- |
 | 첨부 목록 | `dooray post file list <project> <number>` |
 | 첨부 다운로드 | `dooray post file download <project> <number> <file-id>` |
-| 첨부 일괄 다운로드 | `dooray post file download-all <project> <number>` |
+| 첨부 일괄 다운로드 | `dooray post file download-all <project> <number>` — 첨부 목록과 본문에 삽입된 파일을 함께 받는다. 본문 쪽을 빼려면 `--no-inline` |
 | 첨부 업로드 | `dooray post file upload <project> <number> <file-path>` |
 | 첨부 삭제 | `dooray post file delete <project> <number> <file-id>` — 확인 있음, `-y`/`--yes`로 생략 |
 | 댓글 첨부 목록 | `dooray post comment file list <project> <number> <comment-id>` |

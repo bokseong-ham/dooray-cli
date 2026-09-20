@@ -601,6 +601,10 @@ dooray post file upload my-project 42 ./report.pdf     # 업로드
 dooray post file delete my-project 42 <file-id>        # 삭제 (confirm 기본, -y/--yes 로 생략)
 ```
 
+`download-all` 은 첨부 목록(`getPostFiles`)과 본문의 `/files/<id>` 참조를 합쳐 대상으로 삼는다 (ADR-057).
+본문 참조는 업무 상세(`getPost`)를 한 번 더 조회해 뽑고, 두 곳에 같은 id 가 있으면 한 번만 받는다.
+`--no-inline` 을 주면 그 상세 조회를 하지 않고 첨부 목록만 받는다.
+
 ## 삭제 확인 공통 흐름 (ADR-036)
 
 다음 여섯 명령은 같은 안전 정책을 적용한다.
