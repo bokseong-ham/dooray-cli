@@ -4,14 +4,19 @@
 
 - **결정**: CLI 가 본문에 링크를 넣거나 빼는 경로는 그 본문의 `mimeType` 을 읽어 문법을 고른다.
   `text/x-markdown` 이면 지금의 마크다운 문법을 그대로 쓰고, `text/html` 이면 HTML 앵커를 쓴다.
-  해당하는 경로는 넷이다.
+  해당하는 경로는 다섯이다.
 
   | 경로 | 넣거나 빼는 것 |
   | --- | --- |
   | `post edit --mention` / `--mention-group` | 멤버와 그룹 멘션 |
   | `post edit --link-task` | 다른 업무로 가는 링크 |
+  | `post comment edit --mention` / `--link-task` | 댓글의 멘션과 업무 링크 |
   | `post comment file upload` | 첨부 파일 reference |
   | `post comment file delete` | 첨부 파일 reference 제거 |
+
+  `post create` 와 `post comment add` 는 이 다섯에 들어가지 않는다.
+  두 명령은 본문 형식을 `text/x-markdown` 으로 고정해 보내므로 고를 것이 없다.
+  이 결정은 기존 형식을 보존하는 경로만 다룬다.
 
   `text/html` 본문의 멘션을 어떤 태그로 표현하는지는 공식 API 문서로 확인한 표기를 쓴다.
   **공식 문서가 그 표기를 정의하지 않으면 그 경로는 거절한다.**
