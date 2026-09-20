@@ -20,7 +20,7 @@ standalone API `GET /project/v1/posts/{postId}` 응답에 `project.{id,code}` �
 분기 규칙·URL 정규식·테스트 케이스는 `src/resolvers/post-input.ts` 와 `src/utils/dooray-url.ts` 참조.
 후속 (wiki input 통합, CI 통합) 은 별도 task.
 
-**보강 (Issue #82/#83, 2026-06)**: 입력 처리를 '만능 추론' 에서 '명시적 타입 분류' 로 강화한다.
+**적용 범위** (Issue #82/#83): 입력 처리는 '만능 추론' 이 아니라 '명시적 타입 분류' 다.
 `classifyPostInputToken` 이 토큰을 postId / postNumber / url / project 로 분류한다.
 진입점 (`--id` / `--url` / positional) 이 기대 타입과 불일치하면 타입별 안내 에러를 던진다.
 
