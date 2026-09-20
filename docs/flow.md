@@ -1,6 +1,6 @@
-# User Flow — dooray-cli
+# dooray-cli 사용자 흐름
 
-## 최초 설정 — `dooray setup`
+## 최초 설정 (`dooray setup`)
 
 대화형 마법사로 필수 설정을 한 번에 완료한다.
 
@@ -145,7 +145,7 @@ dooray post search my-project "스프린트"   # 4) 제목 검색
 ```
 
 `post create` 출력의 긴 숫자는 internal postId 다 (업무 번호 #N 아님).
-후속 조회·수정은 `--id <postId>` 로 한다 — positional `<project> <number>` 자리에 넣으면 안내 에러로 거부된다 (#82).
+후속 조회·수정은 `--id <postId>` 로 한다. positional `<project> <number>` 자리에 넣으면 안내 에러로 거부된다 (#82).
 
 ### projectId 직접 입력 (member=me 응답 외 프로젝트, ADR-030, Issue #78)
 
@@ -158,7 +158,7 @@ dooray post list 1234567890123456789
 dooray member list 1234567890123456789
 ```
 
-권한 검증은 후속 API 호출 시점 — 권한이 없으면 4xx 발생.
+권한 검증은 후속 API 호출 시점에 이뤄진다. 권한이 없으면 4xx 가 발생한다.
 
 ## 업무 생성 흐름
 
@@ -240,7 +240,7 @@ dooray member list my-project              # 프로젝트 멤버 (이름·이메
 dooray member get <member-id>              # 단건 조회
 ```
 
-`post comment list` 의 Creator 컬럼은 자동으로 표시명으로 채워진다 (`--json` 은 raw 유지 — 파이프라인 호환).
+`post comment list` 의 Creator 컬럼은 자동으로 표시명으로 채워진다 (`--json` 은 파이프라인 호환을 위해 raw 를 유지한다).
 
 ## 댓글 흐름
 
@@ -256,7 +256,7 @@ dooray post comment delete my-project 42 \      # 댓글 삭제 (confirm 기본,
   --comment-id <comment-id>
 ```
 
-post `--id`/`--url` 모드도 동일 지원 — `dooray post comment list --id <postId>` 또는 첫 positional 에 Dooray URL 직접.
+post `--id`/`--url` 모드도 동일하게 지원한다. `dooray post comment list --id <postId>` 로 주거나 첫 positional 에 Dooray URL 을 직접 준다.
 
 ## 댓글 첨부파일 흐름 (ADR-024)
 
@@ -335,7 +335,7 @@ dooray post create my-project --template "릴리스 플랜" \
   --tag "p0"                       # 템플릿 tags 를 덮음
 ```
 
-`interpolation=true` 가 기본 — Dooray 가 `${year}`, `${month}` 같은 시스템 매크로를 응답에서 자동 치환.
+`interpolation=true` 가 기본이다. Dooray 가 `${year}`, `${month}` 같은 시스템 매크로를 응답에서 자동으로 치환한다.
 사용자 정의 변수 (`--field key=value`) 는 본 release scope 외 (별도 후속).
 사용자 옵션이 명시 입력되면 템플릿 값을 override.
 
@@ -350,7 +350,7 @@ dooray post edit --id <postId> --parent <parentPostId>   # 직접 postId
 ```
 
 내부적으로 `client.updatePost` (subject/body/users) → `client.setPostParent` (별도 `POST .../set-parent-post` endpoint) 순차 호출.
-둘 다 무관 endpoint 라 atomic 보장 없음 — partial 실패 시 stderr 안내 후 non-zero exit.
+둘 다 무관 endpoint 라 atomic 보장이 없다. partial 실패 시 stderr 로 안내한 뒤 non-zero exit 로 끝낸다.
 
 **한계**: Dooray API 가 `unset-parent-post` 미제공 → CLI 로 parent 해제 (top-level 화) 불가. 웹 UI 에서 수동 처리.
 
@@ -382,7 +382,7 @@ dooray post edit --id <postId> --tag-clear --tag "분류: <name>"
 dooray post edit --id <postId> --tag-remove "분류: <name>"
 ```
 
-`--title`/`--body` 없이 단독 호출 허용 — 기존 본문 자동 재전송.
+`--title`/`--body` 없이 단독 호출을 허용한다. 기존 본문을 자동으로 재전송한다.
 mandatory tag 그룹 위반 시 친절한 에러.
 
 ## 프로젝트 태그 관리 흐름 (ADR-041)
@@ -513,7 +513,7 @@ dooray messenger channel-send --channel "$THREAD" --body "배포 완료"
 ## 위키 페이지 첨부파일 흐름 (Issue #70, ADR-029)
 
 페이지 첨부파일을 CLI 로 관리.
-post file 명령군과 mirror — UX 동일 (`<project> <page-id>`, `--id`, `--url`, positional URL 지원).
+post file 명령군을 그대로 따른다. UX 가 동일하다 (`<project> <page-id>`, `--id`, `--url`, positional URL 지원).
 
 ```
 # 목록 (general 첨부 + inline image 둘 다 표시)
@@ -536,7 +536,7 @@ dooray wiki page file download-all my-project <page-id> -o ./attachments/
 dooray wiki page file delete my-project <page-id> --file-id <id>
 ```
 
-활용 사례 — 팀 위키에 스킬 파일 첨부 → 팀원이 `wiki page file download-all` 로 일괄 받아 `~/.claude/skills/` 에 그대로 설치.
+활용 사례: 팀 위키에 스킬 파일 첨부 → 팀원이 `wiki page file download-all` 로 일괄 받아 `~/.claude/skills/` 에 그대로 설치.
 
 ## 위키 페이지 댓글 흐름
 
@@ -566,7 +566,7 @@ dooray wiki page comment edit <project> <page-id> <comment-id> --body "..."
 dooray wiki page comment delete <project> <page-id> <comment-id>
 ```
 
-활용 사례 — 회의록 위키 페이지에 자동화 봇이 결정사항 댓글로 누적, 토론 흐름 추적.
+활용 사례: 회의록 위키 페이지에 자동화 봇이 결정사항 댓글로 누적, 토론 흐름 추적.
 
 ## 피드백 흐름 (ADR-022/023)
 
