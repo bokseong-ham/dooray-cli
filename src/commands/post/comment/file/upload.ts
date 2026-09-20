@@ -8,6 +8,7 @@ import { startSpinner, stopSpinner } from "../../../../utils/spinner.js";
 import { DoorayCliError } from "../../../../utils/errors.js";
 import { EXIT_API_ERROR } from "../../../../utils/exit-codes.js";
 import { appendFileReference } from "../../../../utils/comment-files.js";
+import { resolveBodyMimeType } from "../../../../utils/body-input.js";
 
 export const uploadCommentFileCommand = new Command("upload")
   .description("댓글에 파일 업로드 (첨부 카드가 아닌 본문 링크로 표시)")
@@ -49,7 +50,7 @@ export const uploadCommentFileCommand = new Command("upload")
       const currentBody = commentRes.result.body.content;
       const newBody = appendFileReference(currentBody, fileName, fileId);
       await client.updatePostComment(projectId, postId, commentId, {
-        body: { mimeType: "text/x-markdown", content: newBody },
+        body: { mimeType: resolveBodyMimeType(commentRes.result.body.mimeType), content: newBody },
       });
       stopSpinner(true, "reference 추가 완료");
     } catch {

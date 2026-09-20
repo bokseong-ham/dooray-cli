@@ -46,9 +46,10 @@ vi.mock("../../editor/index.js", async (importOriginal) => {
   return { ...actual, openInEditor: mocks.openInEditor };
 });
 
-vi.mock("../../utils/body-input.js", () => ({
-  readBodyInputOrNull: mocks.readBodyInputOrNull,
-}));
+vi.mock("../../utils/body-input.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../utils/body-input.js")>();
+  return { ...actual, readBodyInputOrNull: mocks.readBodyInputOrNull };
+});
 
 vi.mock("../../utils/spinner.js", () => ({
   startSpinner: mocks.startSpinner,
@@ -87,6 +88,22 @@ const post: PostDetail = {
   files: [],
   fileIdList: [],
 };
+
+const htmlPost: PostDetail = {
+  ...post,
+  body: { mimeType: "text/html", content: "<p>기존 본문</p>" },
+  users: {
+    from: { type: "member", member: { organizationMemberId: "member-from" } },
+    to: [],
+    cc: [],
+  },
+};
+
+function exitOverrideAll(cmd: Command): void {
+  cmd.exitOverride();
+  cmd.configureOutput({ writeErr: () => {} });
+  cmd.commands.forEach(exitOverrideAll);
+}
 
 async function createCommandTree(): Promise<Command> {
   vi.resetModules();
@@ -213,6 +230,7 @@ describe("post edit 참여자 단독 호출", () => {
 
     expect(JSON.parse(output)).toEqual({
       body: "기존 본문",
+      mimeType: "text/x-markdown",
       users: {
         to: [existingTo],
         cc: [
@@ -227,5 +245,294 @@ describe("post edit 참여자 단독 호출", () => {
     expect(mocks.openInEditor).not.toHaveBeenCalled();
     expect(mocks.client.updatePost).not.toHaveBeenCalled();
     stdout.mockRestore();
+  });
+});
+
+describe("post edit mimeType 보존", () => {
+  it("비대화형 수정에서 text/html 업무의 mimeType을 유지한다", async () => {
+    mocks.client.getPost.mockResolvedValue({ result: htmlPost });
+    mocks.readBodyInputOrNull.mockResolvedValue("<p>새 본문</p>");
+    const program = await createCommandTree();
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await program.parseAsync([
+      "node",
+      "dooray",
+      "post",
+      "edit",
+      "--id",
+      "post-1",
+      "--body",
+      "<p>새 본문</p>",
+    ]);
+
+    expect(mocks.client.updatePost).toHaveBeenCalledWith(
+      "project-1",
+      "post-1",
+      expect.objectContaining({
+        body: { mimeType: "text/html", content: "<p>새 본문</p>" },
+      }),
+    );
+    stdout.mockRestore();
+  });
+
+  it("$EDITOR 수정에서 text/html 업무의 mimeType을 유지한다", async () => {
+    mocks.client.getPost.mockResolvedValue({ result: htmlPost });
+    mocks.openInEditor.mockImplementation(async (original: string) => original + "\n추가");
+    const program = await createCommandTree();
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await program.parseAsync(["node", "dooray", "post", "edit", "--id", "post-1"]);
+
+    expect(mocks.openInEditor).toHaveBeenCalledOnce();
+    expect(mocks.client.updatePost).toHaveBeenCalledWith(
+      "project-1",
+      "post-1",
+      expect.objectContaining({
+        body: { mimeType: "text/html", content: "<p>기존 본문</p>\n추가" },
+      }),
+    );
+    stdout.mockRestore();
+  });
+
+  it("markdown 업무는 그대로 text/x-markdown으로 나간다", async () => {
+    mocks.readBodyInputOrNull.mockResolvedValue("새 본문");
+    const program = await createCommandTree();
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await program.parseAsync([
+      "node",
+      "dooray",
+      "post",
+      "edit",
+      "--id",
+      "post-1",
+      "--body",
+      "새 본문",
+    ]);
+
+    expect(mocks.client.updatePost).toHaveBeenCalledWith(
+      "project-1",
+      "post-1",
+      expect.objectContaining({
+        body: { mimeType: "text/x-markdown", content: "새 본문" },
+      }),
+    );
+    stdout.mockRestore();
+  });
+
+  it("body.mimeType 이 없으면 text/x-markdown 으로 폴백한다", async () => {
+    mocks.client.getPost.mockResolvedValue({
+      result: { ...htmlPost, body: { content: "기존 본문" } },
+    });
+    mocks.readBodyInputOrNull.mockResolvedValue("새 본문");
+    const program = await createCommandTree();
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await program.parseAsync([
+      "node",
+      "dooray",
+      "post",
+      "edit",
+      "--id",
+      "post-1",
+      "--body",
+      "새 본문",
+    ]);
+
+    expect(mocks.client.updatePost).toHaveBeenCalledWith(
+      "project-1",
+      "post-1",
+      expect.objectContaining({
+        body: { mimeType: "text/x-markdown", content: "새 본문" },
+      }),
+    );
+    stdout.mockRestore();
+  });
+});
+
+describe("post edit --mime-type", () => {
+  it("지정하면 기존 형식 대신 그 값으로 나간다", async () => {
+    mocks.client.getPost.mockResolvedValue({ result: htmlPost });
+    mocks.readBodyInputOrNull.mockResolvedValue("# 마크다운 본문");
+    const program = await createCommandTree();
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await program.parseAsync([
+      "node",
+      "dooray",
+      "post",
+      "edit",
+      "--id",
+      "post-1",
+      "--body",
+      "# 마크다운 본문",
+      "--mime-type",
+      "text/x-markdown",
+    ]);
+
+    expect(mocks.client.updatePost).toHaveBeenCalledWith(
+      "project-1",
+      "post-1",
+      expect.objectContaining({
+        body: { mimeType: "text/x-markdown", content: "# 마크다운 본문" },
+      }),
+    );
+    stdout.mockRestore();
+  });
+
+  it("$EDITOR 경로에서 본문을 고치면 지정한 값이 나간다", async () => {
+    mocks.client.getPost.mockResolvedValue({ result: htmlPost });
+    mocks.openInEditor.mockImplementation(async (original: string) => original + "\n추가");
+    const program = await createCommandTree();
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await program.parseAsync([
+      "node",
+      "dooray",
+      "post",
+      "edit",
+      "--id",
+      "post-1",
+      "--body",
+      "새 본문",
+      "--mime-type",
+      "text/x-markdown",
+    ]);
+
+    const request = mocks.client.updatePost.mock.calls[0]?.[2];
+    expect(request.body.mimeType).toBe("text/x-markdown");
+    stdout.mockRestore();
+  });
+
+  it("본문을 바꾸지 않고 형식만 바꾸면 stderr 로 경고한다", async () => {
+    mocks.client.getPost.mockResolvedValue({ result: htmlPost });
+    mocks.readBodyInputOrNull.mockResolvedValue(null);
+    const program = await createCommandTree();
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    let stderrOutput = "";
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+      stderrOutput += String(chunk);
+      return true;
+    });
+
+    await program.parseAsync([
+      "node",
+      "dooray",
+      "post",
+      "edit",
+      "--id",
+      "post-1",
+      "--mime-type",
+      "text/x-markdown",
+    ]);
+
+    expect(stderrOutput).toContain("본문을 변환하지 않으므로");
+    stdout.mockRestore();
+    stderr.mockRestore();
+  });
+
+  it("본문을 함께 바꾸면 경고하지 않는다", async () => {
+    mocks.client.getPost.mockResolvedValue({ result: htmlPost });
+    mocks.readBodyInputOrNull.mockResolvedValue("# 마크다운 본문");
+    const program = await createCommandTree();
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    let stderrOutput = "";
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+      stderrOutput += String(chunk);
+      return true;
+    });
+
+    await program.parseAsync([
+      "node",
+      "dooray",
+      "post",
+      "edit",
+      "--id",
+      "post-1",
+      "--body",
+      "# 마크다운 본문",
+      "--mime-type",
+      "text/x-markdown",
+    ]);
+
+    expect(stderrOutput).toBe("");
+    stdout.mockRestore();
+    stderr.mockRestore();
+  });
+
+  it("단독 지정하면 $EDITOR 없이 기존 본문을 그대로 두고 형식만 바꾼다", async () => {
+    mocks.client.getPost.mockResolvedValue({ result: htmlPost });
+    mocks.readBodyInputOrNull.mockResolvedValue(null);
+    const program = await createCommandTree();
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await program.parseAsync([
+      "node",
+      "dooray",
+      "post",
+      "edit",
+      "--id",
+      "post-1",
+      "--mime-type",
+      "text/x-markdown",
+    ]);
+
+    expect(mocks.openInEditor).not.toHaveBeenCalled();
+    const request = mocks.client.updatePost.mock.calls[0]?.[2];
+    expect(request.body).toEqual({
+      mimeType: "text/x-markdown",
+      content: "<p>기존 본문</p>",
+    });
+    stdout.mockRestore();
+  });
+
+  it("--dry-run 미리보기에 지정한 형식이 나온다", async () => {
+    mocks.client.getPost.mockResolvedValue({ result: htmlPost });
+    mocks.readBodyInputOrNull.mockResolvedValue("<p>새 본문</p>");
+    const program = await createCommandTree();
+    let output = "";
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+      output += String(chunk);
+      return true;
+    });
+
+    await program.parseAsync([
+      "node",
+      "dooray",
+      "--json",
+      "post",
+      "edit",
+      "--id",
+      "post-1",
+      "--body",
+      "<p>새 본문</p>",
+      "--mime-type",
+      "text/html",
+      "--dry-run",
+    ]);
+
+    expect(JSON.parse(output).mimeType).toBe("text/html");
+    expect(mocks.client.updatePost).not.toHaveBeenCalled();
+    stdout.mockRestore();
+  });
+
+  it("허용하지 않는 값이면 Commander 가 거부한다", async () => {
+    const program = await createCommandTree();
+    exitOverrideAll(program);
+
+    await expect(
+      program.parseAsync([
+        "node",
+        "dooray",
+        "post",
+        "edit",
+        "--id",
+        "post-1",
+        "--mime-type",
+        "markdown",
+      ]),
+    ).rejects.toThrow(/Allowed choices/);
+    expect(mocks.client.updatePost).not.toHaveBeenCalled();
   });
 });

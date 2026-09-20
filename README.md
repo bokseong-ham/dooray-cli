@@ -133,6 +133,23 @@ dooray post edit <project> 42 --cc-group <group-code>  # 제목·본문 없이 �
 
 참조자·담당자 옵션만 지정하면 `$EDITOR`를 열지 않고 기존 제목·본문·태그를 보존한 채 참여자만 바꾼다.
 
+### 본문 형식
+
+업무와 댓글과 위키 페이지의 본문은 마크다운이거나 HTML 이다.
+`post edit`, `post comment edit`, `wiki page edit` 는 수정할 때 기존 형식을 그대로 유지한다.
+
+주는 본문의 형식이 기존과 다르면 `--mime-type` 으로 명시한다.
+빠뜨리면 마크다운 본문이 HTML 로 저장되어 웹에서 원문이 그대로 보인다.
+
+```bash
+dooray post get <project> 42 --json | jq .body.mimeType    # "text/html"
+dooray post edit <project> 42 --body-file notes.md --mime-type text/x-markdown
+dooray post edit <project> 42 --mime-type text/html        # 본문은 그대로, 형식만 되돌리기
+```
+
+값은 `text/x-markdown` 과 `text/html` 둘뿐이다.
+본문을 바꾸지 않고 형식만 바꾸면 CLI 가 본문을 변환하지 않는다는 경고가 나온다.
+
 전체 명령과 옵션은 `--help` 로 본다.
 
 ```bash

@@ -7,6 +7,50 @@ export interface BodyInputOptions {
   bodyFile?: string;
 }
 
+/** 두레이 본문 mimeType — API 값 그대로 사용한다 (별칭 매핑 없음). */
+export const MARKDOWN_MIME = "text/x-markdown";
+export const HTML_MIME = "text/html";
+
+/** `--mime-type` 옵션이 받는 값 목록. */
+export const BODY_MIME_TYPES = [MARKDOWN_MIME, HTML_MIME];
+
+/**
+ * 수정 요청에 실을 본문 mimeType 을 고른다.
+ *
+ * - `override`(`--mime-type`)가 있으면 그 값
+ * - 없으면 기존 글의 mimeType 보존
+ * - 기존 값이 없거나 빈 문자열이면 markdown 폴백
+ *
+ * 빈 문자열을 폴백으로 넘기는 이유는, 그대로 채택하면 `mimeType: ""` 이
+ * 요청에 실려 나가기 때문이다. 타입상 `mimeType` 은 필수 `string` 이라
+ * 이 폴백이 발동하는 것은 응답이 타입 선언과 어긋났다는 뜻이다.
+ */
+export function resolveBodyMimeType(
+  existing: string | undefined,
+  override?: string,
+): string {
+  return override ?? (existing || undefined) ?? MARKDOWN_MIME;
+}
+
+/**
+ * 본문은 그대로인데 `--mime-type` 이 형식만 바꾸는 경우 stderr 로 알린다.
+ *
+ * CLI 는 본문을 변환하지 않는다. 마크다운 본문을 `text/html` 로만 바꾸면
+ * 웹에서 `## 제목` 과 표 구분자가 문자 그대로 보인다.
+ * 형식만 되돌리려는 의도일 수도 있어 막지 않고 알리기만 한다.
+ */
+export function warnUnconvertedBody(
+  existing: string | undefined,
+  override: string | undefined,
+  bodyChanged: boolean,
+): void {
+  if (override == null || bodyChanged) return;
+  if (resolveBodyMimeType(existing) === override) return;
+  process.stderr.write(
+    `⚠  본문은 그대로 두고 형식만 ${override} 으로 바꿉니다. CLI 는 본문을 변환하지 않으므로 내용이 새 형식에 맞지 않으면 렌더링이 깨집니다.\n`,
+  );
+}
+
 /**
  * `--body` / `--body-file` 옵션을 받아 본문 문자열을 돌려준다.
  *

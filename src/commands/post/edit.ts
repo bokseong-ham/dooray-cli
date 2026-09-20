@@ -1,4 +1,4 @@
-import { Command } from "commander";
+import { Command, Option } from "commander";
 import { getConfigOrThrow } from "../../config/store.js";
 import { DoorayApiClient } from "../../api/client.js";
 import { resolvePostInput } from "../../resolvers/post-input.js";
@@ -19,7 +19,7 @@ import {
   parsePostFrontmatter,
 } from "../../editor/index.js";
 import { startSpinner, stopSpinner } from "../../utils/spinner.js";
-import { readBodyInputOrNull } from "../../utils/body-input.js";
+import { readBodyInputOrNull, BODY_MIME_TYPES, resolveBodyMimeType, warnUnconvertedBody } from "../../utils/body-input.js";
 import { checkAndGuardDropped } from "../../utils/attachment-check.js";
 import type { CreatePostUser } from "../../api/types.js";
 
@@ -59,6 +59,10 @@ export const postEditCommand = new Command("edit")
   .option("--tag <name>", "태그 추가 (반복 가능, 기존 태그 유지 + 신규 추가 + dedupe)", (v, prev: string[]) => [...prev, v], [] as string[])
   .option("--tag-clear", "기존 태그 전부 제거 후 --tag 만 적용")
   .option("--tag-remove <name>", "특정 태그 제거 (반복 가능, 이름 부분일치)", (v, prev: string[]) => [...prev, v], [] as string[])
+  .addOption(
+    new Option("--mime-type <type>", "본문 형식 (미지정 시 기존 업무의 형식 유지)")
+      .choices(BODY_MIME_TYPES),
+  )
   .option("--dry-run", "API 호출 없이 합성된 본문만 stdout 출력 (mention/link-task 적용 결과 미리보기)")
   .option("--no-confirm", "누락 attachment 경고 시 confirm 없이 진행 (자동화용)")
   .action(async (project, postNumberStr, opts) => {
@@ -98,7 +102,13 @@ export const postEditCommand = new Command("edit")
       );
     }
 
-    const nonInteractive = title || opts.body || opts.bodyFile || hasTagChange || hasParticipantChange;
+    const bodyMimeType = resolveBodyMimeType(post.body.mimeType, opts.mimeType);
+
+    // --mime-type 단독도 비대화형이다. $EDITOR 를 열면 비대화형 환경에서 쓸 수
+    // 없고, 열려도 본문이 그대로면 "변경사항 없음" 으로 끝나 형식을 되돌릴
+    // 수단이 없다. 본문은 기존 content 를 그대로 다시 보낸다.
+    const nonInteractive = title || opts.body || opts.bodyFile || hasTagChange
+      || hasParticipantChange || opts.mimeType != null;
 
     if (nonInteractive) {
       // Non-interactive mode: apply only specified changes
@@ -167,6 +177,8 @@ export const postEditCommand = new Command("edit")
         await validateMandatoryCoverage(client, projectId, finalTagIds);
       }
 
+      warnUnconvertedBody(post.body.mimeType, opts.mimeType, newBody != null);
+
       if (opts.dryRun) {
         stopSpinner(false);
         const globalOpts = postEditCommand.optsWithGlobals() as OutputOptions;
@@ -174,6 +186,7 @@ export const postEditCommand = new Command("edit")
         if (globalOpts.json) {
           process.stdout.write(JSON.stringify({
             body: previewBody,
+            mimeType: bodyMimeType,
             users: { to: toUsers, cc: ccUsers },
             ...(finalTagIds !== undefined && { tagIds: finalTagIds }),
             ...(opts.parent && { parentChange: opts.parent }),
@@ -188,7 +201,7 @@ export const postEditCommand = new Command("edit")
       await client.updatePost(projectId, postId, {
         subject: title ?? post.subject,
         body: {
-          mimeType: "text/x-markdown",
+          mimeType: bodyMimeType,
           content: newBody ?? post.body.content,
         },
         priority: post.priority,
@@ -252,7 +265,7 @@ export const postEditCommand = new Command("edit")
 
       await client.updatePost(projectId, postId, {
         subject: parsed.subject,
-        body: { mimeType: "text/x-markdown", content: parsed.body },
+        body: { mimeType: bodyMimeType, content: parsed.body },
         priority: parsed.priority,
         dueDate: parsed.due_date ?? undefined,
         dueDateFlag: parsed.due_date != null,
