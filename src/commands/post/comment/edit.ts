@@ -15,6 +15,7 @@ import { prependMentions } from "../../../utils/mention.js";
 import { appendTaskLinks } from "../../../utils/task-link.js";
 import { resolveTaskLinks } from "../../../resolvers/task-link.js";
 import { checkAndGuardDropped } from "../../../utils/attachment-check.js";
+import { checkMarkupSupport, type BodyMarkupKind } from "../../../utils/body-markup.js";
 
 export const commentEditCommand = new Command("edit")
   .description("댓글 수정 ($EDITOR 또는 --body 옵션)")
@@ -117,6 +118,19 @@ export const commentEditCommand = new Command("edit")
     const groupInputs: string[] = (opts.mentionGroup ?? []).filter((s: string) => s.length > 0);
     const linkInputs: string[] = (opts.linkTask ?? []).filter((s: string) => s.length > 0);
 
+    // 본문 형식은 한 번만 구해 두고 아래 세 곳이 같은 값을 쓴다.
+    // 반복해서 부르면 한 곳을 고칠 때 다른 곳이 어긋난다.
+    const bodyMimeType = resolveBodyMimeType(comment.body.mimeType, opts.mimeType);
+
+    // 본문 형식이 그 마크업을 받지 못하면 멤버·업무를 해석하기 전에 멈춘다 (ADR-055).
+    const requireMarkup = (kind: BodyMarkupKind): void => {
+      const check = checkMarkupSupport(bodyMimeType, kind);
+      if (!check.supported) throw new DoorayCliError(check.message, EXIT_PARAM_ERROR);
+    };
+    if (mentionInputs.length > 0) requireMarkup("member-mention");
+    if (groupInputs.length > 0) requireMarkup("group-mention");
+    if (linkInputs.length > 0) requireMarkup("task-link");
+
     let mentionPrefix = "";
     if (mentionInputs.length > 0 || groupInputs.length > 0) {
       const me = await ensureMe(client);
@@ -135,7 +149,7 @@ export const commentEditCommand = new Command("edit")
           return { groupId: g.id, code: g.code, projectCode };
         }),
       );
-      mentionPrefix = prependMentions("", members, groups, me).trimEnd();
+      mentionPrefix = prependMentions("", members, groups, me, bodyMimeType).trimEnd();
     }
 
     let edited = await readBodyInputOrNull(opts);
@@ -165,7 +179,7 @@ export const commentEditCommand = new Command("edit")
     if (linkInputs.length > 0) {
       const me = await ensureMe(client);
       const links = await resolveTaskLinks(client, linkInputs);
-      edited = appendTaskLinks(edited, links, me);
+      edited = appendTaskLinks(edited, links, me, bodyMimeType);
     }
 
     if (opts.dryRun) {
@@ -174,7 +188,7 @@ export const commentEditCommand = new Command("edit")
       if (globalOpts.json) {
         process.stdout.write(JSON.stringify({
           body: edited,
-          mimeType: resolveBodyMimeType(comment.body.mimeType, opts.mimeType),
+          mimeType: bodyMimeType,
         }) + "\n");
       } else {
         process.stdout.write(edited + "\n");
@@ -187,7 +201,7 @@ export const commentEditCommand = new Command("edit")
 
     startSpinner("댓글 수정 중...");
     await client.updatePostComment(projectId, postId, commentId, {
-      body: { mimeType: resolveBodyMimeType(comment.body.mimeType, opts.mimeType), content: edited },
+      body: { mimeType: bodyMimeType, content: edited },
     });
     stopSpinner(true, "댓글 수정 완료");
 
