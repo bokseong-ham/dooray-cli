@@ -43,12 +43,13 @@ phase 01 과 02 로 달라진 동작을 사용자와 다음 구현자가 읽는 
 
 ```bash
 # cwd: <repo root>
-grep -rln "resolveWikiPageInput" src/commands/ --include=*.ts | grep -v "\.test\.ts$"
+grep -rln "resolveWikiPageInput" src/commands/ --include="*.ts" | grep -v "\.test\.ts$"
 ```
 
 테스트 파일을 뺀 출력이 목록의 근거다.
-`--include` 와 `grep -v` 를 빼면 `src/commands/delete-confirmation-policy.test.ts` 가 함께 나와
+`grep -v` 를 빼면 `src/commands/delete-confirmation-policy.test.ts` 가 함께 나와
 명령이 아닌 파일이 목록에 섞인다.
+`--include` 의 값은 따옴표로 감싼다. zsh 에서는 감싸지 않으면 셸이 먼저 풀어 `no matches found` 로 끝난다.
 
 ### 2. `docs/code-architecture.md` 의 resolver 절을 고친다
 
@@ -169,12 +170,13 @@ node scripts/check-pii.mjs
 
 ```bash
 # cwd: <repo root>
-grep -n "입력 형식" CLAUDE.md | grep -c "wiki page edit"
+grep -n "입력 형식" CLAUDE.md | grep -c "wiki page get/edit"
 ```
 
 1 이어야 한다. `grep -c "wiki page edit" CLAUDE.md` 로는 이 phase 를 건너뛰어도 통과한다.
 `CLAUDE.md:63` 의 `$EDITOR` 설명 줄이 그 문자열을 이미 담고 있기 때문이다.
 「입력 형식」 줄에 한정해 보아야 작업 항목 1 이 실제로 들어갔는지 판정한다.
+그 줄이 명령을 `wiki page get/edit/delete/move` 로 묶어 적으므로 검색어도 그 표기를 쓴다.
 
 ```bash
 # cwd: <repo root>

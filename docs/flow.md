@@ -457,17 +457,23 @@ dooray wiki pages <project>
 dooray wiki tree <project>
 ```
 
+개인 프로젝트도 프로젝트 코드로도 projectId 로도 같은 명령을 쓴다 (ADR-054).
+`resolveProject` 가 공용 목록에서 못 찾으면 private 목록을 받아 다시 찾고,
+`resolveWiki` 는 공용과 private 두 캐시를 모두 본 뒤 거기서도 못 찾으면 private 목록을 받아 다시 찾는다.
+사람이 `dooray project list --type private` 를 미리 부를 필요가 없다.
+
 위키 본문의 페이지 링크는 `dooray://<orgId>/pages/<pageId>` 형태다.
 앞 숫자는 orgId 이고 project 도 위키 ID 도 아니다.
 그 값을 project 자리에 넣으면 `프로젝트에 위키가 없습니다` 로 끝난다.
-`resolveProject` 가 15자리 이상 numeric 을 project ID 로 통과시킨 뒤(ADR-030) `resolveWiki` 가 캐시에서 찾지 못하기 때문이다.
+`resolveProject` 가 15자리 이상 numeric 을 project ID 로 통과시키는데(ADR-030)
+orgId 는 공용 목록에도 private 목록에도 없어 `resolveWiki` 가 끝내 찾지 못하기 때문이다.
 뒤 숫자가 페이지 ID 이므로 그것만 떼어 `--id` 에 넣으면 project 없이 조회된다. 오류 안내가 그 방법을 알려준다.
 
 `wiki page get` 은 `wiki page file` 과 `wiki page comment` 와 같은 네 가지 입력 형태를 받는다 (ADR-020, ADR-043).
 `--id` 모드는 project 없이 단독으로 동작한다 (ADR-045).
 `GET /wiki/v1/pages/{page-id}` 를 한 번 불러 응답의 wikiId 를 읽는다.
 `--project` 는 선택이며 함께 주면 그 해석 호출을 아낀다.
-`wiki page` 의 `file`, `comment`, `delete` 도 같은 방식으로 `--id` 만 받는다.
+`wiki page` 의 `edit`, `file`, `comment`, `delete` 도 같은 방식으로 `--id` 만 받는다.
 
 ```
 dooray wiki page get --id <page-id>
