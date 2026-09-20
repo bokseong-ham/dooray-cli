@@ -47,10 +47,9 @@ docs-verifier 에 추가로 넘기는 문서 경로는 `docs/prd.md`, `docs/flow
 경로는 `worktrees/dooray-cli/{이름}` 아래에 만들고,
 저장소의 `.gitignore` 가 그 디렉터리를 무시한다.
 
-worktree 를 만든 직후 `pnpm install` 을 실행한다.
-이후 phase 검증 명령은 이 파일의 "검증 명령" 절을 따른다.
+worktree 를 만든 뒤에 할 일과 phase 검증 명령은 이 파일의 "검증 명령" 절을 따른다.
 
-task metadata 와 phase 파일 형식은 공용 코어의 `references/task-create.md` 가 소유한다.
+task metadata 와 phase 파일 형식은 `planning` 코어의 `references/task-create.md` 가 소유한다.
 이 저장소 고유 변형은 없다.
 
 정리는 PR 머지 뒤에 한다.

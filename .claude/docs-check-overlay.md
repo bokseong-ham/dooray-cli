@@ -11,7 +11,7 @@ dooray-cli 의 6축 검증은 [.claude/docs-audit-axes.md](docs-audit-axes.md)�
 검토가 파일을 고치지 않는 것은 지시로 지키고, 실행 뒤 `git status` 로 확인한다.
 agent 파일은 없으므로 코어 `docs-check` 의 6축 절차와 `.claude/docs-audit-axes.md` 가 기본 경로다.
 
-## docs 구조 + 문서 목록
+## docs 구조와 문서 목록
 
 ```bash
 # cwd: <repo root>
