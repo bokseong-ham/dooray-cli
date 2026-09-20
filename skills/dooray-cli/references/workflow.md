@@ -27,7 +27,7 @@ dooray post create <project> \
 
 ### 댓글에 스크린샷 첨부
 
-댓글 첨부는 두 단계로 나뉜다 — 댓글을 먼저 만들고 그 ID 로 파일을 올린다.
+댓글 첨부는 두 단계로 나뉜다. 댓글을 먼저 만들고 그 ID 로 파일을 올린다.
 
 ```bash
 COMMENT_ID=$(dooray post comment add <project> <post-num> --body "스크린샷 보고:" --json | jq -r '.id')

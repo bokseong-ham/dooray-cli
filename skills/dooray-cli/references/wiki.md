@@ -8,8 +8,8 @@
 dooray wiki page get --id <page-id>
 ```
 
-같은 방식이 `wiki page` 하위 명령 전체에 통한다.
-`wiki page file`, `wiki page comment`, `wiki page delete` 도 `--id` 만으로 동작한다.
+`wiki page get`, `wiki page delete`, `wiki page move`, `wiki page file`, `wiki page comment` 가 `--id` 만으로 동작한다.
+`wiki page create` 와 `wiki page edit` 은 `--id` 를 받지 않고 `<project>` 가 필수다.
 
 `--project` 는 선택이다. 함께 주면 wikiId 를 해석하는 호출을 한 번 아낀다.
 반복 실행하는 자동화라면 함께 주는 편이 빠르다.
