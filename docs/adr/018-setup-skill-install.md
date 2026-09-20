@@ -1,6 +1,6 @@
 ## ADR-018: `dooray setup` 에서 Claude Code 스킬 설치
 
-**상태**: ADR-035로 대체됨.
+**상태**: [ADR-035](035-managed-skill-lifecycle.md)로 대체됨. 아래는 ADR-035 이전의 설계이며 현재 동작이 아니다.
 
 **결정**: setup 마지막 단계에서 스킬 설치 여부를 물어보고 심볼릭 링크로 설치 (`~/.claude/skills/dooray-cli` → 패키지 내부 `skills/dooray-cli/`).
 idempotent 재실행 가능.
