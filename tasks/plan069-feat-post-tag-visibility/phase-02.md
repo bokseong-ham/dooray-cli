@@ -52,6 +52,11 @@
 
 확인한 결과를 `--tag` 옵션의 설명 문구에 적는다. 그 문구가 사용자가 읽는 유일한 설명이다.
 
+문서에도 없고 실제 호출로도 확정하지 못하면 해석을 단정하지 않는다.
+설명 문구를 「태그로 거른다. 여러 번 주면 그 태그들을 함께 보낸다」로 두고,
+확정하지 못했다는 것을 이 phase 의 보고에 적는다.
+phase 03 의 README 문구도 같은 문장을 쓴다.
+
 ### 2. `src/commands/post/list.ts` 에 `--tag` 를 더한다
 
 `post edit` 의 `--tag` 와 같은 형태로 반복 가능하게 만든다.
@@ -80,7 +85,17 @@ if (tagNames.length > 0) {
 `lookupTagIds` 는 `resolveProject` 로 얻은 `projectId` 가 필요하므로
 그 호출 **뒤**에 둔다. 지금 코드에서 `projectId` 를 얻는 줄 바로 다음이다.
 
-### 3. `src/commands/post/list.test.ts` 를 만들고 확인 넷을 담는다
+### 3. `lookupTagIds` 의 not-found 안내를 `post get` 쪽과 맞춘다
+
+`src/resolvers/tag.ts` 의 `lookupTagIds` 는 `matchByName` 을 `helpHint` 없이 부른다.
+그래서 이름을 찾지 못하면 후보 다섯 줄만 나오고 전체 목록을 보는 방법이 나오지 않는다.
+`post get --with-tag-names` 쪽은 캐시를 지우는 방법을 안내하므로 두 명령의 안내가 어긋난다.
+
+`matchByName` 의 다섯 번째 인자에 `{ helpHint: "dooray project tags <project>" }` 를 준다.
+`src/commands/project/tags.ts` 가 그 명령을 이미 제공한다.
+`post edit --tag` 도 같은 함수를 쓰므로 그쪽 안내까지 함께 좋아진다.
+
+### 4. `src/commands/post/list.test.ts` 를 만들고 확인 넷을 담는다
 
 이 파일이 없으면 만든다. `src/commands/post/edit.test.ts` 의 mock 방식을 따른다.
 
@@ -92,7 +107,9 @@ if (tagNames.length > 0) {
 | `--all` 과 함께 | `--tag <이름> --all` | 모든 페이지 호출에 같은 `tagIds` 가 들어간다 |
 
 첫 번째는 키 존재로 확인한다. `expect(args).not.toHaveProperty("tagIds")` 형태여야
-빈 배열을 넣은 경우도 잡힌다. 빈 배열을 보내면 `joinIds` 가 빈 문자열을 내고 그것이 질의에 붙을 수 있다.
+빈 배열을 넣은 경우도 잡힌다.
+`joinIds` 는 빈 배열에 `undefined` 를 돌려주고 전개가 truthy 검사라 질의에는 붙지 않지만,
+빈 배열을 넣으면 `list.ts` 가 의도를 잃는다. 넣지 않는 것을 확인으로 고정한다.
 
 네 번째는 `--all` 의 반복 호출이 `params` 를 펼쳐 쓰는 구조라 회귀가 나기 쉬운 자리다.
 
@@ -164,4 +181,5 @@ node scripts/check-pii.mjs
 | 파일 | 변경 |
 |---|---|
 | `src/commands/post/list.ts` | 수정 — `--tag` 추가와 `tagIds` 전달 |
+| `src/resolvers/tag.ts` | 수정 — `lookupTagIds` 의 not-found 안내에 `helpHint` 추가 |
 | `src/commands/post/list.test.ts` | 신규 — 확인 4건 |

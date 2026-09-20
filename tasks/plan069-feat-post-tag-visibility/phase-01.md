@@ -46,6 +46,9 @@
 - 일반 출력의 태그 조회가 실패해도 `post get` 은 성공으로 끝낸다.
   사람이 읽는 출력이라 태그 한 줄 때문에 상세 조회 전체를 버릴 이유가 없다.
   `--with-tag-names` 는 반대다. 옵션을 준 호출은 이름을 기대하므로 못 채우면 실패한다.
+- `--with-tag-names` 를 `--json` 없이 주면 그 옵션은 효력이 없다.
+  일반 출력은 옵션과 무관하게 이름을 붙이기 때문이다.
+  `CLAUDE.md` 의 「무시되는 옵션」 규약대로 stderr 에 경고를 내고 그대로 진행한다.
 
 ## 작업 항목
 
@@ -121,20 +124,23 @@ export async function attachTagNames(
 
 1. 업무를 받는다
 2. `post.tags` 가 비어 있으면 `attachTagNames` 를 부르지 않고 지금과 같이 출력한다
-3. 비어 있지 않으면 `attachTagNames` 를 부른다
-4. `--with-tag-names` 가 있고 `missing` 이 비어 있지 않으면
+3. `opts.json` 이고 `--with-tag-names` 가 없으면 `attachTagNames` 를 부르지 않는다.
+   그 호출은 응답을 그대로 내므로 결과를 쓸 곳이 없고,
+   캐시가 비어 있으면 `fetchAllTags` 의 페이지 순회가 통째로 붙는다
+4. 남은 경우에 `attachTagNames` 를 부른다
+5. `--with-tag-names` 가 있고 `missing` 이 비어 있지 않으면
    `EXIT_API_ERROR` 로 던진다. 문구에 못 찾은 id 를 적고 캐시를 지우는 방법을 안내한다
-5. `--with-tag-names` 가 있고 `missing` 이 비어 있으면 붙인 목록을 포맷터에 넘긴다
-6. `--with-tag-names` 가 없으면 `--json` 은 raw 그대로 내고,
+6. `--with-tag-names` 가 있고 `missing` 이 비어 있으면 붙인 목록을 포맷터에 넘긴다
+7. `--with-tag-names` 가 없으면 `--json` 은 raw 그대로 내고,
    일반 출력에만 붙인 목록을 쓴다
 
-3번에서 `attachTagNames` 가 실패하면 처리가 갈린다.
+4번에서 `attachTagNames` 가 실패하면 처리가 갈린다.
 
 - `--with-tag-names` 가 있으면 그 오류를 그대로 던진다
 - 없으면 오류를 삼키고 stderr 에 한 줄 경고를 낸 뒤 이름 없이 진행한다.
   사람이 읽는 출력이라 태그 줄 하나 때문에 상세 조회를 버리지 않는다
 
-4번의 오류 문구는 이렇다.
+5번의 오류 문구는 이렇다.
 
 ```
 태그 이름을 찾지 못했습니다: <id>, <id>
@@ -156,7 +162,7 @@ export async function attachTagNames(
 세 번째는 `name` 이 `undefined` 인지가 아니라 **키가 없는지** 확인한다.
 `expect(tag).not.toHaveProperty("name")` 형태여야 `undefined` 로 채운 경우도 잡힌다.
 
-### 5. `src/commands/post/get.test.ts` 를 만들고 확인 다섯을 담는다
+### 5. `src/commands/post/get.test.ts` 를 만들고 확인 일곱을 담는다
 
 이 파일이 없으면 만든다. `src/commands/post/edit.test.ts` 의 mock 방식을 따른다.
 
@@ -167,6 +173,11 @@ export async function attachTagNames(
 | 옵션 없는 `--json` | `--json` 만 | 출력의 `tags` 에 `name` 키가 없다 |
 | 옵션 있는 `--json` | `--json --with-tag-names`, 모두 찾음 | 각 태그에 `name` 이 있다 |
 | 옵션 있고 못 찾음 | `--json --with-tag-names`, 하나를 못 찾음 | `EXIT_API_ERROR` 로 던진다 |
+| 일반 출력, 이름을 못 찾음 | 태그 2개 중 하나가 캐시에 없음 | 출력에 `(이름 없음)` 이 있고 종료 코드 0 이다 |
+| 일반 출력, 조회가 실패 | `ensureTags` 가 던짐 | stderr 에 경고가 있고 종료 코드 0 이다 |
+
+뒤의 둘이 「오류를 삼키는」 경로다.
+회귀가 나도 종료 코드로는 드러나지 않으므로 확인으로만 잡을 수 있다.
 
 세 번째가 ADR-056 의 핵심이다. 옵션을 주지 않은 호출의 출력이 종전과 같아야 한다.
 
