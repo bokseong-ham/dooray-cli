@@ -1,7 +1,7 @@
 import { Command, Option } from "commander";
 import { getConfigOrThrow } from "../../config/store.js";
 import { DoorayApiClient } from "../../api/client.js";
-import { resolveWiki } from "../../resolvers/wiki.js";
+import { resolveWikiPageInput } from "../../resolvers/wiki-page-input.js";
 import {
   openInEditor,
   serializeWikiFrontmatter,
@@ -14,8 +14,11 @@ import { EXIT_PARAM_ERROR } from "../../utils/exit-codes.js";
 
 export const wikiPageEditCommand = new Command("edit")
   .description("위키 페이지 수정 (플래그 없으면 $EDITOR)")
-  .argument("<project>", "프로젝트 코드 또는 ID")
-  .argument("<page-id>", "페이지 ID")
+  .argument("[arg1]", "프로젝트 코드, Dooray Wiki URL, 또는 (`--id`/`--url` 모드일 때) 미사용")
+  .argument("[arg2]", "page-id (positional 2개 모드)")
+  .option("--id <pageId>", "위키 페이지 ID")
+  .option("--url <url>", "Dooray Wiki URL")
+  .option("--project <code>", "프로젝트 코드 (--id 모드에서 wikiId 해석용)")
   .option("--title <title>", "페이지 제목 (지정 시 $EDITOR 생략)")
   .option("--body <text>", "본문 텍스트 (- 입력 시 stdin에서 읽기)")
   .option("--body-file <path>", "본문 파일 경로 (- 입력 시 stdin에서 읽기)")
@@ -23,7 +26,7 @@ export const wikiPageEditCommand = new Command("edit")
     new Option("--mime-type <type>", "본문 형식 (미지정 시 기존 페이지의 형식 유지, 단독 지정 시 본문은 그대로 두고 형식만 변경)")
       .choices(BODY_MIME_TYPES),
   )
-  .action(async (project, pageId, opts) => {
+  .action(async (arg1, arg2, opts) => {
     const config = await getConfigOrThrow();
     const client = new DoorayApiClient(config.apiKey, config.baseUrl);
 
@@ -32,9 +35,17 @@ export const wikiPageEditCommand = new Command("edit")
     const hasMimeType = opts.mimeType != null;
     const nonInteractive = hasTitle || hasBody || hasMimeType;
 
-    // resolveWiki 먼저 호출 — $EDITOR flow와 순서 통일 (page-create와 비대칭은 의도적)
+    // resolveWikiPageInput 을 spinner 보다 먼저 호출 (validation-before-spinner)
+    const { wikiId, pageId } = await resolveWikiPageInput(client, {
+      projectArg: arg1,
+      pageIdArg: arg2,
+      idOpt: opts.id,
+      urlOpt: opts.url,
+      project: opts.project,
+    });
+
+    // 해석 다음에 spinner — $EDITOR flow와 순서 통일 (page-create와 비대칭은 의도적)
     startSpinner("위키 정보 조회 중...");
-    const wikiId = await resolveWiki(client, project);
 
     if (!nonInteractive) {
       // 기존 $EDITOR flow

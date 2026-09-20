@@ -3,7 +3,7 @@ import { Command } from "commander";
 
 const mocks = vi.hoisted(() => ({
   getConfigOrThrow: vi.fn(),
-  resolveWiki: vi.fn(),
+  resolveWikiPageInput: vi.fn(),
   readBodyInput: vi.fn(),
   openInEditor: vi.fn(),
   startSpinner: vi.fn(),
@@ -26,9 +26,9 @@ vi.mock("../../api/client.js", () => ({
   }),
 }));
 
-vi.mock("../../resolvers/wiki.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../resolvers/wiki.js")>();
-  return { ...actual, resolveWiki: mocks.resolveWiki };
+vi.mock("../../resolvers/wiki-page-input.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../resolvers/wiki-page-input.js")>();
+  return { ...actual, resolveWikiPageInput: mocks.resolveWikiPageInput };
 });
 
 vi.mock("../../editor/index.js", async (importOriginal) => {
@@ -82,11 +82,63 @@ beforeEach(() => {
     apiKey: "test-api-key",
     baseUrl: "https://example.dooray.com",
   });
-  mocks.resolveWiki.mockResolvedValue("wiki-1");
+  mocks.resolveWikiPageInput.mockResolvedValue({ wikiId: "wiki-1", pageId: "page-1" });
   mocks.readBodyInput.mockResolvedValue("<p>새 본문</p>");
   mocks.client.updateWikiPage.mockResolvedValue({});
   mocks.client.updateWikiPageTitle.mockResolvedValue({});
   mocks.client.updateWikiPageContent.mockResolvedValue({});
+});
+
+describe("wiki page edit 입력 형태", () => {
+  // resolveWikiPageInput 자체의 동작은 resolvers/wiki-page-input.test.ts 가 확인한다.
+  // 여기서는 명령이 무엇을 넘기는지만 본다.
+  async function runEdit(argv: string[]): Promise<void> {
+    const program = await createCommandTree();
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    await program.parseAsync(["node", "dooray", "wiki", "edit", ...argv]);
+    stdout.mockRestore();
+  }
+
+  it("--id 만 주면 idOpt 로 넘기고 positional 은 비운다", async () => {
+    await runEdit(["--id", "page-1", "--body", "새 본문", "--mime-type", "text/x-markdown"]);
+
+    expect(mocks.resolveWikiPageInput).toHaveBeenCalledWith(
+      mocks.client,
+      expect.objectContaining({ idOpt: "page-1", projectArg: undefined, pageIdArg: undefined }),
+    );
+  });
+
+  it("--id 와 --project 를 함께 주면 project 로 넘긴다", async () => {
+    await runEdit([
+      "--id",
+      "page-1",
+      "--project",
+      "my-wiki",
+      "--body",
+      "새 본문",
+      "--mime-type",
+      "text/x-markdown",
+    ]);
+
+    expect(mocks.resolveWikiPageInput).toHaveBeenCalledWith(
+      mocks.client,
+      expect.objectContaining({ idOpt: "page-1", project: "my-wiki" }),
+    );
+  });
+
+  it("positional 두 개를 주면 projectArg 와 pageIdArg 로 넘긴다", async () => {
+    await runEdit(["my-wiki", "page-1", "--body", "새 본문", "--mime-type", "text/x-markdown"]);
+
+    expect(mocks.resolveWikiPageInput).toHaveBeenCalledWith(
+      mocks.client,
+      expect.objectContaining({
+        projectArg: "my-wiki",
+        pageIdArg: "page-1",
+        idOpt: undefined,
+        urlOpt: undefined,
+      }),
+    );
+  });
 });
 
 describe("wiki page edit mimeType 보존", () => {
