@@ -1,7 +1,11 @@
 import { Command } from "commander";
 import { getConfigOrThrow } from "../../../config/store.js";
 import { DoorayApiClient } from "../../../api/client.js";
-import { resolveWikiPageInput } from "../../../resolvers/wiki-page-input.js";
+import {
+  resolveWikiPageInput,
+  WIKI_PAGE_ID_OPTION_DESC,
+  WIKI_PAGE_PROJECT_OPTION_DESC,
+} from "../../../resolvers/wiki-page-input.js";
 import { startSpinner, stopSpinner } from "../../../utils/spinner.js";
 import { DoorayCliError } from "../../../utils/errors.js";
 import { EXIT_PARAM_ERROR } from "../../../utils/exit-codes.js";
@@ -15,9 +19,9 @@ export const wikiPageFileUploadCommand = new Command("upload")
   .argument("[arg1]", "프로젝트 코드, Dooray Wiki URL, 또는 (`--id`/`--url` 모드일 때) 파일 경로")
   .argument("[arg2]", "page-id 또는 (`--id`/`--url` 모드일 때) 파일 경로")
   .argument("[arg3]", "파일 경로 (positional 3개 모드)")
-  .option("--id <pageId>", "위키 페이지 ID")
+  .option("--id <pageId>", WIKI_PAGE_ID_OPTION_DESC)
   .option("--url <url>", "Dooray Wiki URL")
-  .option("--project <code>", "프로젝트 코드 (--id 모드에서 wikiId 해석용)")
+  .option("--project <code>", WIKI_PAGE_PROJECT_OPTION_DESC)
   .option("--file <path>", "업로드할 파일 경로 (positional 대체)")
   .option("--type <type>", "파일 타입: general | inline_image (기본 general)", "general")
   .action(async (arg1, arg2, arg3, opts) => {

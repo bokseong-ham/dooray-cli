@@ -1,7 +1,11 @@
 import { Command } from "commander";
 import { getConfigOrThrow } from "../../../config/store.js";
 import { DoorayApiClient } from "../../../api/client.js";
-import { resolveWikiPageInput } from "../../../resolvers/wiki-page-input.js";
+import {
+  resolveWikiPageInput,
+  WIKI_PAGE_ID_OPTION_DESC,
+  WIKI_PAGE_PROJECT_OPTION_DESC,
+} from "../../../resolvers/wiki-page-input.js";
 import { formatWikiCommentDetail } from "../../../formatters/wiki-comment.js";
 import type { OutputOptions } from "../../../formatters/table.js";
 import { startSpinner, stopSpinner } from "../../../utils/spinner.js";
@@ -12,9 +16,9 @@ export const wikiPageCommentGetCommand = new Command("get")
   .argument("[arg1]", "프로젝트 코드 / Dooray Wiki URL (모드별)")
   .argument("[arg2]", "위키 페이지 ID (모드별)")
   .argument("[arg3]", "댓글 ID (positional 3개 모드)")
-  .option("--id <pageId>", "위키 페이지 ID (positional 대신)")
+  .option("--id <pageId>", WIKI_PAGE_ID_OPTION_DESC)
   .option("--url <url>", "Dooray Wiki URL (positional 대신)")
-  .option("--project <code>", "프로젝트 코드 (--id 모드용)")
+  .option("--project <code>", WIKI_PAGE_PROJECT_OPTION_DESC)
   .option("--comment-id <id>", "댓글 ID (arg3 대신)")
   .action(async (arg1, arg2, arg3, opts) => {
     const parsed = parseWikiCommentArgs(arg1, arg2, arg3, opts);

@@ -3,7 +3,11 @@ import { getConfigOrThrow } from "../../config/store.js";
 import { DoorayApiClient } from "../../api/client.js";
 import type { MoveWikiPageRequest } from "../../api/types.js";
 import { resolveWiki } from "../../resolvers/wiki.js";
-import { resolveWikiPageInput } from "../../resolvers/wiki-page-input.js";
+import {
+  resolveWikiPageInput,
+  WIKI_PAGE_ID_OPTION_DESC,
+  WIKI_PAGE_PROJECT_OPTION_DESC,
+} from "../../resolvers/wiki-page-input.js";
 import { PROJECT_ID_RE } from "../../resolvers/project.js";
 import { startSpinner, stopSpinner } from "../../utils/spinner.js";
 import { DoorayCliError } from "../../utils/errors.js";
@@ -99,9 +103,9 @@ export const wikiPageMoveCommand = new Command("move")
   .description("위키 페이지 이동 (부모 변경, 정렬 변경, 위키 간 이동)")
   .argument("[arg1]", "프로젝트 코드, Dooray Wiki URL, 또는 (`--id`/`--url` 모드일 때) 미사용")
   .argument("[arg2]", "page-id (positional 2개 모드)")
-  .option("--id <pageId>", "위키 페이지 ID")
+  .option("--id <pageId>", WIKI_PAGE_ID_OPTION_DESC)
   .option("--url <url>", "Dooray Wiki URL")
-  .option("--project <code>", "프로젝트 코드 (--id 모드에서 wikiId 해석 호출 절약)")
+  .option("--project <code>", WIKI_PAGE_PROJECT_OPTION_DESC)
   .option("--parent <page-id>", "이동 대상 부모 페이지 ID (필수)")
   .option("--to-wiki <project|wikiId>", "이동 대상 위키 (프로젝트 코드 또는 위키 ID)")
   .option("--before <page-id>", "이 페이지 바로 뒤에 위치")

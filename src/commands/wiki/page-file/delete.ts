@@ -1,7 +1,11 @@
 import { Command } from "commander";
 import { getConfigOrThrow } from "../../../config/store.js";
 import { DoorayApiClient } from "../../../api/client.js";
-import { resolveWikiPageInput } from "../../../resolvers/wiki-page-input.js";
+import {
+  resolveWikiPageInput,
+  WIKI_PAGE_ID_OPTION_DESC,
+  WIKI_PAGE_PROJECT_OPTION_DESC,
+} from "../../../resolvers/wiki-page-input.js";
 import { startSpinner, stopSpinner } from "../../../utils/spinner.js";
 import { DoorayCliError } from "../../../utils/errors.js";
 import { EXIT_PARAM_ERROR } from "../../../utils/exit-codes.js";
@@ -17,9 +21,9 @@ export const wikiPageFileDeleteCommand = new Command("delete")
   .argument("[arg1]", "프로젝트 코드, Dooray Wiki URL, 또는 (`--id`/`--url` 모드일 때) 파일 ID")
   .argument("[arg2]", "page-id 또는 (`--id`/`--url` 모드일 때) 파일 ID")
   .argument("[arg3]", "파일 ID (positional 3개 모드)")
-  .option("--id <pageId>", "위키 페이지 ID")
+  .option("--id <pageId>", WIKI_PAGE_ID_OPTION_DESC)
   .option("--url <url>", "Dooray Wiki URL")
-  .option("--project <code>", "프로젝트 코드 (--id 모드에서 wikiId 해석용)")
+  .option("--project <code>", WIKI_PAGE_PROJECT_OPTION_DESC)
   .option("--file-id <fileId>", "파일 ID (positional 대체)")
   .option("-y, --yes", "확인 없이 삭제 (자동화용)")
   .action(async (arg1, arg2, arg3, opts) => {

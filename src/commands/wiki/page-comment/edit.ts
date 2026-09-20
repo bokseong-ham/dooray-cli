@@ -1,7 +1,11 @@
 import { Command } from "commander";
 import { getConfigOrThrow } from "../../../config/store.js";
 import { DoorayApiClient } from "../../../api/client.js";
-import { resolveWikiPageInput } from "../../../resolvers/wiki-page-input.js";
+import {
+  resolveWikiPageInput,
+  WIKI_PAGE_ID_OPTION_DESC,
+  WIKI_PAGE_PROJECT_OPTION_DESC,
+} from "../../../resolvers/wiki-page-input.js";
 import { openInEditor } from "../../../editor/index.js";
 import { readBodyInputOrNull } from "../../../utils/body-input.js";
 import { startSpinner, stopSpinner } from "../../../utils/spinner.js";
@@ -12,9 +16,9 @@ export const wikiPageCommentEditCommand = new Command("edit")
   .argument("[arg1]", "프로젝트 코드 / Dooray Wiki URL (모드별)")
   .argument("[arg2]", "위키 페이지 ID (모드별)")
   .argument("[arg3]", "댓글 ID (positional 3개 모드)")
-  .option("--id <pageId>", "위키 페이지 ID (positional 대신)")
+  .option("--id <pageId>", WIKI_PAGE_ID_OPTION_DESC)
   .option("--url <url>", "Dooray Wiki URL (positional 대신)")
-  .option("--project <code>", "프로젝트 코드 (--id 모드용)")
+  .option("--project <code>", WIKI_PAGE_PROJECT_OPTION_DESC)
   .option("--comment-id <commentId>", "댓글 ID (positional 대체)")
   .option("--body <text>", "댓글 본문 변경 (- 입력 시 stdin, non-interactive)")
   .option("--body-file <path>", "본문 파일 경로 (- 입력 시 stdin, non-interactive)")

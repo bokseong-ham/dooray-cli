@@ -1,7 +1,11 @@
 import { Command } from "commander";
 import { getConfigOrThrow } from "../../../config/store.js";
 import { DoorayApiClient } from "../../../api/client.js";
-import { resolveWikiPageInput } from "../../../resolvers/wiki-page-input.js";
+import {
+  resolveWikiPageInput,
+  WIKI_PAGE_ID_OPTION_DESC,
+  WIKI_PAGE_PROJECT_OPTION_DESC,
+} from "../../../resolvers/wiki-page-input.js";
 import { formatWikiCommentDetail } from "../../../formatters/wiki-comment.js";
 import type { OutputOptions } from "../../../formatters/table.js";
 import { startSpinner, stopSpinner } from "../../../utils/spinner.js";
@@ -10,9 +14,9 @@ export const wikiPageCommentLatestCommand = new Command("latest")
   .description("최신 댓글 1건 조회 (= comment list --latest 1)")
   .argument("[project]", "프로젝트 코드 (또는 첫 인자에 Dooray Wiki URL)")
   .argument("[page-id]", "위키 페이지 ID")
-  .option("--id <pageId>", "위키 페이지 ID (--project 동반)")
+  .option("--id <pageId>", WIKI_PAGE_ID_OPTION_DESC)
   .option("--url <url>", "Dooray Wiki URL")
-  .option("--project <code>", "프로젝트 코드 (--id 모드용)")
+  .option("--project <code>", WIKI_PAGE_PROJECT_OPTION_DESC)
   .action(async (project, pageIdArg, opts) => {
     const globalOpts = wikiPageCommentLatestCommand.optsWithGlobals() as OutputOptions;
     const config = await getConfigOrThrow();

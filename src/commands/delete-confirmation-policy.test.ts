@@ -56,6 +56,8 @@ vi.mock("../resolvers/comment-file-input.js", () => ({
 
 vi.mock("../resolvers/wiki-page-input.js", () => ({
   resolveWikiPageInput: vi.fn(),
+  WIKI_PAGE_ID_OPTION_DESC: "위키 페이지 ID (project 없이 조회)",
+  WIKI_PAGE_PROJECT_OPTION_DESC: "프로젝트 코드 (선택, 주면 wikiId 해석 호출을 아낀다)",
 }));
 
 interface DeleteCommandCase {

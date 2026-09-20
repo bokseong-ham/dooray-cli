@@ -1,5 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
-import { resolveWikiPageInput } from "./wiki-page-input.js";
+import {
+  resolveWikiPageInput,
+  WIKI_PAGE_ID_OPTION_DESC,
+  WIKI_PAGE_PROJECT_OPTION_DESC,
+} from "./wiki-page-input.js";
 import { DoorayCliError } from "../utils/errors.js";
 import { EXIT_PARAM_ERROR, EXIT_API_ERROR } from "../utils/exit-codes.js";
 
@@ -100,5 +104,15 @@ describe("resolveWikiPageInput", () => {
     await expect(
       resolveWikiPageInput(makeClient(), {}),
     ).rejects.toBeInstanceOf(DoorayCliError);
+  });
+});
+
+describe("옵션 설명 상수", () => {
+  it("WIKI_PAGE_ID_OPTION_DESC 가 단독 동작을 말한다", () => {
+    expect(WIKI_PAGE_ID_OPTION_DESC).toContain("project 없이");
+  });
+
+  it("WIKI_PAGE_PROJECT_OPTION_DESC 가 선택임을 말한다", () => {
+    expect(WIKI_PAGE_PROJECT_OPTION_DESC).toContain("선택");
   });
 });

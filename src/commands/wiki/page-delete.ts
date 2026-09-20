@@ -1,7 +1,11 @@
 import { Command } from "commander";
 import { getConfigOrThrow } from "../../config/store.js";
 import { DoorayApiClient } from "../../api/client.js";
-import { resolveWikiPageInput } from "../../resolvers/wiki-page-input.js";
+import {
+  resolveWikiPageInput,
+  WIKI_PAGE_ID_OPTION_DESC,
+  WIKI_PAGE_PROJECT_OPTION_DESC,
+} from "../../resolvers/wiki-page-input.js";
 import { startSpinner, stopSpinner } from "../../utils/spinner.js";
 import {
   authorizeDeletion,
@@ -14,9 +18,9 @@ export const wikiPageDeleteCommand = new Command("delete")
   .description("위키 페이지 삭제")
   .argument("[arg1]", "프로젝트 코드, Dooray Wiki URL, 또는 (`--id`/`--url` 모드일 때) 미사용")
   .argument("[arg2]", "page-id (positional 2개 모드)")
-  .option("--id <pageId>", "위키 페이지 ID")
+  .option("--id <pageId>", WIKI_PAGE_ID_OPTION_DESC)
   .option("--url <url>", "Dooray Wiki URL")
-  .option("--project <code>", "프로젝트 코드 (--id 모드에서 wikiId 해석용)")
+  .option("--project <code>", WIKI_PAGE_PROJECT_OPTION_DESC)
   .option("-y, --yes", "확인 없이 삭제 (자동화용)")
   .action(async (arg1, arg2, opts) => {
     const confirmed = await authorizeDeletion(
