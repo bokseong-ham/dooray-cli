@@ -118,7 +118,7 @@ plan 의 제출 조건을 본다.
 
 ```bash
 # cwd: <repo root>
-node scripts/check-plan.mjs plan071-perf-mail-id-lookup
+python3 ~/.claude/skills/planning/scripts/verify_task.py plan071-perf-mail-id-lookup
 ```
 
 종료 코드 0 이어야 한다.

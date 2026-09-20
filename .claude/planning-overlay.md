@@ -57,6 +57,16 @@ planning 에서는 README 와 `skills/` 를 손대는 phase 마다 그 grep 을 
 
 ## 검증
 
+- **task 검사기**: 코어가 지시하는 `verify_task.py` 하나만 쓴다.
+  그 스크립트는 **스킬 번들 안**에 있고 저장소에는 없다. cwd 는 타깃 레포 root 다.
+
+  ```bash
+  # cwd: <repo root>
+  python3 ~/.claude/skills/planning/scripts/verify_task.py plan{N}-{slug}
+  ```
+
+  저장소는 별도 plan 검사기를 두지 않는다. 근거는 `docs/adr/059-plan-check-owned-by-skill.md` 다.
+  같은 규칙을 저장소에 다시 만들면 그 결정이 무효가 된다.
 - **반복 함정 목록**: 코어가 요구하는 task 제출 전 self-check 의 대상은 `docs/pitfalls/` 다. 어느 카테고리를 볼지는 그 안의 `INDEX.md` 라우터가 정한다.
 - **docs-verifier 흡수 원칙**: docs-verifier 의 반복 지적은 별도 회고 docs 를 신설하지 않는다.
   - 위 "변경 유형별 docs 영향 표"에 행 추가나 보강으로 흡수한다.

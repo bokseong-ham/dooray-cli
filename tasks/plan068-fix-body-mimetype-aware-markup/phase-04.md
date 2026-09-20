@@ -124,7 +124,7 @@ plan 의 제출 조건을 본다.
 
 ```bash
 # cwd: <repo root>
-node scripts/check-plan.mjs plan068-fix-body-mimetype-aware-markup
+python3 ~/.claude/skills/planning/scripts/verify_task.py plan068-fix-body-mimetype-aware-markup
 ```
 
 종료 코드 0 이어야 한다.

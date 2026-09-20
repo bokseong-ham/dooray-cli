@@ -152,7 +152,7 @@ plan 의 제출 조건을 본다.
 
 ```bash
 # cwd: <repo root>
-node scripts/check-plan.mjs plan070-fix-cli-usability-and-output
+python3 ~/.claude/skills/planning/scripts/verify_task.py plan070-fix-cli-usability-and-output
 ```
 
 종료 코드 0 이어야 한다.

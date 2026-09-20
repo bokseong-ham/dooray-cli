@@ -141,7 +141,7 @@ plan 의 제출 조건을 본다.
 
 ```bash
 # cwd: <repo root>
-node scripts/check-plan.mjs plan069-feat-post-tag-visibility
+python3 ~/.claude/skills/planning/scripts/verify_task.py plan069-feat-post-tag-visibility
 ```
 
 종료 코드 0 이어야 한다.
