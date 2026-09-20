@@ -92,7 +92,7 @@ src/
     errors.ts               # DoorayCliError (message + exitCode)
     spinner.ts              # ora 래퍼 + setQuiet (--json/--quiet 시 noop proxy 반환, Issue #35 item 1)
     exit-codes.ts           # 0 성공 / 1 API오류 / 2 인증실패 / 3 파라미터오류 / 4 설정오류
-    body-input.ts           # --body / --body-file → string (stdin "-" + 충돌 가드)
+    body-input.ts           # --body / --body-file → string (stdin "-" + 충돌 가드) + BODY_MIME_TYPES / resolveBodyMimeType / warnUnconvertedBody — --mime-type 의 우선순위와 경고를 한 곳에 둔다 (ADR-053)
     dooray-url.ts           # task URL (/task/to/<postId> + /task/<projectId>/<postId> + /project/tasks/<postId>) + wiki URL (/wiki/<wikiId>/<pageId>) parser (ADR-020)
     comment-enrich.ts       # PostComment[] Creator 이름 채우기 (ADR-021, immutable)
     mention.ts              # 멤버·그룹 멘션 마크업 빌더 + prependMentions (Issue #25)
@@ -145,7 +145,7 @@ src/
       search.ts
       get.ts
       create.ts
-      edit.ts               # $EDITOR 또는 제목·본문·태그·참조자·담당자 옵션 기반 비대화형 수정
+      edit.ts               # $EDITOR 또는 제목·본문·태그·참조자·담당자·--mime-type 옵션 기반 비대화형 수정
       done.ts
       workflow.ts
       comment/
@@ -153,7 +153,7 @@ src/
         latest.ts             # 최신 댓글 N개 단축 조회
         get.ts                # 단일 댓글 상세 (positional 3 / --id / --url + --comment-id, Issue #45)
         add.ts
-        edit.ts
+        edit.ts               # 댓글 수정 — --body / --body-file / $EDITOR fallback, --mime-type 단독 지정은 본문을 유지한 채 비대화형 수정
         delete.ts             # 댓글 삭제 (공통 confirm ADR-036)
         file/
           index.ts            # commentFileCommand 조립
@@ -174,7 +174,7 @@ src/
       tree.ts               # 페이지 계층 트리 (root 부터 레벨별 재귀 drill-down, --depth 상한, ADR-034) — text 트리 / --json flat(parentPageId)
       page-get.ts
       page-create.ts
-      page-edit.ts          # $EDITOR + 비대화형 플래그(--title/--body/--body-file)
+      page-edit.ts          # $EDITOR + 비대화형 플래그(--title/--body/--body-file/--mime-type)
       page-move.ts          # 부모 변경, 정렬 변경, 위키 간 이동을 공식 move endpoint 로 호출 (ADR-047)
       page-delete.ts        # 페이지 삭제 (공식 DELETE endpoint, ADR-032) — 공통 confirm ADR-036, resolveWikiPageInput
       page-file/
