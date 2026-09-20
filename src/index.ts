@@ -52,6 +52,7 @@ import { messengerCommand } from "./commands/messenger/index.js";
 import { feedbackCommand } from "./commands/feedback.js";
 import { DoorayCliError } from "./utils/errors.js";
 import { sanitizeArgv } from "./utils/argv-sanitize.js";
+import { attachUsageHint } from "./utils/unknown-option-hint.js";
 import { setQuiet } from "./utils/spinner.js";
 import { writeLastRun } from "./cache/last-run.js";
 import { getConfig } from "./config/store.js";
@@ -157,6 +158,9 @@ program.addCommand(wikiCommand);
 program.addCommand(mailCommand);
 program.addCommand(messengerCommand);
 program.addCommand(feedbackCommand);
+
+// ADR-058: 등록이 끝난 뒤 명령 나무 전체에 오류 안내 후크를 건다.
+attachUsageHint(program, "");
 
 program.parseAsync().catch(async (err) => {
   const errorMessage = err instanceof Error ? err.message : String(err);
