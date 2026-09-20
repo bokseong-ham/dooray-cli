@@ -57,10 +57,10 @@ dooray                # 글로벌 링크 시
   - `<project> <number>` / `--id <id>` / `--url <url>` / 첫 positional 에 Dooray URL 직접 입력
   - wiki 의 `--id` 모드는 project 없이 단독으로 동작한다. `--project` 는 선택이며 주면 wikiId 해석 호출을 아낀다
 - **옵션 이름**
-  - 제목은 post·wiki 모두 `--title` (`--subject` 는 deprecated alias — stderr 경고 후 동작)
+  - 제목은 post·wiki 모두 `--title` 이다. `post create` 와 `post edit` 의 `--subject` 는 `--title` 의 deprecated alias 로 stderr 경고를 낸 뒤 동작한다. `post list` 의 `--subject` 는 제목 키워드 필터라서 별개 옵션이다
   - 본문은 `--body` / `--body-file` (둘 다 `-` 로 stdin 을 받는다)
   - `config set <key> <value>` 의 값도 `-` 로 stdin 을 받는다 — 토큰이 셸 기록과 프로세스 목록에 남지 않게 하는 경로다
-  - `post edit`, `wiki page edit`, `post`·`wiki page` 의 `comment add`/`edit` 는 둘 다 없으면 `$EDITOR` 가 열린다. 단 `post edit` 의 태그·참조자·담당자 변경 옵션은 제목·본문 없이도 비대화형 수정으로 실행한다. `create` 계열은 fallback 없이 에러가 된다
+  - `post edit`, `wiki page edit`, `post`·`wiki page` 의 `comment add`/`edit` 는 둘 다 없으면 `$EDITOR` 가 열린다. 단 `post edit` 의 태그·참조자·담당자 변경 옵션과 `post edit`·`wiki page edit` 의 `--mime-type` 은 제목·본문 없이도 비대화형 수정으로 실행한다. `create` 계열은 fallback 없이 에러가 된다
 - **mail 계열 입력**: `mail get`·`mail reply` 는 IMAP UID 외에 메일 웹 주소와 그 주소의 mail id 도 받는다. mail id 는 도착 시각으로 풀어 UID 를 이분 탐색한다 (ADR-040)
   - 웹 주소와 mail id 로 추정한 메일의 답장은 원본 제목, 발신자, IMAP 도착 시각과 UID 를 보여주고 확인한다. TTY 기본값은 아니오이며 거절하면 발송 없이 정상 취소한다
   - `-y`/`--yes` 로 확인을 생략한다. non-TTY 에서 옵션이 없으면 설정과 IMAP 조회 전에 `EXIT_PARAM_ERROR`(3)로 중단한다. UID 직접 입력은 확인 없이 보낸다
@@ -70,7 +70,7 @@ dooray                # 글로벌 링크 시
   - TTY 확인의 기본값은 아니오다. 사용자가 거절하면 API를 호출하지 않고 정상 취소한다
   - non-TTY에서 `-y`/`--yes`가 없으면 설정 조회·resolver·API 호출 전에 `EXIT_PARAM_ERROR`(3)로 중단한다
 - **post 목록 정렬**: 최신순 (`-createdAt`)
-- **interactive 모드**: 비대화형 진입 조건이 아닌 전용 옵션은 무시하고 경고를 낸다
+- **무시되는 옵션**: 다른 옵션 때문에 효력이 없어진 옵션은 무시하고 stderr 로 경고한다
 
 ## 개인 식별 정보 / 사내 식별자 노출 금지 (public OSS)
 
@@ -108,7 +108,9 @@ CI 가 같은 스크립트를 돌리므로 통과하지 않으면 PR 이 막힌�
 
 ## 공개 문서의 내부 참조 번호 제외
 
-`README.md` 와 `skills/dooray-cli/SKILL.md` 에는 `ADR-NNN`, `Issue #NN`, `task NN` 같은 내부 추적 번호를 넣지 않는다.
+`README.md` 와 `skills/` 아래 문서에는 `ADR-NNN`, `Issue #NN`, `task NN` 같은 내부 추적 번호를 넣지 않는다.
+검사 범위는 `scripts/check-public-refs.mjs` 의 `TARGETS` 목록이 소유한다.
+`skills/dooray-cli/references/` 와 `skills/dooray-persona/` 도 그 범위에 들어간다.
 사용자는 ADR 맥락을 모르고, 이 문서를 그대로 LLM 에 붙여 실행을 요청하기도 한다.
 
 - 기능 동작과 사용법만 기술한다. "왜 이렇게 설계했는가" 는 `docs/adr/` 에만 둔다
@@ -130,8 +132,9 @@ CI 가 같은 스크립트를 돌린다.
 `.claude/skills/` 의 스킬은 셋을 순서대로 둔다.
 목표 한 문장, 단계와 통과 조건을 담은 워크플로 개요 표, 그리고 워크플로 상세다.
 
-- **반복되는 절차와 판정은 `scripts/*.mjs` 로 옮긴다.**
-  이 저장소는 Node 기반이고 `scripts/check-pii.mjs` 와 `scripts/verify-package.mjs` 가 선례다
+- **반복되는 절차와 판정은 그 스킬의 `scripts/*.mjs` 로 옮긴다.**
+  이 저장소는 Node 기반이고 `.claude/skills/release/scripts/preflight.mjs` 가 선례다.
+  저장소 전체가 쓰는 검사는 root 의 `scripts/` 에 둔다. `scripts/check-pii.mjs` 와 `scripts/verify-package.mjs` 가 그쪽 선례다
 - **실행 함정은 스크립트가 흡수한다.** 사람이 읽고 지켜야 하는 규칙으로 문서에 남기지 않는다.
   예로 옵션 문자열을 `grep` 에 넘기면 자기 옵션으로 해석되므로, 스크립트가 파일을 직접 읽어 찾는다
 - 스킬 스크립트는 저장소 root 를 스스로 찾아 이동하고, 각 명령의 종료 코드를 그 자리에서 읽는다.
