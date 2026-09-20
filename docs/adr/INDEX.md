@@ -62,3 +62,8 @@ ADR-NNN 내용은 `docs/adr/NNN-*.md` (번호 glob) 또는 아래 목록 링크�
 - [ADR-051](051-json-large-integer-precision.md) — 응답 JSON 의 큰 정수를 `ky` 의 `parseJson` 공통 파서로 문자열 보존 (`direct-send` 의 log-id 손실)
 - [ADR-052](052-messenger-thread-send.md) — 메신저 스레드 생성을 `thread-send` 한 명령에 `--log` 분기로 둔다 (`threadChannelId` 필드 부재 실측)
 - [ADR-053](053-body-mimetype-preservation.md) — 본문 수정 시 기존 mimeType 을 보존하고 `--mime-type` 으로 덮어쓴다 (신규 작성은 markdown 기본 유지)
+- [ADR-054](054-private-project-resolution.md) — 개인 프로젝트 코드는 공용 목록에서 실패한 자리에서 private 목록을 받아 다시 찾는다 (Issue #173)
+- [ADR-055](055-body-mimetype-aware-markup.md) — 본문에 마크업을 넣고 빼는 경로는 그 본문의 mimeType 에 맞는 문법을 쓴다 (Issue #173)
+- [ADR-056](056-json-enrichment-behind-option.md) — `--json` 의 raw 유지는 그대로 두고 이름 보강은 `--with-tag-names` 로 연다 (Issue #174)
+- [ADR-057](057-download-all-includes-inline-files.md) — `download-all` 은 첨부 목록과 본문에 삽입된 파일을 함께 받는다 (Issue #171)
+- [ADR-058](058-unknown-option-usage-hint.md) — 알 수 없는 옵션 오류에 그 이름의 실제 사용법을 붙인다 (Issue #170)
