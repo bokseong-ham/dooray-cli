@@ -127,6 +127,29 @@ emitDeleteResult(globalOpts, {
 - **m9.** `feedback` 의 버전 항목은 #173 의 덧붙임이지만 `--json` 불일치가 아니다.
   맡은 범위를 「덧붙임 전체」로 다시 적거나 그 항목을 옮긴다. 결함 자체는 실재한다.
 
+## 반영 결과
+
+구현을 시작하기 전에 아래와 같이 반영했다.
+
+| 항목 | 반영 |
+| --- | --- |
+| C1 | plan072 가 맡으므로 다루지 않는다. `index.json` 의 description 에 이슈 175 를 가리키는 문구가 원래 없어 뺄 것이 없었다 |
+| M1 | `phase-01.md` 의 제외 수 안내를 지우고 ADR-057 의 결정을 그대로 가리킨다 |
+| M2 | `phase-02.md` 의 판정 규칙을 정확일치와 접두 판정 둘로 바꾸고 테스트 표에 세 행을 더했다 |
+| M3 | 전파 확인 명령을 `post file download-all --project x` 로 바꿨다 |
+| M4 | README 에 만들 절 제목과 위치를 표로 적었다 |
+| M5 | SKILL.md 의 표 둘을 구별하고, 머리말과 `--no-inline` 을 적을 자리를 정했다 |
+| M6 | `phase-03.md` 를 `emitDeleteResult` 재사용으로 바꾸고 선택 필드 확인 단계를 넣었다 |
+| m1 | 「셋」을 「둘」로 맞췄다 (`index.json`, phase-01·02) |
+| m2 | 항목 3의 제목을 `src/utils/unknown-option-hint.ts` 로 맞췄다 |
+| m3 | `src/index.test.ts` 를 뺐다 |
+| m4 | 진행 출력의 개수를 합친 목록 기준으로 적고 테스트 표에 한 행을 더했다 |
+| m5 | `grep -c ... # = 0` 에 `|| true` 를 붙였다 (phase-02·04) |
+| m6 | `optsWithGlobals()` 를 확인 뒤에 두도록 적었다 |
+| m7 | phase-03 의 `execution_profile` 을 `standard` 로 올렸다 |
+| m8 | 실계정 확인을 건너뛸 때의 대체와 보고 의무를 적었다 |
+| m9 | phase-03 의 목표에 두 항목의 성격이 다르다는 것을 적었다 |
+
 ## 확인해 맞았던 것
 
 아래는 대조해 사실과 맞는 것이다. 고치지 않는다.

@@ -5,9 +5,9 @@
 ## 목표
 
 `error: unknown option '--project'` 한 줄 뒤에,
-그 이름이 그 명령의 positional 인자와 같으면 인자로 준다는 안내와 사용법을 덧붙인다.
+그 이름이 그 명령의 positional 인자를 가리키면 인자로 준다는 안내와 사용법을 덧붙인다.
 
-**범위 외**: 인라인 파일 다운로드는 phase 01 이다. 출력 불일치 셋은 phase 03 이다. 문서는 phase 04 다.
+**범위 외**: 인라인 파일 다운로드는 phase 01 이다. 출력 불일치 둘은 phase 03 이다. 문서는 phase 04 다.
 옵션 이름의 오타 제안은 만들지 않는다. commander 가 이미 한다.
 
 ## 컨텍스트
@@ -55,7 +55,7 @@ commander 15 에서 쓸 수 있는 것은 둘이다.
 /** commander 의 오류 문자열에서 알 수 없는 옵션 이름을 뽑는다. 아니면 undefined. */
 export function parseUnknownOptionName(message: string): string | undefined;
 
-/** 그 이름이 인자 이름과 같으면 붙일 안내를 만든다. 아니면 빈 문자열. */
+/** 그 이름이 인자를 가리키면 붙일 안내를 만든다. 아니면 빈 문자열. */
 export function buildUsageHint(
   optionName: string | undefined,
   commandPath: string,
@@ -66,7 +66,18 @@ export function buildUsageHint(
 `parseUnknownOptionName` 은 `unknown option '--project'` 에서 `project` 를 뽑는다.
 앞의 `-` 를 모두 뗀다. 짧은 옵션(`-p`)도 같은 문구로 오므로 함께 처리한다.
 
-`buildUsageHint` 는 이름이 `argumentNames` 에 있을 때만 문자열을 만든다.
+`buildUsageHint` 는 이름이 인자를 가리킬 때만 문자열을 만든다.
+가리키는 것으로 보는 경우는 둘이다. ADR-058 이 그 판정을 소유한다.
+
+| 판정 | 예 |
+| --- | --- |
+| 인자 이름과 정확히 같다 | `--project` 와 `[project]` |
+| 인자 이름이 `X-` 로 시작하고 그런 인자가 그 명령에 하나뿐이다 | `--post` 와 `[post-number]` |
+
+정확일치를 먼저 본다. 정확일치가 있으면 접두 판정을 하지 않는다.
+`X-` 로 시작하는 인자가 둘 이상이면 어느 쪽인지 정할 수 없으므로 빈 문자열을 돌려준다.
+`post get` 의 인자 이름은 `project` 와 `post-number` 다(`src/commands/post/get.ts`).
+정확일치만 두면 이슈가 든 `--post` 에 안내가 붙지 않는다.
 
 ```
   'project' 는 인자로 전달합니다: dooray post get <project> <post-number>
@@ -90,16 +101,22 @@ export function buildUsageHint(
 | 짧은 옵션 | `unknown option '-p'` | `p` |
 | 다른 오류 | `error: required option '--x' not specified` | `undefined` |
 | 인자와 같은 이름 | `project`, 인자 `["project", "post-number"]` | 안내에 `<project> <post-number>` 가 들어간다 |
+| 접두가 맞는 이름 | `post`, 인자 `["project", "post-number"]` | 안내에 `<project> <post-number>` 가 들어간다 |
+| 접두 후보가 둘 | `post`, 인자 `["post-number", "post-id"]` | 빈 문자열 |
+| 정확일치가 접두보다 앞선다 | `post`, 인자 `["post", "post-number"]` | 안내가 붙는다 |
 | 인자와 다른 이름 | `zzz`, 같은 인자 목록 | 빈 문자열 |
 | 이름이 없음 | `undefined` | 빈 문자열 |
 | 인자가 없는 명령 | `project`, 빈 배열 | 빈 문자열 |
 
-일곱 번째가 `registeredArguments` 가 없어졌을 때의 대비다.
+두 번째와 세 번째가 접두 판정 경로다.
+접두 후보가 둘일 때 붙이지 않는 것을 함께 확인해야 엉뚱한 인자로 보내지 않는다.
+마지막은 `registeredArguments` 가 없어졌을 때의 대비다.
 그 자리에서 빈 배열이 넘어오므로 안내가 붙지 않고 오류만 나간다.
 
-### 3. `src/index.ts` 에 후크를 거는 함수를 넣는다
+### 3. `src/utils/unknown-option-hint.ts` 에 후크를 거는 함수를 두고 `src/index.ts` 가 부른다
 
 명령 나무를 훑어 각 명령에 `configureOutput` 을 건다.
+함수는 작업 항목 1의 파일에 함께 두고 내보낸다. 테스트에서 직접 부를 수 있어야 한다.
 
 ```ts
 function attachUsageHint(cmd: Command, path: string): void {
@@ -127,13 +144,12 @@ attachUsageHint(program, "");
 `registeredArguments` 가 commander 15 에 있는 것은 확인했다.
 타입에 없으면 `as` 로 억지로 맞추지 말고, 없을 때 빈 배열이 되는 접근을 쓴다.
 
-### 4. `src/index.test.ts` 나 새 테스트에 확인 둘을 담는다
+### 4. `src/utils/unknown-option-hint.test.ts` 에 확인 둘을 더 담는다
 
 commander 명령 나무를 직접 만들어 확인한다. `src/index.ts` 를 통째로 태우지 않는다.
 그 파일은 설정 읽기를 포함해 부작용이 많다.
 
-`attachUsageHint` 를 `src/utils/unknown-option-hint.ts` 로 옮겨 내보내면 테스트에서 쓸 수 있다.
-그렇게 하고 `src/index.ts` 는 그것을 import 해 한 줄로 부른다.
+작업 항목 3에서 `attachUsageHint` 를 이 유틸리티에 두고 내보내므로 테스트에서 그대로 부른다.
 
 | 확인할 것 | 상황 | 기대 |
 | --- | --- | --- |
@@ -177,10 +193,10 @@ node dist/index.js post get --project 123 --post 456 ; echo "종료코드=$?"
 
 ```bash
 # cwd: <repo root>
-node dist/index.js post get --zzzz 1 2>&1 | grep -c "인자로 전달합니다"   # = 0
+node dist/index.js post get --zzzz 1 2>&1 | grep -c "인자로 전달합니다" || true   # = 0
 ```
 
-0 이어야 한다.
+0 이어야 한다. `grep -c` 는 찾지 못하면 종료 코드 1 로 끝나므로 `|| true` 로 받는다.
 
 옵션 오타 제안이 그대로 나오는지 본다.
 
@@ -191,15 +207,17 @@ node dist/index.js post get --urls 1 2>&1 | grep -c "Did you mean"   # >= 1
 
 1 이상이어야 한다. commander 의 기존 동작을 이 변경이 덮지 않았다는 값이다.
 
-다른 명령에도 전파됐는지 본다.
+두 단계 아래 명령에도 전파됐는지 본다.
 
 ```bash
 # cwd: <repo root>
-node dist/index.js wiki page get --project x 2>&1 | grep -c "인자로 전달합니다"   # >= 1
+node dist/index.js post file download-all --project x 2>&1 | grep -c "인자로 전달합니다"   # >= 1
 ```
 
-`wiki page get` 의 첫 인자 이름이 `project` 가 아니면 이 확인은 성립하지 않는다.
-그 명령의 `--help` 로 인자 이름을 먼저 확인하고, 다른 이름이면 그 이름으로 바꿔 확인한다.
+`post file download-all` 의 인자는 `[project]` 와 `[post-number]` 다
+(`src/commands/post/file/download-all.ts`). `--project` 는 앞의 것과 정확일치한다.
+`wiki page get` 은 이 확인에 쓰지 않는다. 그 명령은 `--project` 를 실제 옵션으로 갖고 있어
+`unknown option` 오류 자체가 나지 않는다.
 
 개인 식별 정보를 확인한다.
 
@@ -215,5 +233,5 @@ node scripts/check-pii.mjs
 | 파일 | 변경 |
 |---|---|
 | `src/utils/unknown-option-hint.ts` | 신규 — 오류 문자열 해석, 안내 조립, 나무 전체에 후크 걸기 |
-| `src/utils/unknown-option-hint.test.ts` | 신규 — 확인 9건 |
+| `src/utils/unknown-option-hint.test.ts` | 신규 — 확인 12건 |
 | `src/index.ts` | 수정 — `attachUsageHint` 한 줄 호출 |
