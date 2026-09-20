@@ -47,48 +47,66 @@
 
 ### 1. `src/commands/wiki/page-edit.ts` 의 인자와 옵션을 바꾼다
 
-`page-delete.ts` 의 정의를 본으로 삼는다.
+`src/commands/wiki/page-delete.ts:15-19` 의 다섯 줄을 그대로 복사한다.
+인자 이름(`[arg1]`, `[arg2]`)과 설명 문구까지 그대로 가져온다.
+`-y, --yes` 는 삭제 명령에만 필요하므로 가져오지 않는다.
 
-```ts
-.argument("[project]", "프로젝트 코드 또는 ID (또는 첫 인자에 Dooray Wiki URL)")
-.argument("[page-id]", "페이지 ID (project 와 함께 사용)")
-.option("--id <pageId>", "위키 페이지 ID (project/page-id 대신)")
-.option("--url <url>", "Dooray Wiki 페이지 URL (project/page-id 대신)")
-.option("--project <project>", "wikiId 해석에 쓸 프로젝트 (--id 와 함께 쓰는 선택 옵션)")
-```
+**문구를 새로 쓰지 않는다.** 두 명령의 도움말이 다르게 읽히면 사용자가 다른 기능으로 오해한다.
+지금 `page-edit.ts:17-18` 의 `<project>`/`<page-id>` 두 줄이 그 자리를 차지하고 있으므로
+그 둘을 지우고 복사한 다섯 줄을 넣는다.
 
 기존 `--title`, `--body`, `--body-file`, `--mime-type` 은 그대로 둔다.
 
-`page-delete.ts` 의 실제 옵션 설명 문구를 읽고 그것과 같은 표현을 쓴다.
-두 명령의 도움말이 서로 다르게 읽히면 사용자가 다른 기능으로 오해한다.
-
 ### 2. 해석 부분을 `resolveWikiPageInput` 으로 바꾼다
 
-`action` 의 시그니처를 `(project, pageId, opts)` 로 유지하되, 안에서 해석을 바꾼다.
+`action` 의 시그니처를 `page-delete.ts:21` 과 같은 `(arg1, arg2, opts)` 로 바꾼다.
+`page-edit.ts:37` 의 `resolveWiki` 호출을 아래로 바꾼다.
 
 ```ts
-startSpinner("위키 정보 조회 중...");
-const { wikiId, pageId: resolvedPageId } = await resolveWikiPageInput(client, {
-  projectArg: project,
-  pageIdArg: pageId,
+// resolveWikiPageInput 을 spinner 보다 먼저 호출 (validation-before-spinner)
+const { wikiId, pageId } = await resolveWikiPageInput(client, {
+  projectArg: arg1,
+  pageIdArg: arg2,
   idOpt: opts.id,
   urlOpt: opts.url,
   project: opts.project,
 });
+
+startSpinner("위키 정보 조회 중...");
 ```
+
+`page-delete.ts:39` 가 주석까지 달아 이 순서를 지킨다.
+해석이 먼저라야 입력이 모자랄 때 spinner 를 띄우지 않은 채 종료 코드 3 으로 끝난다.
 
 `resolveWiki` import 를 빼고 `resolveWikiPageInput` 을 import 한다.
 
-이 함수 아래의 본문에서 `pageId` 를 쓰는 곳을 모두 `resolvedPageId` 로 바꾼다.
-`getWikiPage`, `updateWikiPage`, `updateWikiPageContent`, `updateWikiPageTitle` 호출과
-마지막 출력 문구가 여기 해당한다.
+**아래 본문에서 이름을 바꿀 자리는 없다.**
+`page-edit.ts` 가 쓰는 두 값이 `wikiId` 와 `pageId` 이고,
+`resolveWikiPageInput` 이 같은 이름으로 돌려준다.
+`arg1` 과 `arg2` 는 이 해석 호출에서만 쓴다.
 
-**이름을 바꿀 때 일괄 치환 도구를 쓰지 않는다.**
-바꿀 자리가 한 파일 안에 열 곳 미만이므로 편집 도구로 직접 고친다.
+`stopSpinner(true, "위키 정보 조회 완료")` 가 비대화형 분기 앞(`page-edit.ts:69`)에 그대로 남는다.
+`startSpinner` 를 뒤로 옮겼어도 그 사이에 API 호출이 없으므로 짝이 맞는다.
 
 ### 3. `src/commands/wiki/page-edit.test.ts` 에 확인 셋을 더한다
 
-이 파일은 이미 있다. 기존 확인은 그대로 두고 아래를 더한다.
+**먼저 mock 을 바꾼다.** 이 파일은 `resolveWiki` 를 mock 하고 있는데(`page-edit.test.ts:29-32`),
+1번과 2번 항목을 끝내면 `page-edit.ts` 가 그 함수를 부르지 않는다.
+`resolveWikiPageInput` 을 mock 하지 않으면 기존 확인 여덟 건이 실제 resolver 를 타고 깨진다.
+
+- `vi.hoisted` 의 `mocks`(`page-edit.test.ts:4-17`)에 `resolveWikiPageInput: vi.fn()` 을 더한다
+- `vi.mock("../../resolvers/wiki-page-input.js", ...)` 을 더한다.
+  기존 `resolvers/wiki.js` mock 과 같은 `importOriginal` 형태를 쓴다
+- `beforeEach`(`page-edit.test.ts:79-90`)에
+  `mocks.resolveWikiPageInput.mockResolvedValue({ wikiId: "wiki-1", pageId: "page-1" })` 를 더한다.
+  기존 확인들이 `"my-wiki" "page-1"` 을 positional 로 주고
+  `"wiki-1"` 과 `"page-1"` 을 기대하므로(`page-edit.test.ts:109-112`) 이 기본값이면 그대로 통과한다
+- 기존 `resolveWiki` mock 과 `beforeEach` 의 `mocks.resolveWiki.mockResolvedValue("wiki-1")` 을 **지운다**.
+  `page-edit.ts` 가 더 부르지 않으므로 남기면 무엇이 실제로 쓰이는지 읽는 쪽이 알 수 없다
+
+기존 확인 여덟 건의 본문은 그대로 둔다. 위 기본값이 그것들을 그대로 통과시킨다.
+
+**그 다음 아래 셋을 더한다.**
 
 | 확인할 것 | 입력 | 기대 |
 | --- | --- | --- |
@@ -141,11 +159,13 @@ node dist/index.js wiki page edit --body "x" ; echo "종료코드=$?"
 
 ```bash
 # cwd: <repo root>
-grep -c "resolveWikiPageInput" src/commands/wiki/page-edit.ts   # >= 1
-grep -c "resolveWiki(" src/commands/wiki/page-edit.ts           # = 0
+grep -c "resolveWikiPageInput" src/commands/wiki/page-edit.ts
+! grep -q "resolveWiki(" src/commands/wiki/page-edit.ts
 ```
 
-두 번째가 0 이어야 한다. `resolveWiki` 직접 호출이 남아 있지 않다는 값이다.
+첫 줄의 값이 1 이상이고 두 줄 모두 종료 코드 0 이어야 한다.
+두 번째가 `resolveWiki` 직접 호출이 남아 있지 않다는 것을 판정한다.
+`grep -c` 는 일치가 없으면 종료 코드 1 로 끝나므로 없는 것을 볼 때는 `! grep -q` 를 쓴다.
 
 개인 식별 정보를 확인한다.
 
