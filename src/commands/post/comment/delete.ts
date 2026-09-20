@@ -9,6 +9,8 @@ import {
   authorizeDeletion,
   promptDeletion,
 } from "../../../utils/delete-confirmation.js";
+import type { OutputOptions } from "../../../formatters/table.js";
+import { emitDeleteResult } from "../../../formatters/file-output.js";
 
 export const commentDeleteCommand = new Command("delete")
   .description("댓글 삭제")
@@ -30,6 +32,7 @@ export const commentDeleteCommand = new Command("delete")
       return;
     }
 
+    const globalOpts = commentDeleteCommand.optsWithGlobals() as OutputOptions;
     const config = await getConfigOrThrow();
     const client = new DoorayApiClient(config.apiKey, config.baseUrl);
 
@@ -90,5 +93,10 @@ export const commentDeleteCommand = new Command("delete")
     await client.deletePostComment(projectId, postId, commentId);
     stopSpinner(true, "댓글 삭제 완료");
 
-    process.stdout.write(`댓글이 삭제되었습니다: ${commentId}\n`);
+    // ADR-031: --json / --quiet / plain 3 모드 분기
+    emitDeleteResult(globalOpts, {
+      id: commentId,
+      jsonKey: "commentId",
+      message: `댓글이 삭제되었습니다: ${commentId}`,
+    });
   });

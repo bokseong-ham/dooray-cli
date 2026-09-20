@@ -7,12 +7,12 @@ import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { input, editor, confirm } from "@inquirer/prompts";
 import {
-  readCliVersion,
   collectMeta,
   buildIssueBody,
   buildLastRunBlock,
 } from "../utils/feedback-meta.js";
 import { readLastRun } from "../cache/last-run.js";
+import { CLI_VERSION } from "../version.js";
 import { DoorayCliError } from "../utils/errors.js";
 import { EXIT_PARAM_ERROR } from "../utils/exit-codes.js";
 
@@ -104,8 +104,7 @@ export const feedbackCommand = new Command("feedback")
       throw new DoorayCliError("본문이 비어있습니다.", EXIT_PARAM_ERROR);
     }
 
-    const version = await readCliVersion();
-    const meta = collectMeta(version);
+    const meta = collectMeta(CLI_VERSION);
     const issueBody = buildIssueBody(userBody, meta);
 
     if (opts.dryRun) {

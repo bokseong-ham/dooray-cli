@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { buildIssueBody, buildLastRunBlock, collectMeta } from "./feedback-meta.js";
+import { CLI_VERSION } from "../version.js";
 
 const FAKE_META = {
   cliVersion: "0.5.2",
@@ -71,5 +72,13 @@ describe("collectMeta", () => {
 
   it("config 객체에 접근하지 않음 (시그니처 검증)", () => {
     expect(collectMeta.length).toBe(1);
+  });
+});
+
+describe("환경 블록의 버전", () => {
+  it("CLI_VERSION 으로 만든 블록의 버전이 unknown 이 아니다", () => {
+    const out = buildIssueBody("의견", collectMeta(CLI_VERSION));
+    expect(out).toContain(`- dooray-cli 버전: ${CLI_VERSION}`);
+    expect(out).not.toContain("- dooray-cli 버전: unknown");
   });
 });
