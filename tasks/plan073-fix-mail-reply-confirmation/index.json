@@ -1,0 +1,20 @@
+{
+  "name": "plan073-fix-mail-reply-confirmation",
+  "description": "mail reply 가 UID 직접 입력에서도 발송 전에 확인을 거치게 한다",
+  "status": "pending",
+  "created_at": "2026-09-21",
+  "total_phases": 2,
+  "current_phase": 1,
+  "phases": [
+    {
+      "number": 1,
+      "file": "phase-01.md",
+      "execution_profile": "standard"
+    },
+    {
+      "number": 2,
+      "file": "phase-02.md",
+      "execution_profile": "fast"
+    }
+  ]
+}
