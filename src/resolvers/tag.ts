@@ -196,6 +196,8 @@ export async function lookupTagIds(
       n,
       "태그",
       (t) => (t.groupName ? `${t.groupName} / ${t.name} (${t.id})` : `${t.name} (${t.id})`),
+      // 이름을 찾지 못하면 후보 다섯 줄만 나온다. 전체 목록을 보는 방법을 함께 알린다.
+      { helpHint: "dooray project tags <project>" },
     ).id
   );
 }
