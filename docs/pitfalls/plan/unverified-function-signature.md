@@ -4,7 +4,7 @@ category: plan
 title: plan 본문이 기존 함수 시그니처 미검증 → executor 빌드 실패
 triggers: [함수 시그니처, TS2554, validateMandatoryTags, grep 시그니처]
 tool_catchable: true
-source: [1-11, PR #64, plan031]
+source: [1-11, PR #64]
 related: [missing-tsc-noemit-check]
 ---
 
@@ -24,7 +24,7 @@ grep -nE "^\s*(export )?async function (validateMandatoryTags|resolveTags|toDoor
 # 인자 수 + 반환 타입 + 동작 (검증만 / 변환만 / 둘 다) 까지 plan 본문에 인용
 ```
 
-**Why**: PR #64 (plan031) critic 재평가 — 1차 REVISE 반영 후 신규 Critical 1건 발견.
+**Why**: PR #64 critic 재평가 — 1차 REVISE 반영 후 신규 Critical 1건 발견.
   plan 본문이 `validateMandatoryTags(client, projectId, effectiveTags)` 로 3인자 호출 작성.
   실제 시그니처는 `(client, projectId)` 2인자이고 입력 검증 안 함 (mandatory 그룹 존재 여부만).
   executor 가 알아서 `resolveTags` vs `validateMandatoryTags` 분기로 회피했지만 plan 본문 그대로 실행됐으면 tsc 실패와 의도에 어긋난 검증.
@@ -35,6 +35,6 @@ grep -nE "^\s*(export )?async function (validateMandatoryTags|resolveTags|toDoor
 - CI 는 PR scope 외 회귀까지 잡아주지만, phase 자체 검증은 plan-local
 
 **Why**: PR #46 (post comment get) 가 `PostCommentDetailResponse` 를 사용했지만 import 누락.
-  plan026 (PR #48) `await Promise<never>` 패턴이 TS2366 발생.
+  PR #48 의 `await Promise<never>` 패턴이 TS2366 발생.
   둘 다 build/test PASS 로 머지 → 다음 PR 의 review-fix 단계에서야 발견.
   tsup 의 type-check 우회 특성은 dooray-cli 모든 type-touching phase 의 공통 함정.

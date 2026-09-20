@@ -4,7 +4,7 @@ category: plan
 title: phase 검증이 실제 발송을 시키고 대상을 placeholder 로 둔다
 triggers: [실제 발송, 발송 확인, messenger send, mail send, placeholder 대상, 본인 이메일, 본인 대화방, 외부 호출 검증]
 tool_catchable: false
-source: [실제 사고 2026-09-08, plan066 phase-01]
+source: [실제 사고 2026-09-08]
 related: []
 ---
 

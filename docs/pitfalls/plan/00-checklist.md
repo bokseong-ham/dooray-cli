@@ -16,7 +16,7 @@ plan 제출 전 11개 패턴을 확인한다.
 ```bash
 # cwd: <repo root>
 node scripts/check-plan.mjs                    # 미완료 plan 전부
-node scripts/check-plan.mjs plan065-...        # 특정 plan
+node scripts/check-plan.mjs <plan-디렉터리 이름>   # 특정 plan
 ```
 
 | 항목 | 판정 주체 |

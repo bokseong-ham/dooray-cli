@@ -4,7 +4,7 @@ category: plan
 title: "`.filter()` 후 TypeScript 타입 자동 미좁힘"
 triggers: [filter, type predicate, narrowing, TS2345, TS2339]
 tool_catchable: true
-source: [1-13, PR #67, plan032]
+source: [1-13, PR #67]
 related: [missing-optional-relaxation-cascade-grep]
 ---
 
@@ -34,7 +34,7 @@ const adapter = valid.map((g) => ({ name: g.code as string }));   // filter 로 
 
 **검출**: type optional 완화 후 `filter` 와 `map` 체인이 plan 에 등장하면 narrowing 패턴 확인. 단언 사용 시 주석 필수.
 
-**Why**: PR #67 (plan032) critic Major #3 — `member-group.ts` 의 `valid.map((g) => ({ name: g.code }))` 에서 TS2345/TS2339.
+**Why**: PR #67 critic Major #3 — `member-group.ts` 의 `valid.map((g) => ({ name: g.code }))` 에서 TS2345/TS2339.
   executor 가 `as string` 추가로 회피.
   type predicate 가 더 안전하나 본 케이스는 단언과 주석으로 처리.
   다른 resolver 의 optional 필드 filter 패턴에서 반복 가능.

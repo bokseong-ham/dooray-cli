@@ -4,7 +4,7 @@ category: plan
 title: nonInteractive trigger 확장 시 interactive 분기의 옵션 경고 정리 누락
 triggers: [nonInteractive, interactive 경고, dead code, hasTagChange]
 tool_catchable: false
-source: [1-14, PR #68, plan033]
+source: [1-14, PR #68]
 related: [interactive-warning-code-mismatch]
 ---
 
@@ -20,6 +20,6 @@ grep -nE "if \(hasTagChange\)|if \(opts\.parent\)|if \(.*\.cc.*\)" src/commands/
 # 같은 옵션이 nonInteractive 조건 + interactive 분기 if 양쪽에 동시에 있으면 한쪽이 dead
 ```
 
-**Why**: PR #68 (plan033) docs-verifier VIOLATION — `nonInteractive = ... || hasTagChange` 확장 후 interactive else 안에 `if (hasTagChange) stderr "단독 호출 안 됨"` 그대로 둠.
+**Why**: PR #68 docs-verifier VIOLATION — `nonInteractive = ... || hasTagChange` 확장 후 interactive else 안에 `if (hasTagChange) stderr "단독 호출 안 됨"` 그대로 둠.
   도달 불가와 메시지 정반대.
   cc/parent 같이 trigger 미포함 옵션의 경고 패턴을 그대로 적용할 때 발생.

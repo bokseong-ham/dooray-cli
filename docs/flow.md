@@ -538,7 +538,7 @@ dooray wiki page file delete my-project <page-id> --file-id <id>
 
 활용 사례 — 팀 위키에 스킬 파일 첨부 → 팀원이 `wiki page file download-all` 로 일괄 받아 `~/.claude/skills/` 에 그대로 설치.
 
-## 위키 페이지 댓글 흐름 (task 036)
+## 위키 페이지 댓글 흐름
 
 post comment 명령군과 동일 UX. 단 wiki comment 는 mention / cc / 첨부 파일 미지원 (Dooray API 부재).
 

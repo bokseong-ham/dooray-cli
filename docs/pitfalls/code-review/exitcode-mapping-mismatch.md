@@ -4,7 +4,7 @@ category: code-review
 title: "catch 의 `err.exitCode` 분기 시 `toDoorayCliError` 의 실제 매핑 미확인"
 triggers: [EXIT_PARAM_ERROR, EXIT_API_ERROR, toDoorayCliError, exitCode 분기]
 tool_catchable: false
-source: [code-review 2-2, PR #63, plan029]
+source: [code-review 2-2, PR #63]
 related: [mock-reject-value-not-mirroring-production]
 ---
 
@@ -42,7 +42,7 @@ grep -rnE "exitCode\s*===\s*EXIT_PARAM_ERROR" src/resolvers/ src/commands/ src/a
 
 **Self-check**: catch 안에서 exitCode 분기를 쓰는 코드를 작성/리뷰할 때, `src/api/client.ts` 의 `toDoorayCliError` 가 그 에러 케이스에 어떤 exitCode 를 *실제로* 부여하는지 grep 으로 확인했는가? mock 으로 짠 테스트가 그 exitCode 를 mirror 하는가?
 
-**Why**: PR #63 (plan029) — `resolveMember` 의 catch 가 `EXIT_PARAM_ERROR` 검사.
+**Why**: PR #63 — `resolveMember` 의 catch 가 `EXIT_PARAM_ERROR` 검사.
 테스트도 같은 값으로 reject 해서 7/7 PASS 였지만 실제 production path 의 `toDoorayCliError` 는 `EXIT_API_ERROR` 부여 → 분기 dead.
 code-reviewer 가 catch 케이스 ↔ toDoorayCliError 매핑 대조해서 잡음.
 다른 resolver/command 에서 같은 패턴 추가 시 또 발생 가능.

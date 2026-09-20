@@ -4,7 +4,7 @@ category: code-review
 title: redirect manual과 status code 분기 누락
 triggers: [redirect manual, throwHttpErrors, 307, status 분기]
 tool_catchable: false
-source: [code-review 6-1, PR #72, plan035]
+source: [code-review 6-1, PR #72]
 related: []
 ---
 
@@ -20,6 +20,6 @@ grep -nE "redirect.*manual|throwHttpErrors.*false" src/api/client.ts
 # 그 위치에서 status === 307 분기 존재 확인
 ```
 
-**Why**: PR #72 (plan035) ADR-029 / ADR-015 연관.
+**Why**: PR #72 ADR-029 / ADR-015 연관.
 
 **Self-check**: `redirect: "manual"` 패턴이 있으면 status 분기도 함께 있는가?

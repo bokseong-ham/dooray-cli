@@ -41,7 +41,6 @@ docs-verifier 에 추가로 넘기는 문서 경로는 `docs/prd.md`, `docs/flow
 ## 브랜치와 작업 공간
 
 브랜치 이름은 `plan{N}-{종류}-{슬러그}` 형식이다.
-예시는 `plan061-feat-wiki-page-move` 다.
 
 작업 공간은 Orca worktree 를 쓴다.
 경로는 `worktrees/dooray-cli/{이름}` 아래에 만들고,

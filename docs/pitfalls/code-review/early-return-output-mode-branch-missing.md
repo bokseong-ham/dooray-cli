@@ -4,7 +4,7 @@ category: code-review
 title: 조기 반환 (early return) 에서 출력 모드 분기 누락
 triggers: [early return, --json, --quiet, download-all]
 tool_catchable: false
-source: [code-review 7-2, plan040]
+source: [code-review 7-2, PR #80]
 related: []
 ---
 
@@ -19,4 +19,4 @@ grep -B2 -A5 "return;" src/commands/**/file/*.ts src/commands/**/page-file/*.ts 
 
 **Self-check**: 조기 반환 블록에 `globalOpts.json` 이 있으면 `globalOpts.quiet` 도 반드시 동반 확인.
 
-**Why**: plan040 code-reviewer FIX_NEEDED — download-all 빈 파일 시 `--quiet` 에도 plain text 출력. 양 명령군 동일 사고.
+**Why**: PR #80 의 code-reviewer FIX_NEEDED — download-all 빈 파일 시 `--quiet` 에도 plain text 출력. 양 명령군 동일 사고.
