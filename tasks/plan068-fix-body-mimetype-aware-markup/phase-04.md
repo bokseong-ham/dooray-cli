@@ -137,10 +137,13 @@ node scripts/check-pii.mjs
 
 ```bash
 # cwd: <repo root>
-bash ~/personal/fos-skills/korean-check/scripts/check.sh README.md docs/code-architecture.md docs/flow.md skills/dooray-cli/SKILL.md skills/dooray-cli/references/mention-link.md skills/dooray-cli/references/comment.md
+bash ~/personal/fos-skills/korean-check/scripts/check.sh README.md docs/code-architecture.md skills/dooray-cli/SKILL.md skills/dooray-cli/references/mention-link.md skills/dooray-cli/references/comment.md
 ```
 
 종료 코드 0 이어야 한다.
+
+`docs/flow.md` 는 이 목록에 넣지 않는다. 이 plan 이전부터 엠대시 12건으로 걸린다.
+그 열둘을 고치면 이 plan 과 무관한 줄이 diff 에 들어간다. 이 phase 가 그 파일에 더하는 문단에는 엠대시가 없다.
 
 문서가 실제로 바뀌었는지 본다.
 
