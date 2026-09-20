@@ -612,13 +612,8 @@ dooray post file delete my-project 42 <file-id>        # 삭제 (confirm 기본,
 - `dooray post comment delete`
 - `dooray post comment file delete`
 
-호출 흐름은 다음과 같다.
-
-1. `-y` 또는 `--yes`가 있으면 확인을 생략하고 기존 입력 해석과 삭제 API 흐름으로 진행한다.
-2. 플래그가 없고 stdin이 non-TTY이면 설정 조회, resolver, API 호출 전에 종료 코드 3으로 중단한다.
-3. 플래그가 없고 stdin이 TTY이면 기본값이 아니오인 확인을 표시한다.
-4. 사용자가 아니오를 선택하면 취소 메시지를 stderr에 쓰고 API 없이 정상 종료한다.
-5. 사용자가 예를 선택하면 기존 spinner, 삭제 API, 성공 출력 흐름으로 진행한다.
+사용자에게는 확인 한 번이 더해질 뿐이고, `-y` 또는 `--yes` 를 주면 그 확인도 생략한다.
+확인 절차와 종료 코드 규약은 ADR-036 이 소유한다.
 
 확인 정책만 통일하며 각 명령의 기존 plain·`--json`·`--quiet` 성공 출력과 부분 실패 처리는 유지한다.
 
