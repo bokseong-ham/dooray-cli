@@ -280,6 +280,9 @@ src/
 | [docs/data-schema.md](docs/data-schema.md) | 캐시 구조와 TTL |
 | [docs/adr/INDEX.md](docs/adr/INDEX.md) | 기술 의사결정 기록 |
 
+이 저장소를 AI 에이전트로 만든 과정은
+[AI 에이전트와 함께 MVP 만들기](https://blog.fosworld.co.kr/posts/AI/practice/mvp-with-ai-agent.md) 에 있다.
+
 ## 기여하기
 
 이슈와 PR 모두 환영한다.

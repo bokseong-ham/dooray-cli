@@ -23,6 +23,7 @@ const APPROVED_DOMAINS = [
   "api.gov-dooray.co.kr",
   "api.gov-dooray.com",
   "b.example.com",
+  "blog.fosworld.co.kr",
   "claude.com",
   "cli.github.com",
   "dooray.com",
@@ -71,8 +72,8 @@ async function createCleanPiiRoot() {
   const skipAsRoot = process.getuid?.() === 0;
 
 describe("findForeignDomains", () => {
-  it("승인된 정확한 21개 도메인 목록을 유지한다", () => {
-    expect(OK_DOMAINS).toHaveLength(21);
+  it("승인된 정확한 22개 도메인 목록을 유지한다", () => {
+    expect(OK_DOMAINS).toHaveLength(22);
     expect(OK_DOMAINS).toEqual(APPROVED_DOMAINS);
   });
 
@@ -80,7 +81,7 @@ describe("findForeignDomains", () => {
     expect(findForeignDomains("https://github.com/x", OK_DOMAINS)).toEqual([]);
   });
 
-  it("허용된 21개 도메인의 URL 과 이메일을 통과시킨다", () => {
+  it("허용된 22개 도메인의 URL 과 이메일을 통과시킨다", () => {
     const text = APPROVED_DOMAINS.flatMap((domain) => [`https://${domain}/x`, `user@${domain}`]).join("\n");
 
     expect(findForeignDomains(text, OK_DOMAINS)).toEqual([]);
