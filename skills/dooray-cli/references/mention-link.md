@@ -49,7 +49,7 @@ title 은 본인이면 `"me"`, 그 외에는 `"member"` 다.
 [@projectCode/그룹명](dooray://{orgId}/member-groups/{groupId})
 ```
 
-`projects/{projectId}/` 경로를 **넣지 않는다** — 직관과 반대라 흔히 틀리는 지점이다.
+`projects/{projectId}/` 경로를 **넣지 않는다**. 직관과 반대라 흔히 틀리는 지점이다.
 title 속성도 없다.
 
 ### 업무
@@ -58,7 +58,7 @@ title 속성도 없다.
 [projectCode/{number} {subject}](dooray://{orgId}/tasks/{postId} "registered")
 ```
 
-title 은 workflow class 다 — `registered` / `working` / `closed` / `backlog`.
+title 은 workflow class 다. `registered`, `working`, `closed`, `backlog` 넷 중 하나를 넣는다.
 클릭하면 브라우저가 아니라 Dooray 앱 안에서 이동하며 workflow 상태가 함께 보인다.
 
 **표시 텍스트의 대괄호는 엔티티로 바꾼다.** `[` 는 `&#91;`, `]` 는 `&#93;` 다.

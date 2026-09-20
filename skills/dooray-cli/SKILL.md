@@ -147,7 +147,7 @@ dooray post edit <project> 42 --mime-type text/html
 | 참조자에 그룹 추가 | `dooray post edit <project> <number> --cc-group <code>` — 기존 참조자를 유지하고 추가한다 |
 | 참조자 전체 교체 | `dooray post edit <project> <number> --cc-clear --cc <name>` |
 | 생성 시 그룹 참조자 | `dooray post create <project> --title "..." --cc-group <code>` |
-| 상위 업무 지정·변경 | `dooray post edit <project> <number> --title "<원제목>" --parent <ref>` — `--title` 이 필수이고 해제는 지원하지 않는다 |
+| 상위 업무 지정·변경 | `dooray post edit <project> <number> --title "<원제목>" --parent <ref>` — `--parent` 는 단독으로 동작하지 않아 다른 수정 옵션을 함께 준다. 해제는 지원하지 않는다 |
 | 태그 추가 | `dooray post edit --id <postId> --tag <name>` (반복 가능, 중복 제거) |
 | 태그 전체 교체 | `dooray post edit --id <postId> --tag-clear --tag <name>` |
 | 태그 제거 | `dooray post edit --id <postId> --tag-remove <name>` |
@@ -261,4 +261,5 @@ dooray messenger channel-send --channel "$THREAD" --body "배포 완료"
 ## 옵션 이름
 
 `post` 와 `wiki page` 모두 제목은 `--title` 이다.
-`post` 의 `--subject` 는 deprecated alias 로 아직 동작하지만 경고가 나온다.
+`post create` 와 `post edit` 의 `--subject` 는 `--title` 의 deprecated alias 로 아직 동작하지만 경고가 나온다.
+`post list` 의 `--subject` 는 제목 키워드 필터라서 별개 옵션이다.
