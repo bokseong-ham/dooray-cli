@@ -6,6 +6,8 @@
 //
 // 사용법: node scripts/check-pii.mjs   (cwd 는 저장소 루트)
 // 위반을 stdout 으로 출력하고 종료 코드 1, 깨끗하면 0, 검사 경로 오류면 2.
+// 검사 경로는 `SCAN` 과 `OPTIONAL_SCAN` 둘로 나뉜다.
+// `SCAN` 은 없으면 2 로 끝내고, `OPTIONAL_SCAN` 은 없으면 건너뛴다.
 //
 // 셸 배열 확장 차이로 검사 범위가 조용히 줄어든 적이 있어 Node 스크립트로 옮겼다.
 
@@ -14,7 +16,13 @@ import { constants } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-export const SCAN = ["README.md", "skills/", "docs/", "CLAUDE.md", ".claude/", ".github/", "scripts/", "tasks/", "src/"];
+export const SCAN = ["README.md", "skills/", "docs/", "CLAUDE.md", ".claude/", ".github/", "scripts/", "src/"];
+
+// 있으면 검사하고 없으면 건너뛰는 경로.
+// `tasks/` 는 계획이 끝나면 비는 작업 공간이라, 없는 것이 정상 상태다.
+// 완료된 계획서를 모두 지우면 디렉터리 자체가 사라진다.
+// 나머지 경로는 항상 있어야 하므로 없으면 그대로 종료 코드 2 다.
+export const OPTIONAL_SCAN = ["tasks/"];
 
 // 공개 도메인. 이 목록 밖의 도메인은 사내 도메인일 수 있다고 본다.
 export const OK_DOMAINS = [
@@ -77,11 +85,23 @@ const PROJECT_PATTERN = /(?:post (?:create|list|get|search)|project (?:list|memb
 export async function walkFiles(roots, options = {}) {
   const cwd = options.cwd ?? process.cwd();
   const skipDirs = options.skipDirs ?? SKIP_DIRS;
+  // 여기 담긴 경로는 없으면 건너뛴다. 읽을 수 있으면 나머지와 똑같이 검사한다.
+  const optionalRoots = new Set(options.optionalRoots ?? []);
   const files = [];
 
   for (const root of roots) {
     const absoluteRoot = resolve(cwd, root);
-    await access(absoluteRoot, constants.R_OK);
+
+    if (optionalRoots.has(root)) {
+      try {
+        await access(absoluteRoot, constants.R_OK);
+      } catch {
+        continue;
+      }
+    } else {
+      await access(absoluteRoot, constants.R_OK);
+    }
+
     await collectFiles(absoluteRoot, files, skipDirs);
   }
 
@@ -190,7 +210,7 @@ export async function main(options = {}) {
 
   let files;
   try {
-    files = await walkFiles(SCAN, { cwd });
+    files = await walkFiles([...SCAN, ...OPTIONAL_SCAN], { cwd, optionalRoots: OPTIONAL_SCAN });
   } catch (error) {
     console.error(`개인 식별 정보 검사 실패: 필수 검사 경로를 읽을 수 없다: ${error.message}`);
     return 2;
