@@ -141,7 +141,7 @@ interface CachedMe {
 }
 ```
 
-### projects.json
+### projects.json / projects-private.json
 
 ```typescript
 interface CacheEntry<CachedProject[]> {
@@ -155,6 +155,8 @@ interface CachedProject {
   wikiId?: string; // project.wiki.id — WikiResolver에서 사용
 }
 ```
+
+개인 프로젝트 목록을 담는 `projects-private.json` 도 같은 shape 과 같은 TTL 을 쓴다.
 
 ### members/{projectId}.json
 
@@ -248,16 +250,15 @@ resolver 는 code 누락 그룹을 사전 필터링하고 후보 5개 안내 출
 
 ### 캐시 전체가 무효해지는 조건 (ADR-042)
 
-캐시 디렉터리는 `~/.dooray/cache` 하나이고 계정·환경별로 나뉘지 않는다.
-그래서 `config.json` 의 `apiKey` 나 `baseUrl` 이 바뀌면 남아 있는 모든 파일이 다른 곳의 데이터가 된다.
-
-`dooray config set` 과 `dooray setup` 은 두 값 중 하나가 실제로 달라졌을 때 캐시 전체를 지운다.
+`dooray config set` 과 `dooray setup` 은 `config.json` 의 `apiKey` 나 `baseUrl` 이
+실제로 달라졌을 때 `~/.dooray/cache/` 전체를 지운다.
 같은 값을 다시 설정하는 경우와 이전 설정이 없는 최초 설정은 지우지 않는다.
+`tenantName`, IMAP·SMTP 설정, `trackLastRun` 은 캐시 내용에 영향을 주지 않아 대상이 아니다.
 설정 파일이 손상됐거나 읽히지 않으면 `dooray config set` 은 기존 파일을 덮지 않고 오류로 끝난다.
 `dooray setup` 이 전체 설정 저장에 성공하면 이전 계정을 알 수 없으므로 캐시 전체를 지운다 (ADR-049).
-`tenantName`, IMAP·SMTP 설정, `trackLastRun` 은 캐시 내용에 영향을 주지 않아 대상이 아니다.
 
 지운 것이 있었을 때만 사용자에게 알린다. 지울 캐시가 없었으면 알리지 않는다.
+두 값이 바뀌었을 때 남은 캐시가 전부 무효가 되는 이유는 ADR-042 가 소유한다.
 
 ### Lazy Loading 전략
 

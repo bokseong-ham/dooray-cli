@@ -4,7 +4,7 @@
 
 **이유**:
 
-- 현재 ~440줄으로 분리 임계점(~800줄+)에 미달
+- 분리 임계점(~800줄+)에 아직 미달
 - 섹션 주석으로 Common, Project, Post, Comment, Member, Workflow, Wiki, File 구분이 충분
 - `DoorayApiHeader`, `DoorayApiResponse<T>` 등 Common 타입을 거의 모든 도메인이 참조 → barrel export 관리 오버헤드 대비 실익 부족
 - `client.ts`에서 한 파일로 모든 타입을 import하는 현재 구조가 간결

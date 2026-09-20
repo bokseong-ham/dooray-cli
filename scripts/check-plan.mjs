@@ -2,7 +2,7 @@
 // plan 의 phase 파일이 제출 조건을 지켰는지 본다.
 //
 // 사용법
-//   node scripts/check-plan.mjs plan065-fix-json-large-integer-precision
+//   node scripts/check-plan.mjs <plan-디렉터리 이름>
 //   node scripts/check-plan.mjs                 tasks/ 아래 status 가 completed 가 아닌 plan 전부
 //
 // 종료 코드

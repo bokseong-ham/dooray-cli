@@ -40,4 +40,6 @@ table 출력은 Creator 컬럼을 프로젝트 멤버 캐시로 채운다. `--js
 2. 파일을 편집한다
 3. `dooray post comment edit <p> <n> <id> --body-file current.md --no-confirm`
 
+주는 본문의 형식이 기존과 다르면 3번에 `--mime-type` 을 함께 준다. 값은 `text/x-markdown` 과 `text/html` 이다.
+
 3번의 `--no-confirm` 은 첨부 보호 확인을 건너뛴다. 본문에서 기존 첨부 markdown 을 지우지 않았을 때만 쓴다.

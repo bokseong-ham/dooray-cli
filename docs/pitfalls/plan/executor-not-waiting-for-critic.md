@@ -4,7 +4,7 @@ category: plan
 title: executor 가 critic 평가 결과 대기 안 하고 자체 구현 진행
 triggers: [critic 대기, REVISE, executor 자체 진행, 1 cycle 낭비]
 tool_catchable: false
-source: [1-16, PR #64, PR #67, PR #68, plan031, plan032, plan033]
+source: [1-16, PR #64, PR #67, PR #68]
 related: []
 ---
 
@@ -17,8 +17,8 @@ related: []
   team-lead 도 executor 스폰 시점에 "대기 상태로 시작, SendMessage 까지 작업 시작 금지" 강조.
   또 plan 본문 v1 → v2 차이가 있을 때 SendMessage 메시지에 "이전 자체 진행 결과는 reset 됨, plan 본문 v2 강제" 명시.
 
-**Why**: PR #64 (plan031) / PR #67 (plan032) / PR #68 (plan033) 3회 연속 발생.
-  plan031 때는 executor 가 알아서 critic 발견 패턴 회피했지만, plan032/033 에서는 사용자 결정 옵션 a 와 다른 옵션 b 변형으로 진행 → reset 후 재투입.
+**Why**: PR #64 와 PR #67 과 PR #68 에서 3회 연속 발생했다.
+  PR #64 때는 executor 가 알아서 critic 발견 패턴 회피했지만, PR #67 과 PR #68 에서는 사용자 결정 옵션 a 와 다른 옵션 b 변형으로 진행 → reset 후 재투입.
   매 plan 마다 1 cycle 낭비.
   critic 평가가 비동기로 도착하는 점이 근본 원인.
   executor 가 "대기" 명시받지 않으면 자체 진행 본능적 경향.

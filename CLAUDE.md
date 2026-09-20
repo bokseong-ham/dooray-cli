@@ -53,17 +53,16 @@ dooray                # 글로벌 링크 시
 
 명령별 옵션·동작은 `docs/adr/INDEX.md` 와 `README.md` 에서 찾는다. 여기에는 전 명령 공통 규약만 둔다.
 
-- **입력 형식** — post 계열, wiki page get, wiki page file, wiki page comment 명령이 공통으로 받는다
+- **입력 형식** — post get/edit/done/workflow 와 post comment·post file 계열, wiki page get/delete/move 와 wiki page file·comment 계열이 공통으로 받는다. `post list`·`post search`·`post create` 는 받지 않는다
   - `<project> <number>` / `--id <id>` / `--url <url>` / 첫 positional 에 Dooray URL 직접 입력
   - wiki 의 `--id` 모드는 project 없이 단독으로 동작한다. `--project` 는 선택이며 주면 wikiId 해석 호출을 아낀다
 - **옵션 이름**
   - 제목은 post·wiki 모두 `--title` 이다. `post create` 와 `post edit` 의 `--subject` 는 `--title` 의 deprecated alias 로 stderr 경고를 낸 뒤 동작한다. `post list` 의 `--subject` 는 제목 키워드 필터라서 별개 옵션이다
   - 본문은 `--body` / `--body-file` (둘 다 `-` 로 stdin 을 받는다)
   - `config set <key> <value>` 의 값도 `-` 로 stdin 을 받는다 — 토큰이 셸 기록과 프로세스 목록에 남지 않게 하는 경로다
-  - `post edit`, `wiki page edit`, `post`·`wiki page` 의 `comment add`/`edit` 는 둘 다 없으면 `$EDITOR` 가 열린다. 단 `post edit` 의 태그·참조자·담당자 변경 옵션과 `post edit`·`wiki page edit`·`post comment edit` 의 `--mime-type` 은 제목·본문 없이도 비대화형 수정으로 실행한다. `create` 계열은 `$EDITOR` 폴백이 없고, 둘 다 없으면 에러 대신 빈 본문으로 생성한다. `post create` 는 `--template` 을 주면 그 템플릿 본문을 채운다
+  - `post edit`, `wiki page edit`, `post`·`wiki page` 의 `comment add`/`edit`, `messenger send`·`channel-send`·`thread-send` 는 둘 다 없으면 `$EDITOR` 가 열린다. 단 `post edit` 의 태그·참조자·담당자 변경 옵션과 `post edit`·`wiki page edit`·`post comment edit` 의 `--mime-type` 은 제목·본문 없이도 비대화형 수정으로 실행한다. `create` 계열은 `$EDITOR` 폴백이 없고, 둘 다 없으면 에러 대신 빈 본문으로 생성한다. `post create` 는 `--template` 을 주면 그 템플릿 본문을 채운다
 - **mail 계열 입력**: `mail get`·`mail reply` 는 IMAP UID 외에 메일 웹 주소와 그 주소의 mail id 도 받는다. mail id 는 도착 시각으로 풀어 UID 를 이분 탐색한다 (ADR-040)
-  - 웹 주소와 mail id 로 추정한 메일의 답장은 원본 제목, 발신자, IMAP 도착 시각과 UID 를 보여주고 확인한다. TTY 기본값은 아니오이며 거절하면 발송 없이 정상 취소한다
-  - `-y`/`--yes` 로 확인을 생략한다. non-TTY 에서 옵션이 없으면 설정과 IMAP 조회 전에 `EXIT_PARAM_ERROR`(3)로 중단한다. UID 직접 입력은 확인 없이 보낸다
+  - 시각으로 추정한 메일에 답장할 때만 원본을 보여주고 확인을 거친다. 확인 절차와 종료 코드 규약은 ADR-040 이 소유한다
 - **resolver 매칭**: 정확일치 → 이름 부분일치 → 모호하면 에러와 후보 목록 출력
 - **출력**: `--json` 은 raw 유지, `--quiet` 은 식별자만
 - **파괴적 삭제 명령**: 확인을 기본으로 하고 `-y`/`--yes` 로 생략한다 (ADR-036)

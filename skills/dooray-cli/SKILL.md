@@ -21,7 +21,7 @@ NHN Dooray REST API 를 래핑한 CLI 다. 이 파일은 라우터이므로, 작
 ## 대상 지정 방법
 
 `post get`/`edit`/`done`/`workflow`, `post comment` 전체, `post file` 전체, `post comment file` 전체,
-`wiki page get`, `wiki page file` 과 `wiki page comment` 전체, 그리고 `wiki page delete` 가 네 가지 형태를 모두 받는다.
+`wiki page get`, `wiki page file` 과 `wiki page comment` 전체, 그리고 `wiki page delete` 와 `wiki page move` 가 네 가지 형태를 모두 받는다.
 
 - `<project> <number>` — 업무는 번호, 위키는 `<project> <page-id>`
 - `--id <postId>` / `--id <pageId>` — 위키는 `--project` 없이도 조회된다. 함께 주면 wikiId 를 해석하는 호출을 한 번 아낀다
@@ -107,7 +107,7 @@ NHN Dooray REST API 를 래핑한 CLI 다. 이 파일은 라우터이므로, 작
 
 | 의도 | 커맨드 |
 | --- | --- |
-| 업무 목록 | `dooray post list <project>` |
+| 업무 목록 | `dooray post list <project>` — `--all` 로 모든 페이지를 이어 받는다 |
 | 업무 검색 | `dooray post search <project> "<keyword>"` — projectId(15자리 이상 numeric) 를 넣으면 캐시를 우회한다 |
 | 업무 상세 | `dooray post get <project> <number>` 또는 `dooray post get --id <postId>` |
 | 업무 생성 | `dooray post create <project> --title "..." [--body "..." \| --body-file <path>]` — 담당자는 `--to <name\|email>`, 참조자는 `--cc`, 둘 다 여러 명 가능 |
@@ -146,6 +146,7 @@ dooray post edit <project> 42 --mime-type text/html
 | --- | --- |
 | 참조자에 그룹 추가 | `dooray post edit <project> <number> --cc-group <code>` — 기존 참조자를 유지하고 추가한다 |
 | 참조자 전체 교체 | `dooray post edit <project> <number> --cc-clear --cc <name>` |
+| 담당자 전체 교체 | `dooray post edit <project> <number> --to-clear --to <name>` |
 | 생성 시 그룹 참조자 | `dooray post create <project> --title "..." --cc-group <code>` |
 | 상위 업무 지정·변경 | `dooray post edit <project> <number> --title "<원제목>" --parent <ref>` — `--parent` 는 단독으로 동작하지 않아 다른 수정 옵션을 함께 준다. 해제는 지원하지 않는다 |
 | 태그 추가 | `dooray post edit --id <postId> --tag <name>` (반복 가능, 중복 제거) |
@@ -183,7 +184,7 @@ dooray post edit <project> 42 --mime-type text/html
 | 첨부 삭제 | `dooray post file delete <project> <number> <file-id>` — 확인 있음, `-y`/`--yes`로 생략 |
 | 댓글 첨부 목록 | `dooray post comment file list <project> <number> <comment-id>` |
 | 댓글 첨부 업로드 | `dooray post comment file upload <project> <number> <comment-id> <path>` |
-| 댓글 첨부 다운로드 | `dooray post comment file download <project> <number> <comment-id> <file-id>` |
+| 댓글 첨부 다운로드 | `dooray post comment file download <project> <number> <comment-id> <file-id>` — 저장 경로는 `--out <path>` 다. 다른 download 명령의 `-o, --output <dir>` 와 옵션 이름이 다르다 |
 | 댓글 첨부 삭제 | `dooray post comment file delete <project> <number> <comment-id> <file-id>` — 확인 있음, `-y`/`--yes`로 생략 |
 
 - 댓글 파일 업로드는 이미지 확장자면 이미지 마크다운을, 그 외에는 일반 링크를 만든다.
@@ -231,8 +232,8 @@ dooray post edit <project> 42 --mime-type text/html
 | 안 읽은 메일 | `dooray mail list --unread` |
 | 제목 검색 | `dooray mail list --search "<keyword>"` |
 | 메일 상세 | `dooray mail get <uid\|url\|mail-id>` — `mail list` 의 UID, 메일 웹 주소, 그 주소의 19자리 id 를 모두 받는다 |
-| 메일 발송 | `dooray mail send --to "..." --subject "..." --body "..."` |
-| 메일 답장 | `dooray mail reply <uid\|url\|mail-id> --body "..."` |
+| 메일 발송 | `dooray mail send --to "..." --subject "..." --body "..."` — 숨은참조는 `--bcc`, HTML 본문은 `--html` |
+| 메일 답장 | `dooray mail reply <uid\|url\|mail-id> --body "..."` — HTML 본문은 `--html` |
 | 저장된 인증정보 제거 | `dooray mail logout` (비대화형 환경은 `--yes`) |
 
 메일 웹 주소와 mail id 는 도착 시각으로 원본을 추정하므로 다른 메일이 선택될 수 있다.
@@ -246,7 +247,7 @@ dooray post edit <project> 42 --mime-type text/html
 | --- | --- |
 | 1:1 다이렉트 메시지 | `dooray messenger send --to "<id\|email>" --body "..."` — `--to` 는 ID 나 이메일만 받고 이름은 지원하지 않는다 |
 | 대화방 메시지 | `dooray messenger channel-send --channel "<channelId\|이름>" --body "..."` — 이름으로는 자신이 속한 방만 찾는다 |
-| 대화방 스레드 열기 | `dooray messenger thread-send --channel "<channelId\|이름>" --body "..."` — `--thread-body` 로 첫 메시지를 함께 보내고, `--log <log-id>` 로 이미 올라간 메시지에 연다 |
+| 대화방 스레드 열기 | `dooray messenger thread-send --channel "<channelId\|이름>" --body "..."` — `--thread-body` 나 `--thread-body-file` 로 첫 메시지를 함께 보내고, `--log <log-id>` 로 이미 올라간 메시지에 연다 |
 
 진행 상황을 여러 번 보고할 때는 대화방 본문에 늘어놓지 말고 스레드에 쌓는다.
 `thread-send --quiet` 이 내는 값은 log-id 가 아니라 새로 만들어진 스레드 채널의 id 이고,

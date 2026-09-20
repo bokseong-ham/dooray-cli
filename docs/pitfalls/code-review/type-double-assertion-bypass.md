@@ -4,7 +4,7 @@ category: code-review
 title: "`as unknown as T` 이중 단언"
 triggers: [as unknown as, 이중 단언, types.ts, 타입 설계]
 tool_catchable: false
-source: [code-review 5-2, PR #64, plan031]
+source: [code-review 5-2, PR #64]
 related: [double-assertion-union-bypass, json-parse-as-type-assertion, test-fixture-as-never-bypass]
 ---
 
@@ -19,6 +19,6 @@ related: [double-assertion-union-bypass, json-parse-as-type-assertion, test-fixt
 grep -nE "as unknown as " src/
 ```
 
-**Why**: PR #64 (plan031) — 두 타입 관계를 이중 단언으로 우회.
+**Why**: PR #64 — 두 타입 관계를 이중 단언으로 우회.
 
 **Self-check**: `as unknown as T` 가 등장하면 타입 구조적 관계를 types.ts 에 명시했는가?

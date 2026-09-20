@@ -4,7 +4,7 @@ category: code-review
 title: 문서 자리수/범위 표기와 코드 regex 불일치
 triggers: [자리수, regex, 19자리, 15+자리]
 tool_catchable: false
-source: [code-review 7-1, plan039]
+source: [code-review 7-1, PR #79]
 related: []
 ---
 
@@ -21,4 +21,4 @@ grep -rn "_RE = " src/resolvers/
 
 **Self-check**: 새 regex 상수 추가 시 docs 전체에서 해당 자릿수 표현을 grep 하여 일관성 확인.
 
-**Why**: plan039 code-reviewer FIX_NEEDED와 docs-verifier UPDATE_NEEDED — "19자리" 가 README, SKILL.md, flow.md 3곳에 전파. regex 는 15+자리.
+**Why**: PR #79 의 code-reviewer FIX_NEEDED와 docs-verifier UPDATE_NEEDED — "19자리" 가 README, SKILL.md, flow.md 3곳에 전파. regex 는 15+자리.

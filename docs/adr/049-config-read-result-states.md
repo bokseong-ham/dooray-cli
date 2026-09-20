@@ -73,9 +73,7 @@
     손상된 상태에서 계정을 바꿀 때 이전 계정의 캐시가 남지 않는다.
     `clearMailCredentials` 가 읽지 못한 것과 자격 증명이 없던 것을 구별한다.
     필드가 빠진 설정 파일이 후속 호출까지 가지 않는다.
-  - 감당할 것: 호출부 일곱 곳을 모두 고친다.
-    `src/index.ts`, `src/commands/setup.ts`, `src/commands/doctor.ts`, `src/commands/config.ts`,
-    `src/services/config.ts` 와 `src/config/store.ts` 안의 두 곳이다.
+  - 감당할 것: 읽기 호출부를 모두 고친다. 반환 타입이 바뀌므로 타입 검사가 누락을 잡는다.
     읽기 실패에서 캐시를 지우므로, 일시적인 입출력 오류가 캐시를 비우는 경우가 생긴다.
     다음 조회가 느려지는 것이 그 대가다.
 

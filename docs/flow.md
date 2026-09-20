@@ -291,7 +291,7 @@ dooray post comment file delete my-project 42 <comment-id> <file-id>    # 삭제
 
 기존 업무의 참조자·담당자에 멤버 또는 그룹 추가/제거.
 자동화 시나리오: 신규 업무 생성 후 후속으로 특정 그룹을 참조에 첨부.
-참여자 옵션 하나만 지정해도 비대화형 수정으로 실행하며 `$EDITOR` 를 열지 않는다.
+참여자 옵션이나 `--mime-type` 하나만 지정해도 비대화형 수정으로 실행하며 `$EDITOR` 를 열지 않는다.
 이때 조회한 기존 제목과 본문을 `updatePost` 요청에 다시 사용하고, 태그 변경 옵션이 없으면 `tagIds` 를 보내지 않아 기존 태그를 보존한다.
 
 ```
@@ -538,7 +538,7 @@ dooray wiki page file delete my-project <page-id> --file-id <id>
 
 활용 사례 — 팀 위키에 스킬 파일 첨부 → 팀원이 `wiki page file download-all` 로 일괄 받아 `~/.claude/skills/` 에 그대로 설치.
 
-## 위키 페이지 댓글 흐름 (task 036)
+## 위키 페이지 댓글 흐름
 
 post comment 명령군과 동일 UX. 단 wiki comment 는 mention / cc / 첨부 파일 미지원 (Dooray API 부재).
 
@@ -612,13 +612,8 @@ dooray post file delete my-project 42 <file-id>        # 삭제 (confirm 기본,
 - `dooray post comment delete`
 - `dooray post comment file delete`
 
-호출 흐름은 다음과 같다.
-
-1. `-y` 또는 `--yes`가 있으면 확인을 생략하고 기존 입력 해석과 삭제 API 흐름으로 진행한다.
-2. 플래그가 없고 stdin이 non-TTY이면 설정 조회, resolver, API 호출 전에 종료 코드 3으로 중단한다.
-3. 플래그가 없고 stdin이 TTY이면 기본값이 아니오인 확인을 표시한다.
-4. 사용자가 아니오를 선택하면 취소 메시지를 stderr에 쓰고 API 없이 정상 종료한다.
-5. 사용자가 예를 선택하면 기존 spinner, 삭제 API, 성공 출력 흐름으로 진행한다.
+사용자에게는 확인 한 번이 더해질 뿐이고, `-y` 또는 `--yes` 를 주면 그 확인도 생략한다.
+확인 절차와 종료 코드 규약은 ADR-036 이 소유한다.
 
 확인 정책만 통일하며 각 명령의 기존 plain·`--json`·`--quiet` 성공 출력과 부분 실패 처리는 유지한다.
 
@@ -638,6 +633,8 @@ dooray mail get <uid>                                   # 메일 상세
 
 dooray mail send --to "recipient@example.com" --subject "제목" --body "본문"
 dooray mail reply <uid> --body "답장 내용"              # 스레드 유지
+
+dooray mail logout                                      # 저장된 IMAP·SMTP 인증정보 제거
 ```
 
 `mail get` 과 `mail reply` 는 세 가지 입력을 받는다.

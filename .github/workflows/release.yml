@@ -1,6 +1,6 @@
 name: Release
 
-# 태그 push 로 발동한다. 릴리스 스킬의 7단계가 `v{version}` 태그를 만들어 올린다.
+# 태그 push 로 발동한다. 릴리스 스킬의 5단계가 `v{version}` 태그를 만들어 올린다.
 on:
   push:
     tags: ["v*"]

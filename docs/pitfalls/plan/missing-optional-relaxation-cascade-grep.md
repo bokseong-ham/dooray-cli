@@ -4,7 +4,7 @@ category: plan
 title: type optional 완화 시 cascade 파일 grep 누락
 triggers: [optional, cascade, MemberGroup.code, TS2322, type narrowing]
 tool_catchable: true
-source: [1-12, PR #67, plan032]
+source: [1-12, PR #67]
 related: [filter-type-narrowing-gap]
 ---
 
@@ -23,7 +23,7 @@ grep -rn "MemberGroup\|CachedMemberGroup" src/    # type 참조 전수 조사
 # 결과 파일들이 plan 의 `## 변경 파일` 에 모두 있는지 확인
 ```
 
-**Why**: PR #67 (plan032) critic Major #1 — `MemberGroup.code: string → string | undefined` 완화로 `groups.ts:24` `[g.id, g.code]` 가 `(string | undefined)[][]` 가 되어 TS2322.
+**Why**: PR #67 critic Major #1 — `MemberGroup.code: string → string | undefined` 완화로 `groups.ts:24` `[g.id, g.code]` 가 `(string | undefined)[][]` 가 되어 TS2322.
   plan 본문에 `groups.ts` 누락.
   executor 가 자체 `g.code ?? ""` 패치로 회피했지만 plan-only 실행이면 tsc 실패.
   다른 resolver 의 type 완화 작업 시 동일 패턴 재발 가능.

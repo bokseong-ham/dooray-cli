@@ -4,7 +4,7 @@ category: plan
 title: 테스트 정규식 — 에러 메시지 개행 시 dotAll (`s`) 플래그 필수
 triggers: [toThrow, dotAll, 정규식, 개행, DoorayCliError 메시지]
 tool_catchable: false
-source: [1-18, plan039]
+source: [1-18, PR #79]
 related: []
 ---
 
@@ -20,4 +20,4 @@ grep -A2 'toThrow(/' tasks/*/phase-*.md | grep -v '/s)'
 
 **대안**: `/패턴A.*패턴B/s` — `s` (dotAll) 플래그로 `.` 가 `\n` 포함 매칭.
 
-**Why**: plan039 critic REVISE v2 — `DoorayCliError` 메시지에 `\n` 2개 포함. dotAll 없이 `.*` 가 연결 실패해 테스트 항상 red.
+**Why**: PR #79 의 critic REVISE v2 — `DoorayCliError` 메시지에 `\n` 2개 포함. dotAll 없이 `.*` 가 연결 실패해 테스트 항상 red.
