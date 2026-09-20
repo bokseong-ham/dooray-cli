@@ -15,7 +15,7 @@ const MAIL_ID_SEARCH_DAY_MARGIN_MS = 24 * 60 * 60 * 1000;
 const MAIL_ID_FETCH_BATCH = 500;
 // 후보가 이보다 많으면 UID 를 고르지 않고 중단한다.
 // ADR-040 의 측정에서 후보가 8통에서 14통이었으므로 2000 은 그보다 충분히 크고,
-// 상한에서의 왕복 1 + 2000/500 = 5 회가 이분 탐색의 14회보다 적다.
+// 상한에서의 왕복 1 + 2000/500 = 5 회가 종전 방식의 14회보다 적다.
 const MAIL_ID_CANDIDATE_LIMIT = 2000;
 const INBOX_SEARCH_HINT = '받은 메일함(INBOX) 대체 조회: dooray mail list --search "<제목 일부>"';
 

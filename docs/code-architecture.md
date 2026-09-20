@@ -27,7 +27,7 @@ src/
   api/
     client.ts               # DoorayApiClient — ky 기반 HTTP 래퍼
     rate-limiter.ts         # 요청 토큰 버킷. 응답 헤더로 서버 잔량과 동기화 (ADR-039)
-    imapClient.ts           # IMAP 메일 조회 (imapflow + mailparser). resolveUidByMailId — 도착 시각으로 UID 이분 탐색 (ADR-040)
+    imapClient.ts           # IMAP 메일 조회 (imapflow + mailparser). resolveUidByMailId — 도착 시각의 일자로 SEARCH 해 UID 결정 (ADR-040)
     smtpClient.ts           # SMTP 메일 발송 (nodemailer)
     mailErrors.ts           # IMAP·SMTP 예외를 DoorayCliError 로 변환. 인증 실패는 exitCode 2, 연결 실패는 exitCode 1
     messenger-thread-request.ts # 스레드 생성 요청 경로·body 를 만드는 순수 함수. --log 유무로 channels/{id}/threads/create-and-send 와 logs/{log-id}/threads/create-and-send 를 가른다 (ADR-052)
