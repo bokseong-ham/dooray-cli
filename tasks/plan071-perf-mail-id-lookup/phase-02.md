@@ -27,6 +27,7 @@ ADR 은 phase 01 시작 전에 이미 갱신됐다.
 - 사용자가 읽는 문서에는 탐색 방식을 적지 않는다. 그것은 구현이고, 사용자에게 달라지는 것은 속도뿐이다.
   README 에 탐색 방식을 적은 곳이 있으면 지운다.
 - 코드 주석이 가장 어긋나기 쉽다. `이분 탐색` 이라고 적힌 주석이 남으면 다음 사람이 코드와 주석 중 무엇을 믿을지 판단해야 한다.
+- `CLAUDE.md` 의 mail 계열 규약이 탐색 방식을 한 줄로 적는다. 그 줄이 이 변경으로 사실과 어긋난다.
 
 ## 작업 항목
 
@@ -44,14 +45,21 @@ grep -rn "이분 탐색\|binary search" src/ docs/ README.md skills/ CLAUDE.md
 ### 2. `src/api/imapClient.ts` 의 주석을 고친다
 
 phase 01 이 코드를 바꿀 때 함께 고쳤어야 하는 자리다. 남아 있으면 지금 고친다.
-`MAIL_ID_SEARCH_TIME_MARGIN_MS` 위의 주석이 여기 해당한다.
+phase 01 이 `MAIL_ID_SEARCH_TIME_MARGIN_MS` 를 상수째 지우므로 그 위의 주석도 함께 사라진다.
+없는 상수를 찾지 않는다. 위 1번의 `grep` 출력이 실제로 남은 자리를 정한다.
 
-### 3. `docs/code-architecture.md` 를 고친다
+### 3. `CLAUDE.md` 의 mail 계열 규약을 고친다
+
+「명령 공통 규약」의 mail 계열 입력 줄이 「도착 시각으로 풀어 UID 를 이분 탐색한다」를 적는다.
+탐색 방식을 적지 말고 「도착 시각으로 풀어 UID 를 찾는다」로 줄인다.
+`CLAUDE.md` 는 내부 문서이므로 ADR 참조 번호는 그대로 둔다.
+
+### 4. `docs/code-architecture.md` 를 고친다
 
 `src/api/imapClient.ts` 의 책임 서술에 탐색 방식이 적혀 있으면 고친다.
 없으면 손대지 않는다.
 
-### 4. `README.md` 와 `skills/dooray-cli/SKILL.md` 를 확인한다
+### 5. `README.md` 와 `skills/dooray-cli/SKILL.md` 를 확인한다
 
 `mail get` 과 `mail reply` 의 설명에 탐색 방식이나 조회 횟수가 적혀 있으면 지운다.
 사용자가 그 값으로 할 일이 없다.
@@ -59,7 +67,7 @@ phase 01 이 코드를 바꿀 때 함께 고쳤어야 하는 자리다. 남아 �
 메일 웹 주소로 조회할 때 시간이 걸린다고 적은 곳이 있으면 그 문장을 지운다.
 왕복이 14회에서 2회로 줄었으므로 사실과 맞지 않게 된다.
 
-### 5. `docs/flow.md` 를 확인한다
+### 6. `docs/flow.md` 를 확인한다
 
 메일 조회 흐름이 그려져 있으면 탐색 단계를 고친다.
 이분 탐색 반복 대신 검색 한 번과 배치 조회 한 번이 된다.
@@ -70,11 +78,20 @@ phase 01 이 코드를 바꿀 때 함께 고쳤어야 하는 자리다. 남아 �
 grep -n "mail\|UID" docs/flow.md
 ```
 
-### 6. `index.json` 을 완료로 표시한다
+### 7. `index.json` 을 완료로 표시한다
 
 이 plan 의 마지막 phase 다.
 `tasks/plan071-perf-mail-id-lookup/index.json` 의 `status` 를 `completed` 로 바꾸고,
 `current_phase` 를 2 로 두고, `phases` 배열의 각 항목에 `"status": "completed"` 를 넣는다.
+
+이슈 #164 는 이 plan 의 변경이 `main` 에 머지된 뒤에 닫는다.
+머지 전에 닫으면 되돌릴 때 추적할 자리가 없어진다.
+이 phase 는 닫지 않고, 닫아야 한다는 것을 보고에 적는다.
+
+### 8. 문서와 코드 검사를 모두 돌린다
+
+아래 검증 절의 명령을 순서대로 돌리고 각 명령의 종료 코드를 그 자리에서 읽는다.
+출력을 다른 명령에 파이프로 잇지 않는다.
 
 ## 검증
 
@@ -82,10 +99,12 @@ ADR 밖에 이분 탐색 서술이 남지 않았는지 본다.
 
 ```bash
 # cwd: <repo root>
-grep -rn "이분 탐색" src/ docs/ README.md skills/ CLAUDE.md | grep -vc "docs/adr/040"   # = 0
+grep -rn "이분 탐색" src/ docs/ README.md skills/ CLAUDE.md > /tmp/plan071-binsearch.txt
+grep -vc "docs/adr/040" /tmp/plan071-binsearch.txt   # = 0
 ```
 
-0 이어야 한다.
+두 번째 명령의 출력이 0 이어야 한다.
+`grep -vc` 는 걸린 줄이 없으면 종료 코드 1 을 내므로, 종료 코드가 아니라 출력값을 읽는다.
 
 공개 문서에 내부 참조 번호가 들어가지 않았는지 본다.
 
@@ -109,7 +128,7 @@ node scripts/check-pii.mjs
 
 ```bash
 # cwd: <repo root>
-bash ~/personal/fos-skills/korean-check/scripts/check.sh README.md docs/code-architecture.md skills/dooray-cli/SKILL.md
+bash ~/personal/fos-skills/korean-check/scripts/check.sh README.md docs/code-architecture.md docs/flow.md skills/dooray-cli/SKILL.md CLAUDE.md
 ```
 
 종료 코드 0 이어야 한다.
@@ -136,8 +155,9 @@ pnpm test
 | 파일 | 변경 |
 |---|---|
 | `src/api/imapClient.ts` | 수정 — 주석이 남아 있을 때만 |
+| `CLAUDE.md` | 수정 — mail 계열 입력 규약의 탐색 방식 서술 |
 | `docs/code-architecture.md` | 수정 — 해당 서술이 있을 때만 |
+| `docs/flow.md` | 수정 — 해당 흐름이 있을 때만 |
 | `README.md` | 수정 — 해당 서술이 있을 때만 |
 | `skills/dooray-cli/SKILL.md` | 수정 — 해당 서술이 있을 때만 |
-| `docs/flow.md` | 수정 — 해당 흐름이 있을 때만 |
 | `tasks/plan071-perf-mail-id-lookup/index.json` | 수정 — `completed` 마킹 |
