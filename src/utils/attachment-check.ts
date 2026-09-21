@@ -1,6 +1,7 @@
 import readline from "node:readline";
 import { DoorayCliError } from "./errors.js";
 import { EXIT_PARAM_ERROR } from "./exit-codes.js";
+import { sanitizeForTerminal } from "./sanitize.js";
 
 export interface AttachmentReference {
   id: string;
@@ -52,7 +53,7 @@ export function findDroppedAttachments(
 // 서버에서 받은 파일명에 ANSI escape 나 control sequence 가 들어있을 수 있어
 // 터미널 변조 방지 목적으로 출력 직전 sanitize.
 export function sanitizeFileName(name: string): string {
-  return name.replace(/[\x00-\x1F\x7F]/g, "?");
+  return sanitizeForTerminal(name);
 }
 
 function printDroppedWarning(dropped: DroppedAttachment[]): void {

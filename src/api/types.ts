@@ -663,4 +663,23 @@ export interface MessengerChannel {
 }
 
 export type MessengerChannelListResponse = DoorayApiResponse<MessengerChannel[]>;
+
+// 대화방 로그 발신자. 실측상 `{ type: "member", member: { organizationMemberId } }` 이고
+// 이름은 오지 않는다. member 가 아닌 type(봇 등)이 올 수 있어 member 를 optional 로 둔다.
+export interface MessengerLogSender {
+  type?: string;
+  member?: { organizationMemberId?: string };
+}
+
+export interface MessengerLog {
+  id: string;
+  seq?: number;
+  sender?: MessengerLogSender;
+  sentAt?: string;
+  text?: string;
+  type?: string;
+}
+
+// 목록 응답에 totalCount 는 없고 hasMore 만 온다.
+export type MessengerLogListResponse = DoorayApiResponse<MessengerLog[]> & { hasMore?: boolean };
 export type TemplateDetailResponse = DoorayApiResponse<TemplateDetail>;

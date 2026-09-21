@@ -7,6 +7,22 @@ import { fileURLToPath } from "node:url";
 const METHOD_NAMES = ["get", "post", "put", "delete", "patch"];
 
 /**
+ * 공식 문서에 없는 줄 알고 쓰는 endpoint 와 그 사유.
+ *
+ * 여기 적힌 것은 「구현에 있고 공식에 없는 것」 에서 빠지고 별도 절에 사유와 함께 나온다.
+ * 그 목록이 비어야 정상이라는 판정을 지키려고 나눈다.
+ *
+ * 새로 더할 때는 공식 문서를 화면으로 열어 없다는 것을 확인한 날짜와 ADR 번호를 사유에 적는다.
+ * 확인하지 않은 것을 여기 넣으면 스냅샷이 낡아서 생긴 차이가 묻힌다.
+ */
+const KNOWN_UNDOCUMENTED = new Map([
+  [
+    "GET messenger/v1/channels/{id}/logs",
+    "대화방 메시지 읽기. 2026-09-21 에 공식 문서 Messenger > Channels 절에 없는 것을 확인했다 (ADR-061)",
+  ],
+]);
+
+/**
  * `${...}` 를 `{id}` 로 바꾼다. 중괄호가 중첩된 표현식도 하나로 센다.
  */
 function replaceInterpolations(raw) {
@@ -163,10 +179,13 @@ export function compareEndpoints(implEndpoints, officialEndpoints) {
   const impl = new Set(implEndpoints);
   const official = new Set(officialEndpoints);
 
+  const notInOfficial = [...impl].filter((entry) => !official.has(entry));
+
   return {
     matched: [...impl].filter((entry) => official.has(entry)).length,
     missingInImpl: [...official].filter((entry) => !impl.has(entry)).sort(),
-    missingInOfficial: [...impl].filter((entry) => !official.has(entry)).sort(),
+    missingInOfficial: notInOfficial.filter((entry) => !KNOWN_UNDOCUMENTED.has(entry)).sort(),
+    knownUndocumented: notInOfficial.filter((entry) => KNOWN_UNDOCUMENTED.has(entry)).sort(),
   };
 }
 
@@ -194,8 +213,17 @@ function printHuman(result, implCount, officialCount) {
   }
   console.log("");
 
+  console.log(`문서에 없는 줄 알고 쓰는 것: ${result.knownUndocumented.length}건`);
+  console.log("  공식 문서에 없다는 것을 확인하고 쓰기로 정한 경로다. 예고 없이 막힐 수 있다.");
+  for (const entry of result.knownUndocumented) {
+    console.log(`    ${entry}`);
+    console.log(`      ${KNOWN_UNDOCUMENTED.get(entry)}`);
+  }
+  console.log("");
+
   console.log(`구현에 있고 공식에 없는 것: ${result.missingInOfficial.length}건`);
   console.log("  비공식 endpoint 를 쓰고 있다는 뜻이거나, 스냅샷이 낡았다는 뜻이다.");
+  console.log("  공식 문서를 열어 어느 쪽인지 확인한 뒤, 쓰기로 정했으면 KNOWN_UNDOCUMENTED 에 사유와 함께 옮긴다.");
   for (const entry of result.missingInOfficial) console.log(`    ${entry}`);
 }
 

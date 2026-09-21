@@ -1,5 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
-import { resolveMember, resolveMemberByIdOrEmail } from "./member.js";
+import {
+  buildOrganizationMemberNameMap,
+  resolveMember,
+  resolveMemberByIdOrEmail,
+} from "./member.js";
 import type { DoorayApiClient } from "../api/client.js";
 import { DoorayCliError } from "../utils/errors.js";
 import { EXIT_API_ERROR } from "../utils/exit-codes.js";
@@ -135,5 +139,65 @@ describe("resolveMemberByIdOrEmail (messenger --to 공유 헬퍼)", () => {
   it("id/email 어느 쪽에도 매칭 안 되는 입력(이름) → null 반환 (matchByName 호출 없음)", async () => {
     const client = mockClient({});
     expect(await resolveMemberByIdOrEmail(client, "홍길동")).toBeNull();
+  });
+});
+
+describe("buildOrganizationMemberNameMap", () => {
+  const A = "1111222233334444555";
+  const B = "2222333344445555666";
+
+  it("중복 id 는 한 번만 조회한다", async () => {
+    const getMemberDetail = vi.fn(async (id: string) => ({ result: { id, name: `이름-${id}` } }));
+    const client = mockClient({ getMemberDetail });
+
+    const map = await buildOrganizationMemberNameMap(client, [A, B, A, B, A]);
+
+    expect(getMemberDetail).toHaveBeenCalledTimes(2);
+    expect(map.get(A)).toBe(`이름-${A}`);
+    expect(map.get(B)).toBe(`이름-${B}`);
+  });
+
+  it("조회를 병렬로 낸다", async () => {
+    let inFlight = 0;
+    let peak = 0;
+    const getMemberDetail = vi.fn(async (id: string) => {
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      await new Promise((r) => setTimeout(r, 5));
+      inFlight -= 1;
+      return { result: { id, name: `이름-${id}` } };
+    });
+    const client = mockClient({ getMemberDetail });
+
+    await buildOrganizationMemberNameMap(client, [A, B]);
+
+    expect(peak).toBe(2);
+  });
+
+  it("일부 조회가 실패해도 나머지를 채우고 실패한 id 는 map 에 넣지 않는다", async () => {
+    const getMemberDetail = vi.fn(async (id: string) => {
+      if (id === A) throw new Error("404");
+      return { result: { id, name: `이름-${id}` } };
+    });
+    const client = mockClient({ getMemberDetail });
+
+    const map = await buildOrganizationMemberNameMap(client, [A, B]);
+
+    expect(map.has(A)).toBe(false);
+    expect(map.get(B)).toBe(`이름-${B}`);
+  });
+
+  it("이름이 빈 값이면 map 에 넣지 않는다", async () => {
+    const client = mockClient({
+      getMemberDetail: vi.fn(async (id: string) => ({ result: { id, name: "" } })),
+    });
+    expect((await buildOrganizationMemberNameMap(client, [A])).has(A)).toBe(false);
+  });
+
+  it("빈 목록이면 조회하지 않는다", async () => {
+    const getMemberDetail = vi.fn();
+    const client = mockClient({ getMemberDetail });
+    expect((await buildOrganizationMemberNameMap(client, [])).size).toBe(0);
+    expect(getMemberDetail).not.toHaveBeenCalled();
   });
 });

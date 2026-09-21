@@ -22,6 +22,14 @@ Dooray 공식 API 문서: [https://helpdesk.dooray.com/share/pages/9wWo-xwiR66BO
 
 구현된 endpoint 와 공식 목록을 대조하려면 `pnpm api:inventory` 를 돌린다.
 
+「구현에 있고 공식에 없는 것」 이 0건이 아니면 공식 문서를 열어 비공식 경로인지 스냅샷이 낡은 것인지 확인한다.
+스냅샷이 낡았으면 `docs/api/official-endpoints.txt` 를 갱신하고, 비공식 경로인데 쓰기로 정했으면
+그 스크립트의 `KNOWN_UNDOCUMENTED` 로 옮긴다.
+
+**공식 문서에 없는 endpoint 는 기본으로 쓰지 않는다.** 쓰려면 읽기 전용이어야 하고
+확인·실측·등록·경고 네 가지를 모두 채워야 한다. 조건과 그 이유는
+[ADR-062](docs/adr/062-undocumented-endpoint-policy.md)가 소유한다.
+
 ## 빌드 & 실행
 
 ```bash
