@@ -44,7 +44,10 @@ function warnHasMore(hasMore: boolean | undefined): void {
 }
 
 export const messengerLogsCommand = new Command("logs")
-  .description("메신저 대화방 메시지 조회 (최근 N건, 최대 1000건)")
+  .description(
+    "메신저 대화방 메시지 조회 (최근 N건, 최대 1000건). " +
+      "공식 API 문서에 없는 endpoint 라 예고 없이 막힐 수 있다",
+  )
   .argument("<channel>", "대화방 channelId 또는 이름 (부분일치)")
   .option("-n, --count <n>", `가져올 개수 (기본 ${DEFAULT_LOG_COUNT})`, String(DEFAULT_LOG_COUNT))
   .action(async (channel: string, opts: { count: string }) => {
