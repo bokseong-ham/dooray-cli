@@ -1,10 +1,10 @@
 import { DoorayApiClient } from "../api/client.js";
 import type { Wiki } from "../api/types.js";
-import { getProjects, getWikis, setWikis, isExpired } from "../cache/store.js";
-import { PROJECTS_TTL_MS, WIKIS_TTL_MS, type CachedWiki } from "../cache/types.js";
+import { getProjects, getPrivateProjects, getWikis, setWikis, isExpired } from "../cache/store.js";
+import { WIKIS_TTL_MS, type CachedProject, type CachedWiki } from "../cache/types.js";
 import { DoorayCliError } from "../utils/errors.js";
 import { EXIT_PARAM_ERROR, EXIT_API_ERROR } from "../utils/exit-codes.js";
-import { resolveProject, PROJECT_ID_RE } from "./project.js";
+import { resolveProject, ensurePrivateProjects, PROJECT_ID_RE } from "./project.js";
 
 export async function fetchAllWikis(client: DoorayApiClient): Promise<Wiki[]> {
   const all: Wiki[] = [];
@@ -32,13 +32,21 @@ export async function resolveWiki(
   client: DoorayApiClient,
   projectCode: string,
 ): Promise<string> {
-  // resolveProject ensures project cache is fresh
-  await resolveProject(client, projectCode);
+  // resolveProject 가 공용 목록을 채우고, 거기서 못 찾으면 private 목록도 채운다 (ADR-054)
+  const projectId = await resolveProject(client, projectCode);
 
-  const entry = await getProjects();
-  const project = entry?.data.find(
-    (p) => p.code === projectCode || p.id === projectCode,
-  );
+  const matches = (p: CachedProject) =>
+    p.id === projectId || p.code === projectCode || p.id === projectCode;
+
+  const publicEntry = await getProjects();
+  const privateEntry = await getPrivateProjects();
+  let project = [...(publicEntry?.data ?? []), ...(privateEntry?.data ?? [])].find(matches);
+
+  // 입력이 15자리 이상 numeric 이면 resolveProject 가 캐시를 거치지 않고 그대로 돌려준다 (ADR-030).
+  // 그 경로에서는 private 캐시가 비어 있을 수 있으므로 여기서 받아 채우고 다시 찾는다 (ADR-054).
+  if (!project) {
+    project = (await ensurePrivateProjects(client)).find(matches);
+  }
 
   if (!project?.wikiId) {
     const orgIdHint = PROJECT_ID_RE.test(projectCode)

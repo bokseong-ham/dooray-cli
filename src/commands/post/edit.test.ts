@@ -7,6 +7,10 @@ const mocks = vi.hoisted(() => ({
   resolvePostInput: vi.fn(),
   ensureMembers: vi.fn(),
   resolveUserAdditions: vi.fn(),
+  ensureMe: vi.fn(),
+  resolveMember: vi.fn(),
+  buildMemberNameMap: vi.fn(),
+  resolveTaskLinks: vi.fn(),
   openInEditor: vi.fn(),
   readBodyInputOrNull: vi.fn(),
   startSpinner: vi.fn(),
@@ -33,8 +37,21 @@ vi.mock("../../resolvers/post-input.js", () => ({
 
 vi.mock("../../resolvers/member.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../resolvers/member.js")>();
-  return { ...actual, ensureMembers: mocks.ensureMembers };
+  return {
+    ...actual,
+    ensureMembers: mocks.ensureMembers,
+    resolveMember: mocks.resolveMember,
+    buildMemberNameMap: mocks.buildMemberNameMap,
+  };
 });
+
+vi.mock("../../resolvers/me.js", () => ({
+  ensureMe: mocks.ensureMe,
+}));
+
+vi.mock("../../resolvers/task-link.js", () => ({
+  resolveTaskLinks: mocks.resolveTaskLinks,
+}));
 
 vi.mock("../../resolvers/post-users.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../resolvers/post-users.js")>();
@@ -135,6 +152,12 @@ beforeEach(() => {
   mocks.client.updatePost.mockResolvedValue({});
   mocks.ensureMembers.mockResolvedValue([]);
   mocks.readBodyInputOrNull.mockResolvedValue(null);
+  mocks.ensureMe.mockResolvedValue({ id: "me-1", orgId: "org-1", name: "본인" });
+  mocks.resolveMember.mockResolvedValue("member-2");
+  mocks.buildMemberNameMap.mockResolvedValue(new Map([["member-2", "홍길동"]]));
+  mocks.resolveTaskLinks.mockResolvedValue([
+    { projectCode: "my-project", number: 7, postId: "post-7", subject: "다른 업무" },
+  ]);
   mocks.resolveUserAdditions.mockImplementation(
     async (_client, _projectId, names: string[], groupCodes: string[]) => [
       ...names.map((name) => ({
@@ -408,6 +431,12 @@ describe("post edit --mime-type", () => {
   it("본문을 바꾸지 않고 형식만 바꾸면 stderr 로 경고한다", async () => {
     mocks.client.getPost.mockResolvedValue({ result: htmlPost });
     mocks.readBodyInputOrNull.mockResolvedValue(null);
+  mocks.ensureMe.mockResolvedValue({ id: "me-1", orgId: "org-1", name: "본인" });
+  mocks.resolveMember.mockResolvedValue("member-2");
+  mocks.buildMemberNameMap.mockResolvedValue(new Map([["member-2", "홍길동"]]));
+  mocks.resolveTaskLinks.mockResolvedValue([
+    { projectCode: "my-project", number: 7, postId: "post-7", subject: "다른 업무" },
+  ]);
     const program = await createCommandTree();
     const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
     let stderrOutput = "";
@@ -464,6 +493,12 @@ describe("post edit --mime-type", () => {
   it("단독 지정하면 $EDITOR 없이 기존 본문을 그대로 두고 형식만 바꾼다", async () => {
     mocks.client.getPost.mockResolvedValue({ result: htmlPost });
     mocks.readBodyInputOrNull.mockResolvedValue(null);
+  mocks.ensureMe.mockResolvedValue({ id: "me-1", orgId: "org-1", name: "본인" });
+  mocks.resolveMember.mockResolvedValue("member-2");
+  mocks.buildMemberNameMap.mockResolvedValue(new Map([["member-2", "홍길동"]]));
+  mocks.resolveTaskLinks.mockResolvedValue([
+    { projectCode: "my-project", number: 7, postId: "post-7", subject: "다른 업무" },
+  ]);
     const program = await createCommandTree();
     const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
 
@@ -534,5 +569,87 @@ describe("post edit --mime-type", () => {
       ]),
     ).rejects.toThrow(/Allowed choices/);
     expect(mocks.client.updatePost).not.toHaveBeenCalled();
+  });
+});
+
+describe("post edit 본문 형식별 마크업", () => {
+  // --mention 만 주면 nonInteractive 가 거짓이라 $EDITOR 분기로 간다.
+  // --mime-type 을 함께 주어 비대화형 경로로 들어간다.
+  const baseArgs = ["node", "dooray", "post", "edit", "--id", "post-1"];
+
+  it("마크다운 본문의 멘션은 종전 문자열을 본문 앞에 붙인다", async () => {
+    const program = await createCommandTree();
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    await program.parseAsync([
+      ...baseArgs, "--mime-type", "text/x-markdown", "--mention", "홍길동",
+    ]);
+
+    expect(mocks.client.updatePost).toHaveBeenCalledWith(
+      "project-1",
+      "post-1",
+      expect.objectContaining({
+        body: {
+          mimeType: "text/x-markdown",
+          content: '[@홍길동](dooray://org-1/members/member-2 "member") 기존 본문',
+        },
+      }),
+    );
+    stdout.mockRestore();
+    stderr.mockRestore();
+  });
+
+  it("HTML 본문의 멘션은 표기가 없어 EXIT_PARAM_ERROR 로 거절한다", async () => {
+    mocks.client.getPost.mockResolvedValue({ result: htmlPost });
+    const program = await createCommandTree();
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    await expect(
+      program.parseAsync([...baseArgs, "--mime-type", "text/html", "--mention", "홍길동"]),
+    ).rejects.toMatchObject({ exitCode: 3 });
+
+    expect(mocks.client.updatePost).not.toHaveBeenCalled();
+    stdout.mockRestore();
+    stderr.mockRestore();
+  });
+
+  it("HTML 본문의 업무 링크도 같은 종료 코드로 거절한다", async () => {
+    mocks.client.getPost.mockResolvedValue({ result: htmlPost });
+    const program = await createCommandTree();
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    await expect(
+      program.parseAsync([
+        ...baseArgs, "--mime-type", "text/html", "--link-task", "my-project/7",
+      ]),
+    ).rejects.toMatchObject({ exitCode: 3 });
+
+    expect(mocks.client.updatePost).not.toHaveBeenCalled();
+    stdout.mockRestore();
+    stderr.mockRestore();
+  });
+
+  it("거절은 멤버와 업무를 해석하기 전에 한다", async () => {
+    mocks.client.getPost.mockResolvedValue({ result: htmlPost });
+    const program = await createCommandTree();
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    await expect(
+      program.parseAsync([
+        ...baseArgs,
+        "--mime-type", "text/html",
+        "--mention", "홍길동",
+        "--link-task", "my-project/7",
+      ]),
+    ).rejects.toMatchObject({ exitCode: 3 });
+
+    expect(mocks.resolveMember).not.toHaveBeenCalled();
+    expect(mocks.resolveTaskLinks).not.toHaveBeenCalled();
+    stdout.mockRestore();
+    stderr.mockRestore();
   });
 });

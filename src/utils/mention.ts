@@ -1,4 +1,6 @@
 import type { CachedMe } from "../cache/types.js";
+import { buildLink } from "./body-markup.js";
+import { MARKDOWN_MIME } from "./body-input.js";
 
 export interface MentionMember {
   memberId: string;
@@ -11,13 +13,27 @@ export interface MentionGroup {
   projectCode: string;
 }
 
-export function buildMemberMention(m: MentionMember, me: CachedMe): string {
-  const title = m.memberId === me.id ? "me" : "member";
-  return `[@${m.name}](dooray://${me.orgId}/members/${m.memberId} "${title}")`;
+export function buildMemberMention(
+  m: MentionMember,
+  me: CachedMe,
+  mimeType: string = MARKDOWN_MIME,
+): string {
+  return buildLink(mimeType, {
+    text: `@${m.name}`,
+    url: `dooray://${me.orgId}/members/${m.memberId}`,
+    title: m.memberId === me.id ? "me" : "member",
+  });
 }
 
-export function buildGroupMention(g: MentionGroup, me: CachedMe): string {
-  return `[@${g.projectCode}/${g.code}](dooray://${me.orgId}/member-groups/${g.groupId})`;
+export function buildGroupMention(
+  g: MentionGroup,
+  me: CachedMe,
+  mimeType: string = MARKDOWN_MIME,
+): string {
+  return buildLink(mimeType, {
+    text: `@${g.projectCode}/${g.code}`,
+    url: `dooray://${me.orgId}/member-groups/${g.groupId}`,
+  });
 }
 
 /**
@@ -29,10 +45,11 @@ export function prependMentions(
   members: MentionMember[],
   groups: MentionGroup[],
   me: CachedMe,
+  mimeType: string = MARKDOWN_MIME,
 ): string {
   const parts: string[] = [];
-  for (const m of members) parts.push(buildMemberMention(m, me));
-  for (const g of groups) parts.push(buildGroupMention(g, me));
+  for (const m of members) parts.push(buildMemberMention(m, me, mimeType));
+  for (const g of groups) parts.push(buildGroupMention(g, me, mimeType));
   if (parts.length === 0) return body;
   return parts.join(" ") + " " + body;
 }

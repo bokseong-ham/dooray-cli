@@ -14,8 +14,7 @@
 ## 컨텍스트
 
 **근거 문서**: `docs/adr/055-body-mimetype-aware-markup.md` 의 「실측으로 확인한 것」 절과
-`docs/adr/024-...` 계열이 정한 댓글 첨부 처리 방식.
-`docs/adr/INDEX.md` 에서 댓글 첨부 관련 ADR 번호를 찾아 그것을 읽는다.
+`docs/adr/024-comment-file-synthesis.md`.
 
 Dooray 가 댓글 전용 첨부 endpoint 를 제공하지 않아, 댓글 첨부는 업무 파일을 올린 뒤
 그 참조를 댓글 본문에 문자열로 넣어 표현한다. 지우는 것도 그 문자열을 본문에서 빼는 것이다.
@@ -37,7 +36,8 @@ Dooray 가 댓글 전용 첨부 endpoint 를 제공하지 않아, 댓글 첨부�
 **1단계가 참조를 찾지 못해도 성공으로 처리된다.** 본문이 그대로여도 갱신 호출이 성공하기 때문이다.
 그래서 HTML 본문에서는 2단계가 파일을 지우고, 본문에는 대상이 사라진 링크가 남는다.
 
-`src/commands/post/comment/file/upload.ts` 는 `appendFileReference` 결과를
+`src/commands/post/comment/file/upload.ts` 는 파일을 먼저 올리고,
+그 뒤에 `getPostComment` 로 댓글을 받아 `appendFileReference` 결과를
 `resolveBodyMimeType(commentRes.result.body.mimeType)` 과 함께 보낸다.
 형식은 보존하면서 내용은 마크다운으로 만든다.
 
@@ -47,6 +47,8 @@ Dooray 가 댓글 전용 첨부 endpoint 를 제공하지 않아, 댓글 첨부�
   반환 모양을 바꾸는 것이 이 phase 의 핵심이다.
 - 찾지 못했을 때 파일을 지우지 않고 멈춘다. 지운 뒤에는 되돌릴 수 없고, 본문에 남은 링크가 그 사실을 알리지 않는다.
 - HTML 제거 정규식은 마크다운 정규식과 따로 둔다. 하나로 합치려고 넓히면 본문의 다른 링크까지 지운다.
+- **제거는 넣기보다 너그럽게 한다.** 이 버그가 이미 `text/html` 댓글에 마크다운 참조를 평문으로 남겼다.
+  HTML 정규식만 쓰면 그 본문에서 아무것도 찾지 못하고, 새 `removed` 검사가 삭제까지 막아 종전보다 나빠진다.
 
 ## 작업 항목
 
@@ -78,11 +80,21 @@ export function removeFileReference(
 이미지 여부 판정(`IMAGE_FILE_EXTENSION_RE`)과 대괄호 제거는 지금 그대로 두고,
 그 결과를 `buildLink` 의 `image` 와 `text` 에 넘긴다.
 
-`removeFileReference` 는 형식별로 정규식을 고른다.
+#### `removeFileReference` 가 형식별로 쓰는 정규식
 
-- `text/x-markdown` — 지금 정규식을 그대로 쓴다
-- `text/html` — ADR-055 의 표가 적은 HTML 표기에 맞는 정규식을 쓴다.
-  `fileId` 를 담은 앵커를 줄 단위와 줄 안에서 각각 찾는다
+| 본문 형식 | 어떻게 찾나 |
+| --- | --- |
+| `text/x-markdown` | 지금 정규식을 그대로 쓴다 |
+| `text/html`, ADR-055 가 HTML 표기를 적었을 때 | 그 표기에 맞는 정규식을 먼저 쓴다. 찾지 못하면 마크다운 정규식으로 한 번 더 찾는다 |
+| `text/html`, ADR-055 가 `확인 못함` 일 때 | 마크다운 정규식만 쓴다 |
+
+**`text/html` 에서 마크다운 정규식으로 한 번 더 찾는 것이 M5 의 대응이다.**
+이 버그가 만든 본문에는 HTML 댓글 안에 마크다운 참조가 평문으로 들어 있다.
+그 본문을 만든 것이 이 CLI 라는 것이 근거다.
+
+**빼는 쪽에는 `checkMarkupSupport` 거절을 두지 않는다.**
+거절하면 이 버그가 만든 참조를 지울 방법이 CLI 에 없어진다.
+거절은 넣는 쪽에만 둔다.
 
 `removed` 는 바뀐 본문이 원래 본문과 다른지로 정한다.
 정규식이 몇 번 맞았는지를 세지 않는다. 호출부가 알아야 하는 것은 지워졌는지 여부뿐이다.
@@ -100,7 +112,16 @@ grep -rn "removeFileReference" src/
 
 1단계에서 형식을 함께 넘기고, 찾지 못하면 2단계로 가지 않는다.
 
+지금은 조회와 제거와 갱신이 모두 한 `try` 안에 있다.
+그 `catch` 는 무엇이 실패했든 `reference 제거 실패` 한 문구로 바꾼다.
+찾지 못한 것과 호출이 실패한 것은 원인이 다르므로 문구도 달라야 한다.
+
+**`try` 에 남기는 것은 `updatePostComment` 하나다.**
+댓글 조회와 `removeFileReference` 와 `removed` 판정을 그 `try` 앞으로 옮긴다.
+
 ```ts
+const commentRes = await client.getPostComment(projectId, postId, commentId);
+const currentBody = commentRes.result.body.content;
 const bodyMimeType = resolveBodyMimeType(commentRes.result.body.mimeType);
 const { body: newBody, removed } = removeFileReference(currentBody, fileId, bodyMimeType);
 if (!removed) {
@@ -108,28 +129,46 @@ if (!removed) {
     `댓글 본문에서 파일 reference 를 찾지 못했습니다. 파일을 삭제하지 않습니다. fileId=${fileId}\n` +
       `  본문 형식: ${bodyMimeType}\n` +
       `  파일만 지우려면: dooray post file delete ...`,
-    EXIT_API_ERROR,
+    EXIT_PARAM_ERROR,
   );
 }
+try {
+  await client.updatePostComment(/* ... */);
+} catch { /* 지금 문구 그대로 */ }
 ```
 
-마지막 줄의 안내는 실제 명령 형태로 적는다. `post file delete` 의 인자 형태를 그 명령 파일에서 확인해 옮긴다.
+조회가 실패하는 경우는 그 호출이 던지는 오류가 그대로 올라간다.
+`catch` 로 감싸 한 문구로 덮으면 권한 오류와 댓글 없음이 구별되지 않는다.
 
-이 `throw` 를 지금의 `try` 블록 **밖**에 둔다.
-안에 두면 그 블록의 `catch` 가 잡아 `reference 제거 실패` 라는 다른 문구로 바뀐다.
-찾지 못한 것과 호출이 실패한 것은 원인이 달라 문구도 달라야 한다.
+**종료 코드는 `EXIT_PARAM_ERROR`(3) 다.** 참조를 찾지 못한 것은 API 오류가 아니라 판정 결과다.
+`fileId` 가 그 댓글의 것이 아니거나 이미 지워진 상태라는 뜻이라 입력 문제에 가깝다.
+ADR-055 도 이 plan 의 거절을 종료 코드 3 으로 정한다.
+`updatePostComment` 와 `deletePostFile` 이 실패했을 때의 `EXIT_API_ERROR` 는 그대로 둔다.
+
+마지막 줄의 안내는 실제 명령 형태로 적는다. `post file delete` 의 인자 형태를 그 명령 파일에서 확인해 옮긴다.
 
 확인 문구도 고친다. 지금은 본문을 고치고 파일을 지운다고만 적는다.
 찾지 못하면 아무것도 지우지 않는다는 것을 함께 적는다.
 
 ### 3. `src/commands/post/comment/file/upload.ts` 를 고친다
 
-`appendFileReference` 호출에 형식을 넘긴다.
-그 파일이 이미 `resolveBodyMimeType(commentRes.result.body.mimeType)` 을 부르고 있으므로
-그 값을 변수에 담아 두 곳에 쓴다.
+**지금 순서로는 사전 거절이 성립하지 않는다.**
+파일 업로드가 Step 1 이고, 본문 형식을 알 수 있는 `getPostComment` 는 Step 2 안에 있다.
+그대로 두고 거절을 넣으면 업로드가 끝난 뒤에 멈춰, 어디에도 참조되지 않는 파일이 업무에 남는다.
 
-넣기 **전에** `checkMarkupSupport(bodyMimeType, "file-reference")` 로 판정한다.
-거절이면 파일을 올리기 전에 멈춘다. 올린 뒤에 멈추면 어디에도 참조되지 않는 파일이 업무에 남는다.
+순서를 아래로 바꾼다.
+
+| 단계 | 무엇 |
+| --- | --- |
+| Step 0 | `getPostComment` 로 댓글을 받아 `resolveBodyMimeType` 으로 형식을 구하고 `checkMarkupSupport(bodyMimeType, "file-reference")` 로 판정한다. 거절이면 `EXIT_PARAM_ERROR`(3) 로 멈춘다 |
+| Step 1 | `uploadPostFile` 로 파일을 올린다 |
+| Step 2 | Step 0 이 받아 둔 본문에 `appendFileReference` 로 참조를 붙이고 `updatePostComment` 를 부른다 |
+
+Step 0 이 받은 본문과 형식을 변수에 담아 Step 2 가 그대로 쓴다.
+`getPostComment` 를 두 번 부르지 않는다.
+
+Step 2 의 `try`/`catch` 와 그 안의 「업로드 OK / 댓글 reference 추가 실패」 문구는 그대로 둔다.
+그 경로는 업로드가 이미 끝난 뒤라 지금 문구가 맞다.
 
 ### 4. `src/utils/comment-files.test.ts` 를 고치고 확인을 더한다
 
@@ -142,22 +181,36 @@ if (!removed) {
 | --- | --- | --- |
 | 마크다운에서 찾았을 때 | 마크다운 본문에 그 참조가 있음 | `removed` 가 참이고 `body` 가 종전 결과와 같다 |
 | 마크다운에서 못 찾았을 때 | 마크다운 본문에 그 참조가 없음 | `removed` 가 거짓이고 `body` 가 원래와 같다 |
-| HTML 본문 | ADR-055 의 HTML 표기를 담은 본문 | `removed` 가 참이고 그 앵커만 사라진다 |
-| HTML 본문의 다른 링크 | 같은 본문에 다른 fileId 의 앵커도 있음 | 그 앵커는 남는다 |
+| HTML 본문에 마크다운 참조 | `text/html` 인데 본문에 마크다운 참조가 있음 | `removed` 가 참이고 그 참조가 사라진다 |
+| HTML 본문의 다른 파일 | 같은 본문에 다른 fileId 의 참조도 있음 | 그 참조는 남는다 |
 | 형식을 주지 않았을 때 | 마크다운 본문 | 마크다운 정규식으로 동작한다 |
-| 넣기: HTML 본문 | `text/html` | ADR-055 의 표기로 붙는다. 표기가 없으면 이 확인 대신 거절 확인을 넣는다 |
+| 넣기: HTML 본문 | `text/html` | ADR-055 의 표기로 붙는다. 표기가 `확인 못함` 이면 이 확인 대신 `checkMarkupSupport` 거절 확인을 넣는다 |
 
-### 5. `src/commands/post/comment/file/delete.test.ts` 에 확인 둘을 더한다
+ADR-055 가 HTML 표기를 적었으면 그 표기를 담은 본문의 제거 확인을 한 건 더 넣는다.
 
-이 파일이 없으면 만든다. `src/commands/post/comment/file/` 아래의 다른 테스트 파일의 mock 방식을 따른다.
+### 5. `src/commands/post/comment/file/` 의 테스트 둘을 고친다
+
+`delete.test.ts` 와 `upload.test.ts` 가 이미 있다. 그 파일에 더한다.
+
+`delete.test.ts` 에 더할 것이다.
 
 | 확인할 것 | 상황 | 기대 |
 | --- | --- | --- |
-| 못 찾았을 때 | `removeFileReference` 가 `removed: false` 를 돌려줌 | `deletePostFile` 이 불리지 않고 `EXIT_API_ERROR` 로 던진다 |
-| 찾았을 때 | `removed: true` | 본문 갱신 뒤 `deletePostFile` 이 한 번 불린다 |
+| 못 찾았을 때 | 본문에 그 fileId 의 참조가 없음 | `deletePostFile` 이 불리지 않고 `EXIT_PARAM_ERROR` 로 던진다 |
+| 찾았을 때 | 본문에 참조가 있음 | 본문 갱신 뒤 `deletePostFile` 이 한 번 불린다 |
 
 첫 번째는 `deletePostFile` 의 호출 횟수를 확인한다.
 던지는 것만 확인하면 파일이 지워졌는지 알 수 없다. 이 phase 가 막으려는 것이 그 삭제다.
+
+`upload.test.ts` 에 더할 것이다.
+
+| 확인할 것 | 상황 | 기대 |
+| --- | --- | --- |
+| 거절이 업로드보다 앞선다 | 거절 대상 형식의 댓글 | `uploadPostFile` 이 불리지 않고 `EXIT_PARAM_ERROR` 로 던진다 |
+| 조회가 업로드보다 앞선다 | 정상 형식의 댓글 | `getPostComment` 가 한 번만 불리고 업로드와 갱신이 이어진다 |
+
+ADR-055 가 네 표기를 모두 확인해 거절 대상이 없으면 첫 번째 확인은 넣지 않는다.
+그 사실을 이 phase 의 보고에 적는다.
 
 ## 검증
 
@@ -185,6 +238,15 @@ grep -c "removed" src/utils/comment-files.ts                              # >= 2
 grep -c "removed" src/commands/post/comment/file/delete.ts                # >= 1
 grep -c "checkMarkupSupport" src/commands/post/comment/file/upload.ts     # >= 1
 ```
+
+`upload.ts` 에서 조회가 업로드보다 앞에 있는지 본다.
+
+```bash
+# cwd: <repo root>
+grep -n "getPostComment\|uploadPostFile" src/commands/post/comment/file/upload.ts
+```
+
+`getPostComment` 의 줄 번호가 `uploadPostFile` 보다 작아야 한다.
 
 `removeFileReference` 를 쓰는 모든 자리가 새 반환 모양을 쓰는지 본다.
 
@@ -216,6 +278,7 @@ node scripts/check-pii.mjs
 |---|---|
 | `src/utils/comment-files.ts` | 수정 — 형식 인자와 `removed` 반환 |
 | `src/utils/comment-files.test.ts` | 수정 — 기존 확인 조정과 확인 6건 추가 |
-| `src/commands/post/comment/file/delete.ts` | 수정 — 못 찾으면 삭제하지 않는다 |
-| `src/commands/post/comment/file/delete.test.ts` | 신규 또는 수정 — 확인 2건 |
-| `src/commands/post/comment/file/upload.ts` | 수정 — 형식 전달과 사전 거절 |
+| `src/commands/post/comment/file/delete.ts` | 수정 — 조회와 판정을 `try` 앞으로, 못 찾으면 삭제하지 않는다 |
+| `src/commands/post/comment/file/delete.test.ts` | 수정 — 확인 2건 |
+| `src/commands/post/comment/file/upload.ts` | 수정 — 조회와 사전 거절을 업로드 앞으로 |
+| `src/commands/post/comment/file/upload.test.ts` | 수정 — 확인 2건 |

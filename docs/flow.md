@@ -1,6 +1,6 @@
-# User Flow — dooray-cli
+# dooray-cli User Flow
 
-## 최초 설정 — `dooray setup`
+## 최초 설정: `dooray setup`
 
 대화형 마법사로 필수 설정을 한 번에 완료한다.
 
@@ -137,15 +137,17 @@ dooray skill update --force  # 관리되지 않은 기존 파일을 백업한 �
 ```
 dooray project list                         # 1) 프로젝트 목록 (캐시 자동 갱신)
 dooray post list my-project                 # 2) 업무 목록 (postNumber 포함)
+dooray post list my-project --tag "<태그 이름>"  # 2-1) 태그로 거르기 (여러 번 주면 모두 가진 업무)
 dooray post get my-project 42              # 3) 업무 상세 (#42번)
 dooray post get --id <postId>              # 3-1) internal postId 로 (create 출력값)
 dooray post get https://x.dooray.com/task/to/<postId>        # 3-2) URL 직접 입력 (task/to)
 dooray post get https://x.dooray.com/project/tasks/<postId>  # 3-3) URL 직접 입력 (project/tasks, #83)
+dooray post get my-project 42 --json --with-tag-names        # 3-4) 태그 이름까지 채워서 (ADR-056)
 dooray post search my-project "스프린트"   # 4) 제목 검색
 ```
 
 `post create` 출력의 긴 숫자는 internal postId 다 (업무 번호 #N 아님).
-후속 조회·수정은 `--id <postId>` 로 한다 — positional `<project> <number>` 자리에 넣으면 안내 에러로 거부된다 (#82).
+후속 조회·수정은 `--id <postId>` 로 한다. positional `<project> <number>` 자리에 넣으면 안내 에러로 거부된다 (#82).
 
 ### projectId 직접 입력 (member=me 응답 외 프로젝트, ADR-030, Issue #78)
 
@@ -158,7 +160,7 @@ dooray post list 1234567890123456789
 dooray member list 1234567890123456789
 ```
 
-권한 검증은 후속 API 호출 시점 — 권한이 없으면 4xx 발생.
+권한 검증은 후속 API 호출 시점에 이뤄지고, 권한이 없으면 4xx 가 발생한다.
 
 ## 업무 생성 흐름
 
@@ -240,7 +242,7 @@ dooray member list my-project              # 프로젝트 멤버 (이름·이메
 dooray member get <member-id>              # 단건 조회
 ```
 
-`post comment list` 의 Creator 컬럼은 자동으로 표시명으로 채워진다 (`--json` 은 raw 유지 — 파이프라인 호환).
+`post comment list` 의 Creator 컬럼은 자동으로 표시명으로 채워진다 (`--json` 은 파이프라인 호환을 위해 raw 를 유지한다).
 
 ## 댓글 흐름
 
@@ -256,7 +258,7 @@ dooray post comment delete my-project 42 \      # 댓글 삭제 (confirm 기본,
   --comment-id <comment-id>
 ```
 
-post `--id`/`--url` 모드도 동일 지원 — `dooray post comment list --id <postId>` 또는 첫 positional 에 Dooray URL 직접.
+post `--id`/`--url` 모드도 같이 지원한다. `dooray post comment list --id <postId>` 또는 첫 positional 에 Dooray URL 을 직접 넣는다.
 
 ## 댓글 첨부파일 흐름 (ADR-024)
 
@@ -275,7 +277,14 @@ dooray post comment file delete my-project 42 <comment-id> <file-id>    # 삭제
 - `png`, `jpg`, `jpeg`, `gif`, `webp`, `bmp`, `svg`, `avif`, `heic`는 이미지 마크다운 `![파일명](/files/<file-id>)`을 추가한다.
 - 그 외 확장자와 확장자 없는 파일은 일반 링크 `[파일명](/files/<file-id>)`를 추가한다.
 
+`upload`은 파일을 올리기 전에 댓글을 조회해 본문 형식을 판정한다 (ADR-055).
+`text/html` 이면 그 형식의 첨부 표기가 확인되지 않아 종료 코드 3으로 멈춘다.
+업로드 뒤에 멈추면 어디에도 참조되지 않는 파일이 업무에 남기 때문에 판정이 업로드보다 앞선다.
+
 `delete`는 두 참조 형식을 모두 제거한 뒤 post-level 파일을 삭제한다.
+본문에서 참조를 찾지 못하면 본문도 파일도 건드리지 않고 종료 코드 3으로 멈춘다 (ADR-055).
+`text/html` 본문에서도 마크다운 정규식으로 찾는다.
+ADR-055 이전의 CLI가 `text/html` 댓글에 마크다운 참조를 평문으로 남겼고, 그것을 지울 경로가 여기뿐이다.
 두 단계의 원자성은 보장하지 않으며 부분 성공 시 stderr 안내와 0이 아닌 종료 코드로 종료한다.
 
 `list`는 첨부 경로가 둘로 갈리므로 두 출처를 합쳐서 보여준다.
@@ -335,7 +344,7 @@ dooray post create my-project --template "릴리스 플랜" \
   --tag "p0"                       # 템플릿 tags 를 덮음
 ```
 
-`interpolation=true` 가 기본 — Dooray 가 `${year}`, `${month}` 같은 시스템 매크로를 응답에서 자동 치환.
+`interpolation=true` 가 기본이다. Dooray 가 `${year}`, `${month}` 같은 시스템 매크로를 응답에서 자동으로 치환한다.
 사용자 정의 변수 (`--field key=value`) 는 본 release scope 외 (별도 후속).
 사용자 옵션이 명시 입력되면 템플릿 값을 override.
 
@@ -350,7 +359,7 @@ dooray post edit --id <postId> --parent <parentPostId>   # 직접 postId
 ```
 
 내부적으로 `client.updatePost` (subject/body/users) → `client.setPostParent` (별도 `POST .../set-parent-post` endpoint) 순차 호출.
-둘 다 무관 endpoint 라 atomic 보장 없음 — partial 실패 시 stderr 안내 후 non-zero exit.
+둘 다 무관 endpoint 라 atomic 을 보장하지 않는다. 일부만 실패하면 stderr 로 안내한 뒤 non-zero 로 끝난다.
 
 **한계**: Dooray API 가 `unset-parent-post` 미제공 → CLI 로 parent 해제 (top-level 화) 불가. 웹 UI 에서 수동 처리.
 
@@ -382,7 +391,7 @@ dooray post edit --id <postId> --tag-clear --tag "분류: <name>"
 dooray post edit --id <postId> --tag-remove "분류: <name>"
 ```
 
-`--title`/`--body` 없이 단독 호출 허용 — 기존 본문 자동 재전송.
+`--title`/`--body` 없이 단독으로 호출할 수 있고, 그때는 기존 본문을 자동으로 다시 보낸다.
 mandatory tag 그룹 위반 시 친절한 에러.
 
 ## 프로젝트 태그 관리 흐름 (ADR-041)
@@ -421,6 +430,10 @@ dooray post done my-project 42                  # 완료 상태로
 dooray post workflow my-project 42 "review"     # 임의 상태로 (이름 또는 class)
 ```
 
+`post done` 은 `set-done` endpoint 를 불러 완료 클래스의 대표 워크플로우로 옮기고,
+완료 이전 담당자들의 상태도 함께 바꾼다. `post workflow` 는 `set-workflow` 로 임의 워크플로우로 옮기므로
+완료 클래스로 옮기고 싶으면 `post done` 을, 그 밖의 상태로 옮기고 싶으면 `post workflow` 를 쓴다.
+
 ## 위키 흐름
 
 ```
@@ -457,17 +470,23 @@ dooray wiki pages <project>
 dooray wiki tree <project>
 ```
 
+개인 프로젝트도 프로젝트 코드로도 projectId 로도 같은 명령을 쓴다 (ADR-054).
+`resolveProject` 가 공용 목록에서 못 찾으면 private 목록을 받아 다시 찾고,
+`resolveWiki` 는 공용과 private 두 캐시를 모두 본 뒤 거기서도 못 찾으면 private 목록을 받아 다시 찾는다.
+사람이 `dooray project list --type private` 를 미리 부를 필요가 없다.
+
 위키 본문의 페이지 링크는 `dooray://<orgId>/pages/<pageId>` 형태다.
 앞 숫자는 orgId 이고 project 도 위키 ID 도 아니다.
 그 값을 project 자리에 넣으면 `프로젝트에 위키가 없습니다` 로 끝난다.
-`resolveProject` 가 15자리 이상 numeric 을 project ID 로 통과시킨 뒤(ADR-030) `resolveWiki` 가 캐시에서 찾지 못하기 때문이다.
+`resolveProject` 가 15자리 이상 numeric 을 project ID 로 통과시키는데(ADR-030)
+orgId 는 공용 목록에도 private 목록에도 없어 `resolveWiki` 가 끝내 찾지 못하기 때문이다.
 뒤 숫자가 페이지 ID 이므로 그것만 떼어 `--id` 에 넣으면 project 없이 조회된다. 오류 안내가 그 방법을 알려준다.
 
 `wiki page get` 은 `wiki page file` 과 `wiki page comment` 와 같은 네 가지 입력 형태를 받는다 (ADR-020, ADR-043).
 `--id` 모드는 project 없이 단독으로 동작한다 (ADR-045).
 `GET /wiki/v1/pages/{page-id}` 를 한 번 불러 응답의 wikiId 를 읽는다.
 `--project` 는 선택이며 함께 주면 그 해석 호출을 아낀다.
-`wiki page` 의 `file`, `comment`, `delete` 도 같은 방식으로 `--id` 만 받는다.
+`wiki page` 의 `edit`, `file`, `comment`, `delete` 도 같은 방식으로 `--id` 만 받는다.
 
 ```
 dooray wiki page get --id <page-id>
@@ -513,7 +532,7 @@ dooray messenger channel-send --channel "$THREAD" --body "배포 완료"
 ## 위키 페이지 첨부파일 흐름 (Issue #70, ADR-029)
 
 페이지 첨부파일을 CLI 로 관리.
-post file 명령군과 mirror — UX 동일 (`<project> <page-id>`, `--id`, `--url`, positional URL 지원).
+post file 명령군과 같은 구조다. `<project> <page-id>`, `--id`, `--url`, positional URL 을 모두 지원한다.
 
 ```
 # 목록 (general 첨부 + inline image 둘 다 표시)
@@ -536,7 +555,7 @@ dooray wiki page file download-all my-project <page-id> -o ./attachments/
 dooray wiki page file delete my-project <page-id> --file-id <id>
 ```
 
-활용 사례 — 팀 위키에 스킬 파일 첨부 → 팀원이 `wiki page file download-all` 로 일괄 받아 `~/.claude/skills/` 에 그대로 설치.
+활용 사례: 팀 위키에 스킬 파일 첨부 → 팀원이 `wiki page file download-all` 로 일괄 받아 `~/.claude/skills/` 에 그대로 설치.
 
 ## 위키 페이지 댓글 흐름
 
@@ -566,7 +585,7 @@ dooray wiki page comment edit <project> <page-id> <comment-id> --body "..."
 dooray wiki page comment delete <project> <page-id> <comment-id>
 ```
 
-활용 사례 — 회의록 위키 페이지에 자동화 봇이 결정사항 댓글로 누적, 토론 흐름 추적.
+활용 사례: 회의록 위키 페이지에 자동화 봇이 결정사항 댓글로 누적, 토론 흐름 추적.
 
 ## 피드백 흐름 (ADR-022/023)
 
@@ -649,7 +668,9 @@ dooray mail get https://<tenant>.dooray.com/mail/systems/inbox/<mail-id>  # 메�
 dooray mail get <mail-id>                                               # 주소에서 뽑은 19자리 id
 ```
 
-뒤의 두 형태는 id 에서 도착 시각을 꺼낸 뒤 UID 를 이분 탐색해 찾는다 (ADR-040).
+뒤의 두 형태는 id 에서 도착 시각을 꺼낸 뒤, 그 시각의 앞뒤 하루를 `SEARCH` 로 조회하고
+받은 후보의 도착 시각을 한 번에 받아 UID 를 결정한다 (ADR-040).
+후보가 상한을 넘으면 UID 를 고르지 않고 대체 조회를 안내한다.
 시간 일치는 원본 메일의 동일성을 보장하지 않는다.
 대상이 이동되거나 삭제된 뒤 같은 시각의 다른 메일만 남으면 그 메일이 조회될 수 있다.
 웹 주소나 mail id 로 답장할 때는 제목, 발신자, IMAP 도착 시각과 UID 를 확인한다.

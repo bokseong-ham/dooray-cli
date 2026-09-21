@@ -27,7 +27,7 @@ src/
   api/
     client.ts               # DoorayApiClient — ky 기반 HTTP 래퍼
     rate-limiter.ts         # 요청 토큰 버킷. 응답 헤더로 서버 잔량과 동기화 (ADR-039)
-    imapClient.ts           # IMAP 메일 조회 (imapflow + mailparser). resolveUidByMailId — 도착 시각으로 UID 이분 탐색 (ADR-040)
+    imapClient.ts           # IMAP 메일 조회 (imapflow + mailparser). resolveUidByMailId — 도착 시각의 일자로 SEARCH 해 UID 결정 (ADR-040)
     smtpClient.ts           # SMTP 메일 발송 (nodemailer)
     mailErrors.ts           # IMAP·SMTP 예외를 DoorayCliError 로 변환. 인증 실패는 exitCode 2, 연결 실패는 exitCode 1
     messenger-thread-request.ts # 스레드 생성 요청 경로·body 를 만드는 순수 함수. --log 유무로 channels/{id}/threads/create-and-send 와 logs/{log-id}/threads/create-and-send 를 가른다 (ADR-052)
@@ -36,13 +36,13 @@ src/
 
   resolvers/
     me.ts                   # /common/v1/members/me → CachedMe (id·name·orgId; orgId 없으면 캐시 갱신)
-    project.ts              # code·id → projectId. 입력 자동 분기: numeric 15+자리 → cache 우회 + 그대로 반환 / 그 외 → cache 매칭 (code+id). 권한 검증은 후속 API 4xx 위임 (ADR-030, Issue #78)
+    project.ts              # code·id → projectId. 입력 자동 분기: numeric 15+자리 → cache 우회 + 그대로 반환 / 그 외 → cache 매칭 (code+id). 공용 목록에서 못 찾으면 private 목록을 받아 다시 찾는다 (ADR-054). 권한 검증은 후속 API 4xx 위임 (ADR-030, Issue #78)
     member.ts               # 입력 자동 분기: 15자리 숫자 / 이메일 / 이름. lookupMemberName + buildMemberNameMap (ADR-021)
     workflow.ts             # name·class → workflowId
     post.ts                 # postNumber → postId (API 호출)
-    wiki.ts                 # projectCode → wikiId / wikiId → homePageId (캐시). fetchAllWikis 가 size 100 씩 totalCount 까지 순회 (ADR-043)
+    wiki.ts                 # projectCode → wikiId / wikiId → homePageId (캐시). 공용과 private 두 프로젝트 캐시를 모두 보고, 거기서도 못 찾으면 private 목록을 받아 다시 찾는다 (ADR-054). fetchAllWikis 가 size 100 씩 totalCount 까지 순회 (ADR-043)
     postRef.ts              # "code/number" 또는 raw postId → postId (post create / post edit --parent 공용)
-    tag.ts                  # name[] → tagIds + mandatory/selectOne 검증, 그룹 이름 → groupId (태그 목록의 tagGroup 에서 파생, ADR-041)
+    tag.ts                  # name[] → tagIds + mandatory/selectOne 검증, 그룹 이름 → groupId (태그 목록의 tagGroup 에서 파생, ADR-041). attachTagNames 로 업무 응답의 태그 id 에 캐시의 이름을 붙임 (ADR-056)
     milestone.ts            # name → milestoneId
     match.ts                # 공용 매칭: 정확일치 → 부분일치 → 모호 시 에러. helpHint 옵션 + name 가드 (ADR-028)
     post-input.ts           # --id / --url / positional / Dooray URL → {projectId, postId, ...} 단일 헬퍼 (ADR-020). 입력 토큰 타입 판별 (classifyPostInputToken) + 진입점별 검증 (ADR-020 보강)
@@ -95,12 +95,13 @@ src/
     body-input.ts           # --body / --body-file → string (stdin "-" + 충돌 가드) + BODY_MIME_TYPES / resolveBodyMimeType / warnUnconvertedBody — --mime-type 의 우선순위와 경고를 한 곳에 둔다 (ADR-053)
     dooray-url.ts           # task URL (/task/to/<postId> + /task/<projectId>/<postId> + /project/tasks/<postId>) + wiki URL (/wiki/<wikiId>/<pageId>) parser (ADR-020)
     comment-enrich.ts       # PostComment[] Creator 이름 채우기 (ADR-021, immutable)
-    mention.ts              # 멤버·그룹 멘션 마크업 빌더 + prependMentions (Issue #25)
-    task-link.ts            # 업무 링크 빌더 (escapeLinkText / buildTaskLink / appendTaskLinks / parseLinkRef, Issue #33)
+    body-markup.ts          # 본문 형식별 링크 문법과 지원 판정 (buildLink / checkMarkupSupport / escapeLinkText, ADR-055) — 아래 셋이 이것을 쓴다
+    mention.ts              # 멤버·그룹 멘션 마크업 빌더 + prependMentions — 선택 형식 인자 (Issue #25, ADR-055)
+    task-link.ts            # 업무 링크 빌더 (buildTaskLink / appendTaskLinks / parseLinkRef) — 선택 형식 인자, escapeLinkText 는 body-markup 재export (Issue #33, ADR-055)
     feedback-meta.ts        # CLI 버전·환경 수집 + GitHub issue body 빌더 + buildLastRunBlock (ADR-022, ADR-023)
     argv-sanitize.ts        # argv 시크릿 패턴 마스킹 (--api-key/--token/--password/Authorization, ADR-023)
     command-hint.ts         # 실행된 argv 에서 positional 을 빼고 --id 를 끼운 완성 명령 문자열 빌더 (ADR-044)
-    comment-files.ts        # 확장자별 이미지/일반 링크 생성 + 두 형식 제거 (ADR-024)
+    comment-files.ts        # 확장자별 이미지/일반 링크 생성 + 두 형식 제거 — 선택 형식 인자와 removed 반환 (ADR-024, ADR-055)
     wiki-snippet.ts         # wiki inline_image 본문 삽입용 markdown reference 빌더 (ADR-031 보강, Issue #81)
     dooray-message.ts       # resultMessage URL-encoding 디코드 정규화 (API 에러 메시지 표시용)
     attachment-check.ts     # 본문 markdown 의 attachment 참조(fileId 와 라벨) 추출 (post edit 누락 confirm, comment file list 병합)
@@ -143,9 +144,9 @@ src/
       search.ts             # dooray member search (org-wide, ad-hoc, 캐시 미사용)
 
     post/
-      list.ts
+      list.ts               # --tag <name> 반복 지정 → tagIds 필터 (여러 개면 모두 가진 업무, ADR-056)
       search.ts
-      get.ts
+      get.ts                # --with-tag-names 로 --json 의 tags[] 에 name 을 채움 (ADR-056)
       create.ts
       edit.ts               # $EDITOR 또는 제목·본문·태그·참조자·담당자·--mime-type 옵션 기반 비대화형 수정
       done.ts

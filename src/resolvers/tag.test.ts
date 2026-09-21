@@ -7,7 +7,13 @@ vi.mock("../cache/store.js", () => ({
   isExpired: vi.fn().mockReturnValue(true),
 }));
 
-import { validateMandatoryTags, lookupTagIds, validateMandatoryCoverage, resolveTagGroup } from "./tag.js";
+import {
+  validateMandatoryTags,
+  lookupTagIds,
+  validateMandatoryCoverage,
+  resolveTagGroup,
+  attachTagNames,
+} from "./tag.js";
 import { DoorayCliError } from "../utils/errors.js";
 import { EXIT_PARAM_ERROR } from "../utils/exit-codes.js";
 import type { DoorayApiClient } from "../api/client.js";
@@ -152,5 +158,53 @@ describe("resolveTagGroup", () => {
         exitCode: EXIT_PARAM_ERROR,
       });
     }
+  });
+});
+
+describe("attachTagNames", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("tags 가 비면 API 를 부르지 않고 빈 결과를 돌려준다", async () => {
+    const client = mockClient([{ id: "1", name: "bug" }]);
+    const result = await attachTagNames(client, "<project>", []);
+    expect(result).toEqual({ tags: [], missing: [] });
+    expect(client.getProjectTags).not.toHaveBeenCalled();
+  });
+
+  it("캐시에 모든 id 가 있으면 name 을 채우고 missing 은 빈 배열이다", async () => {
+    const client = mockClient([
+      { id: "1", name: "bug" },
+      { id: "2", name: "urgent" },
+    ]);
+    const result = await attachTagNames(client, "<project>", [{ id: "1" }, { id: "2" }]);
+    expect(result.tags).toEqual([
+      { id: "1", name: "bug" },
+      { id: "2", name: "urgent" },
+    ]);
+    expect(result.missing).toEqual([]);
+  });
+
+  it("캐시에 없는 id 는 name 키 자체가 붙지 않고 missing 에 담긴다", async () => {
+    const client = mockClient([{ id: "1", name: "bug" }]);
+    const result = await attachTagNames(client, "<project>", [{ id: "1" }, { id: "9" }]);
+    expect(result.tags[0]).toEqual({ id: "1", name: "bug" });
+    expect(result.tags[1]).not.toHaveProperty("name");
+    expect(result.missing).toEqual(["9"]);
+  });
+
+  it("캐시의 name 이 빈 문자열이면 못 찾은 것으로 본다", async () => {
+    const client = mockClient([{ id: "1", name: "" }]);
+    const result = await attachTagNames(client, "<project>", [{ id: "1" }]);
+    expect(result.tags[0]).not.toHaveProperty("name");
+    expect(result.missing).toEqual(["1"]);
+  });
+
+  it("응답에 name 이 이미 있으면 덮어쓰지 않는다", async () => {
+    const client = mockClient([{ id: "1", name: "캐시 이름" }]);
+    const result = await attachTagNames(client, "<project>", [{ id: "1", name: "서버 이름" }]);
+    expect(result.tags[0]).toEqual({ id: "1", name: "서버 이름" });
+    expect(result.missing).toEqual([]);
   });
 });

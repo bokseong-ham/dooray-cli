@@ -1,7 +1,11 @@
 import { Command } from "commander";
 import { getConfigOrThrow } from "../../../config/store.js";
 import { DoorayApiClient } from "../../../api/client.js";
-import { resolveWikiPageInput } from "../../../resolvers/wiki-page-input.js";
+import {
+  resolveWikiPageInput,
+  WIKI_PAGE_ID_OPTION_DESC,
+  WIKI_PAGE_PROJECT_OPTION_DESC,
+} from "../../../resolvers/wiki-page-input.js";
 import { openInEditor } from "../../../editor/index.js";
 import { readBodyInputOrNull } from "../../../utils/body-input.js";
 import type { OutputOptions } from "../../../formatters/table.js";
@@ -14,9 +18,9 @@ export const wikiPageCommentAddCommand = new Command("add")
   .description("위키 페이지 댓글 추가 (--body 없으면 $EDITOR)")
   .argument("[project]", "프로젝트 코드 (또는 첫 인자에 Dooray Wiki URL)")
   .argument("[page-id]", "위키 페이지 ID")
-  .option("--id <pageId>", "위키 페이지 ID (--project 동반)")
+  .option("--id <pageId>", WIKI_PAGE_ID_OPTION_DESC)
   .option("--url <url>", "Dooray Wiki URL")
-  .option("--project <code>", "프로젝트 코드 (--id 모드용)")
+  .option("--project <code>", WIKI_PAGE_PROJECT_OPTION_DESC)
   .option("--body <text>", "댓글 본문 (- 입력 시 stdin에서 읽기)")
   .option("--body-file <path>", "본문 파일 경로 (- 입력 시 stdin에서 읽기)")
   .action(async (project, pageIdArg, opts) => {

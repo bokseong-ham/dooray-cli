@@ -86,15 +86,13 @@ export async function resolveProject(
   const match = projects.find((p) => p.code === input || p.id === input);
   if (match) return match.id;
 
-  // private 캐시가 있으면 추가 검색 (캐시 미스 시 API 호출 없음)
-  const privateCached = await getPrivateProjects();
-  if (privateCached && !isExpired(privateCached.updatedAt, PROJECTS_TTL_MS)) {
-    const privateMatch = privateCached.data.find((p) => p.code === input || p.id === input);
-    if (privateMatch) return privateMatch.id;
-  }
+  // private 프로젝트는 별도 목록에만 있다. 캐시가 없거나 기간이 지났으면 받아서 채운다 (ADR-054).
+  const privateProjects = await ensurePrivateProjects(client);
+  const privateMatch = privateProjects.find((p) => p.code === input || p.id === input);
+  if (privateMatch) return privateMatch.id;
 
   throw new DoorayCliError(
-    `프로젝트를 찾을 수 없습니다: ${input}\n  개인 프로젝트라면 캐시를 갱신하세요: dooray project list --type private\n  목록에 없는 프로젝트는 projectId 를 직접 넣으면 됩니다 (15자리 이상 숫자)`,
+    `프로젝트를 찾을 수 없습니다: ${input}\n  목록에 없는 프로젝트는 projectId 를 직접 넣으면 됩니다 (15자리 이상 숫자)`,
     EXIT_PARAM_ERROR,
   );
 }

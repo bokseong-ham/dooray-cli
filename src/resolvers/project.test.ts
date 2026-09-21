@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { resolveProject } from "./project.js";
+import { getPrivateProjects } from "../cache/store.js";
 import type { DoorayApiClient } from "../api/client.js";
 import { DoorayCliError } from "../utils/errors.js";
 import { EXIT_PARAM_ERROR } from "../utils/exit-codes.js";
@@ -13,13 +14,26 @@ vi.mock("../cache/store.js", () => ({
       { id: "1111222233334444555", code: "project-a", wikiId: undefined },
       { id: "2222333344445555666", code: "project-b", wikiId: undefined },
     ],
-    updatedAt: Date.now(),
+    updatedAt: new Date().toISOString(),
   }),
   setProjects: vi.fn().mockResolvedValue(undefined),
   getPrivateProjects: vi.fn().mockResolvedValue(null),
   setPrivateProjects: vi.fn().mockResolvedValue(undefined),
   isExpired: vi.fn().mockReturnValue(false),
 }));
+
+/**
+ * 공용 캐시에서 못 찾으면 resolveProject 가 private 목록을 받으러 간다 (ADR-054).
+ * 그래서 빈 client 로는 TypeError 가 나므로 getProjects 를 가진 mock 을 넘긴다.
+ */
+function mockClient(privateProjects: { id: string; code: string }[] = []): DoorayApiClient {
+  return {
+    getProjects: vi.fn().mockResolvedValue({
+      result: privateProjects.map((p) => ({ ...p, wiki: undefined })),
+      totalCount: privateProjects.length,
+    }),
+  } as unknown as DoorayApiClient;
+}
 
 describe("resolveProject", () => {
   beforeEach(() => vi.clearAllMocks());
@@ -40,7 +54,7 @@ describe("resolveProject", () => {
   });
 
   it("code 매칭 실패 — 내부 번호와 API 용어 없이 회피책을 안내한다", async () => {
-    await expect(resolveProject({} as unknown as DoorayApiClient, "nonexistent-code")).rejects.toSatisfy(
+    await expect(resolveProject(mockClient(), "nonexistent-code")).rejects.toSatisfy(
       (err: unknown) => {
         expect(err).toBeInstanceOf(DoorayCliError);
         if (!(err instanceof DoorayCliError)) return false;
@@ -48,10 +62,35 @@ describe("resolveProject", () => {
         expect(err.message).toContain("프로젝트를 찾을 수 없습니다: nonexistent-code");
         expect(err.message).not.toContain("ADR");
         expect(err.message).not.toContain("member=me");
-        expect(err.message).toContain("dooray project list --type private");
+        // CLI 가 private 목록을 스스로 받으므로 사람에게 캐시 갱신을 시키지 않는다 (ADR-054)
+        expect(err.message).not.toContain("dooray project list --type private");
         expect(err.message).toContain("15자리 이상 숫자");
         return true;
       },
     );
+  });
+
+  it("private 캐시가 비어 있으면 그 목록을 받아 코드를 찾는다", async () => {
+    const client = mockClient([{ id: "3333444455556666777", code: "@my-account" }]);
+
+    const result = await resolveProject(client, "@my-account");
+
+    expect(result).toBe("3333444455556666777");
+    expect(client.getProjects).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "private" }),
+    );
+  });
+
+  it("private 캐시가 유효하면 목록을 받지 않는다", async () => {
+    vi.mocked(getPrivateProjects).mockResolvedValueOnce({
+      data: [{ id: "3333444455556666777", code: "@my-account" }],
+      updatedAt: new Date().toISOString(),
+    });
+    const client = mockClient();
+
+    const result = await resolveProject(client, "@my-account");
+
+    expect(result).toBe("3333444455556666777");
+    expect(client.getProjects).not.toHaveBeenCalled();
   });
 });

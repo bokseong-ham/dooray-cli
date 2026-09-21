@@ -21,7 +21,8 @@ NHN Dooray REST API 를 래핑한 CLI 다. 이 파일은 라우터이므로, 작
 ## 대상 지정 방법
 
 `post get`/`edit`/`done`/`workflow`, `post comment` 전체, `post file` 전체, `post comment file` 전체,
-`wiki page get`, `wiki page file` 과 `wiki page comment` 전체, 그리고 `wiki page delete` 와 `wiki page move` 가 네 가지 형태를 모두 받는다.
+`wiki page get` 과 `wiki page edit`, `wiki page file` 과 `wiki page comment` 전체,
+그리고 `wiki page delete` 와 `wiki page move` 가 네 가지 형태를 모두 받는다.
 
 - `<project> <number>` — 업무는 번호, 위키는 `<project> <page-id>`
 - `--id <postId>` / `--id <pageId>` — 위키는 `--project` 없이도 조회된다. 함께 주면 wikiId 를 해석하는 호출을 한 번 아낀다
@@ -109,13 +110,15 @@ NHN Dooray REST API 를 래핑한 CLI 다. 이 파일은 라우터이므로, 작
 | 의도 | 커맨드 |
 | --- | --- |
 | 업무 목록 | `dooray post list <project>` — `--all` 로 모든 페이지를 이어 받는다 |
+| 태그로 거르기 | `dooray post list <project> --tag "<이름>"` — 반복 가능하고, 여러 번 주면 그 태그를 모두 가진 업무만 온다 |
 | 업무 검색 | `dooray post search <project> "<keyword>"` — projectId(15자리 이상 numeric) 를 넣으면 캐시를 우회한다 |
-| 업무 상세 | `dooray post get <project> <number>` 또는 `dooray post get --id <postId>` |
+| 업무 상세 | `dooray post get <project> <number>` 또는 `dooray post get --id <postId>` — 일반 출력에는 태그가 이름으로 나온다 |
+| 태그 이름까지 받기 | `dooray post get <project> <number> --json --with-tag-names` — `--json` 의 `tags[]` 에 `name` 을 채운다. 하나라도 못 채우면 멈춘다 |
 | 업무 생성 | `dooray post create <project> --title "..." [--body "..." \| --body-file <path>]` — 담당자는 `--to <name\|email>`, 참조자는 `--cc`, 둘 다 여러 명 가능 |
 | 템플릿으로 생성 | `dooray post create <project> --template <name\|id>` — 본문·담당자·태그가 채워지고 사용자 옵션이 우선한다 |
 | 제목·본문 수정 | `dooray post edit <project> <number> --title "..." --body "..."` — 본문 형식이 기존과 다르면 `--mime-type` 을 함께 준다 |
-| 완료 처리 | `dooray post done <project> <number>` |
-| 워크플로우 변경 | `dooray post workflow <project> <number> <workflow>` |
+| 완료 처리 (업무 상태를 완료로) | `dooray post done <project> <number>` |
+| 워크플로우 변경 (업무 상태·진행 상태 변경) | `dooray post workflow <project> <number> <workflow>` |
 
 ## 본문 형식
 
@@ -154,9 +157,21 @@ dooray post edit <project> 42 --mime-type text/html
 | 태그 전체 교체 | `dooray post edit --id <postId> --tag-clear --tag <name>` |
 | 태그 제거 | `dooray post edit --id <postId> --tag-remove <name>` |
 
+태그를 붙인 뒤 들어갔는지 확인하려면 두 명령을 잇는다.
+
+```bash
+dooray post edit <project> <number> --tag "<이름>"
+dooray post get <project> <number> --json --with-tag-names
+```
+
+`--with-tag-names` 없이 `--json` 만 주면 응답이 그대로 나와 태그에 `id` 만 들어 있다.
+
 참조자·담당자 옵션만 지정하면 `$EDITOR`를 열지 않고 기존 제목·본문·태그를 보존한 채 참여자만 바꾼다.
 
 그룹 지정(`--cc-group`, `--mention-group`)은 15자리 이상 numeric 이면 ID 로, 그 외에는 code 부분일치로 찾는다.
+
+본문 형식이 `text/html` 인 업무와 댓글에서는 `--mention`, `--mention-group`, `--link-task` 가 종료 코드 3 으로 멈춘다.
+그 형식의 표기가 확인되지 않아서다. `--mime-type text/x-markdown` 으로 형식을 바꾸면 쓸 수 있다.
 
 ## 업무 댓글
 
@@ -184,9 +199,9 @@ dooray post edit <project> 42 --mime-type text/html
 | 첨부 업로드 | `dooray post file upload <project> <number> <file-path>` |
 | 첨부 삭제 | `dooray post file delete <project> <number> <file-id>` — 확인 있음, `-y`/`--yes`로 생략 |
 | 댓글 첨부 목록 | `dooray post comment file list <project> <number> <comment-id>` |
-| 댓글 첨부 업로드 | `dooray post comment file upload <project> <number> <comment-id> <path>` |
+| 댓글 첨부 업로드 | `dooray post comment file upload <project> <number> <comment-id> <path>` — 댓글 본문이 `text/html` 이면 파일을 올리기 전에 종료 코드 3 으로 멈춘다 |
 | 댓글 첨부 다운로드 | `dooray post comment file download <project> <number> <comment-id> <file-id>` — 저장 경로는 `--out <path>` 다. 다른 download 명령의 `-o, --output <dir>` 와 옵션 이름이 다르다 |
-| 댓글 첨부 삭제 | `dooray post comment file delete <project> <number> <comment-id> <file-id>` — 확인 있음, `-y`/`--yes`로 생략 |
+| 댓글 첨부 삭제 | `dooray post comment file delete <project> <number> <comment-id> <file-id>` — 확인 있음, `-y`/`--yes`로 생략. 본문에서 그 파일의 참조를 찾지 못하면 본문도 파일도 건드리지 않고 종료 코드 3 으로 멈춘다 |
 
 - 댓글 파일 업로드는 이미지 확장자면 이미지 마크다운을, 그 외에는 일반 링크를 만든다.
 - `comment file list`의 `출처`는 다음과 같다.
@@ -206,10 +221,10 @@ dooray post edit <project> 42 --mime-type text/html
 | 페이지 목록 | `dooray wiki pages <project>` |
 | 페이지 트리 | `dooray wiki tree <project>` (`--depth N` 으로 상한, `--json` 은 flat) |
 | 페이지 상세 | `dooray wiki page get --id <page-id>` — project 없이 조회된다. `<project> <page-id>` 와 `--url` 도 받는다 |
-| 페이지 ID 로 바로 조회 | `wiki page file`, `wiki page comment`, `wiki page delete` 도 `--id` 만으로 동작한다 |
+| 페이지 ID 로 바로 조회 | `wiki page edit`, `wiki page file`, `wiki page comment`, `wiki page delete` 도 `--id` 만으로 동작한다 |
 | 페이지 생성 | `dooray wiki page create <project> --title "..." [--parent <page-id>] [--body "..."]` — `--parent` 를 생략하면 위키 home 아래에 만든다 |
-| 페이지 제목 수정 | `dooray wiki page edit <project> <page-id> --title "..."` |
-| 페이지 본문 수정 | `dooray wiki page edit <project> <page-id> --body "..."` 또는 `--body-file ./new.md` — 본문 형식이 기존과 다르면 `--mime-type` 을 함께 준다 |
+| 페이지 제목 수정 | `dooray wiki page edit <project> <page-id> --title "..."` — `--id <page-id>` 와 `--url` 도 받는다 |
+| 페이지 본문 수정 | `dooray wiki page edit <project> <page-id> --body "..."` 또는 `--body-file ./new.md` — `--id <page-id>` 와 `--url` 도 받는다. 본문 형식이 기존과 다르면 `--mime-type` 을 함께 준다 |
 | 페이지 에디터로 수정 | `dooray wiki page edit <project> <page-id>` — 플래그가 없으면 `$EDITOR` 가 열린다 |
 | 페이지 이동 | `dooray wiki page move <project> <page-id> --parent <parent-page-id>` — `--parent` 는 필수다. 하위 페이지는 기본으로 함께 이동하고, `--no-children` 으로 페이지 하나만 옮긴다. `--to-wiki <project-or-wiki-id>` 로 다른 위키로 옮기며, `--first` 와 `--before <page-id>` 로 형제 사이 정렬을 바꾼다 |
 | 페이지 삭제 | `dooray wiki page delete <project> <page-id>` — 확인 있음, `-y`/`--yes`로 생략. 하위 페이지는 삭제한 페이지의 부모 아래로 재부착되어 orphan 이 생기지 않는다 |

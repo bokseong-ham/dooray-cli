@@ -3,7 +3,11 @@ import { writeFile, mkdir } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { getConfigOrThrow } from "../../../config/store.js";
 import { DoorayApiClient } from "../../../api/client.js";
-import { resolveWikiPageInput } from "../../../resolvers/wiki-page-input.js";
+import {
+  resolveWikiPageInput,
+  WIKI_PAGE_ID_OPTION_DESC,
+  WIKI_PAGE_PROJECT_OPTION_DESC,
+} from "../../../resolvers/wiki-page-input.js";
 import { startSpinner, stopSpinner } from "../../../utils/spinner.js";
 import type { WikiPageFile } from "../../../api/types.js";
 import type { OutputOptions } from "../../../formatters/table.js";
@@ -14,9 +18,9 @@ export const wikiPageFileDownloadAllCommand = new Command("download-all")
   .description("위키 페이지의 모든 첨부파일 다운로드 (general + inline image)")
   .argument("[project]", "프로젝트 코드 (또는 첫 인자에 Dooray Wiki URL)")
   .argument("[page-id]", "위키 페이지 ID (project와 함께 사용)")
-  .option("--id <pageId>", "위키 페이지 ID (--project 동반 필요)")
+  .option("--id <pageId>", WIKI_PAGE_ID_OPTION_DESC)
   .option("--url <url>", "Dooray Wiki URL")
-  .option("--project <code>", "프로젝트 코드 (--id 모드에서 wikiId 해석용)")
+  .option("--project <code>", WIKI_PAGE_PROJECT_OPTION_DESC)
   .option("-o, --output <dir>", "저장 디렉토리", ".")
   .action(async (project, pageIdArg, opts) => {
     const globalOpts = wikiPageFileDownloadAllCommand.optsWithGlobals() as OutputOptions;
