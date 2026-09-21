@@ -212,6 +212,8 @@ dooray post create --help
 
 전역 옵션이라 모든 명령에 붙일 수 있다. 서브커맨드의 `--help` 에는 나오지 않는다.
 
+`--no-color` 도 전역 옵션이다. 붙이면 색상을 끄고, 환경 변수 `NO_COLOR` 가 설정돼 있어도 같게 동작한다.
+
 ```bash
 POST_ID=$(dooray post create <project> --title "배포" --quiet)
 dooray post comment add --id "$POST_ID" --body "시작합니다"
