@@ -3,6 +3,8 @@
 ## 멘션·링크 옵션
 
 `post create`, `post edit`, `post comment add`, `post comment edit` 이 모두 지원한다.
+`post edit` 과 `post comment edit` 은 본문 형식이 `text/html` 이면 이 옵션들을 거절한다.
+아래 「Dooray 마크다운 링크 형식」 절이 그 이유를 적는다.
 
 | 옵션 | 동작 |
 | --- | --- |
@@ -30,6 +32,13 @@ dooray post comment add <project> 1 --mention 홍길동 --mention-group 개발 -
 code 로 못 찾으면 15자리 이상 numeric ID 를 직접 넣을 수도 있다.
 
 ## Dooray 마크다운 링크 형식
+
+**이 절은 본문 형식이 `text/x-markdown` 일 때에 해당한다.**
+`text/html` 본문의 멘션과 링크 표기는 확인된 것이 없다.
+그 형식에서는 CLI 가 `--mention` 과 `--mention-group` 과 `--link-task` 를 종료 코드 3 으로 거절하고,
+`--mime-type text/x-markdown` 으로 형식을 바꾸는 방법을 안내한다.
+손으로 조립할 때도 마찬가지다. 아래 markdown 을 `text/html` 본문에 넣으면 평문으로 남아
+링크로 렌더링되지 않고 멘션 알림도 가지 않는다.
 
 CLI 옵션(`--mention` 등)을 쓰면 아래 markdown 을 자동으로 만들어 주므로 직접 조립할 필요가 없다.
 본문을 손으로 쓸 때만 이 형식을 쓴다. Dooray 앱이 inline 멘션과 내부 이동으로 렌더링한다.

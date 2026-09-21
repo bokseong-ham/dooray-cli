@@ -43,3 +43,16 @@ table 출력은 Creator 컬럼을 프로젝트 멤버 캐시로 채운다. `--js
 주는 본문의 형식이 기존과 다르면 3번에 `--mime-type` 을 함께 준다. 값은 `text/x-markdown` 과 `text/html` 이다.
 
 3번의 `--no-confirm` 은 첨부 보호 확인을 건너뛴다. 본문에서 기존 첨부 markdown 을 지우지 않았을 때만 쓴다.
+
+## 댓글 첨부와 본문 형식
+
+댓글 본문의 형식에 따라 두 명령이 멈추는 조건이 있다.
+
+- `post comment file upload` 는 댓글 본문이 `text/html` 이면 파일을 올리기 전에 종료 코드 3 으로 멈춘다.
+  그 형식의 첨부 표기가 확인되지 않아, 올려도 본문에서 그 파일에 닿을 수 없다
+- `post comment file delete` 는 본문에서 그 파일의 참조를 찾지 못하면
+  본문도 파일도 건드리지 않고 종료 코드 3 으로 멈춘다.
+  파일만 지우려면 `dooray post file delete <project> <number> <file-id>` 를 쓴다
+
+`post comment edit` 의 `--mention` 과 `--mention-group` 과 `--link-task` 도
+본문이 `text/html` 이면 같은 종료 코드로 멈춘다. 표기는 [mention-link.md](mention-link.md) 를 읽는다.

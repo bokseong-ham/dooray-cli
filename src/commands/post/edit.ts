@@ -21,6 +21,9 @@ import {
 import { startSpinner, stopSpinner } from "../../utils/spinner.js";
 import { readBodyInputOrNull, BODY_MIME_TYPES, resolveBodyMimeType, warnUnconvertedBody } from "../../utils/body-input.js";
 import { checkAndGuardDropped } from "../../utils/attachment-check.js";
+import { checkMarkupSupport, type BodyMarkupKind } from "../../utils/body-markup.js";
+import { DoorayCliError } from "../../utils/errors.js";
+import { EXIT_PARAM_ERROR } from "../../utils/exit-codes.js";
 import type { CreatePostUser } from "../../api/types.js";
 
 async function resolveUsers(
@@ -112,6 +115,16 @@ export const postEditCommand = new Command("edit")
 
     if (nonInteractive) {
       // Non-interactive mode: apply only specified changes
+      // 본문 형식이 그 마크업을 받지 못하면 여기서 멈춘다. 멤버·업무 해석은
+      // API 왕복이라, 거절할 호출에 왕복을 쓰지 않으려면 판정이 먼저다 (ADR-055).
+      const requireMarkup = (kind: BodyMarkupKind): void => {
+        const check = checkMarkupSupport(bodyMimeType, kind);
+        if (!check.supported) throw new DoorayCliError(check.message, EXIT_PARAM_ERROR);
+      };
+      if (mentionInputs.length > 0) requireMarkup("member-mention");
+      if (groupInputs.length > 0) requireMarkup("group-mention");
+      if (linkInputs.length > 0) requireMarkup("task-link");
+
       let newBody = await readBodyInputOrNull(opts);
 
       if (newBody != null && !opts.dryRun) {
@@ -136,14 +149,14 @@ export const postEditCommand = new Command("edit")
             return { groupId: g.id, code: g.code, projectCode };
           }),
         );
-        newBody = prependMentions(effectiveBody, members, groups, me);
+        newBody = prependMentions(effectiveBody, members, groups, me, bodyMimeType);
       }
 
       if (linkInputs.length > 0) {
         const effectiveBody = newBody ?? post.body.content;
         const me = await ensureMe(client);
         const links = await resolveTaskLinks(client, linkInputs);
-        newBody = appendTaskLinks(effectiveBody, links, me);
+        newBody = appendTaskLinks(effectiveBody, links, me, bodyMimeType);
       }
 
       let toUsers: CreatePostUser[] = post.users.to.map((u) => ({

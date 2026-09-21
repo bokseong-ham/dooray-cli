@@ -151,6 +151,30 @@ dooray post edit <project> 42 --mime-type text/html        # 본문은 그대로
 값은 `text/x-markdown` 과 `text/html` 둘뿐이다.
 본문을 바꾸지 않고 형식만 바꾸면 CLI 가 본문을 변환하지 않는다는 경고가 나온다.
 
+### 멘션과 업무 링크
+
+`post edit` 과 `post comment edit` 은 본문에 멘션과 다른 업무 링크를 붙인다.
+
+```bash
+dooray post edit <project> 42 --title "배포 준비" --mention 홍길동
+dooray post comment edit <project> 42 --comment-id <comment-id> --body "확인 부탁" --link-task <project>/7
+```
+
+| 옵션 | 동작 |
+| --- | --- |
+| `--mention <name>` | 이름으로 멤버를 찾아 본문 앞에 멘션을 붙인다 (반복 가능) |
+| `--mention-group <code>` | 그룹 코드로 찾아 멘션을 붙인다 (반복 가능) |
+| `--link-task <ref>` | 다른 업무 링크를 본문 끝에 붙인다. `<project>/<number>` 또는 postId (반복 가능) |
+| `--dry-run` | API 를 호출하지 않고 합성된 본문만 stdout 에 출력한다 |
+
+**본문 형식이 `text/html` 이면 이 세 옵션을 쓸 수 없다.**
+그 형식의 멘션과 링크 표기가 확인되지 않아, 종료 코드 3 으로 멈추고
+`--mime-type text/x-markdown` 으로 형식을 바꾸는 방법을 안내한다.
+추측한 표기를 넣으면 링크로 렌더링되지 않는 문자열이 본문에 남는다.
+
+`post edit` 에서 `--mention` 이나 `--link-task` 만 주면 `$EDITOR` 가 열리고 그 옵션은 무시된다.
+`--title` 이나 `--body` 나 `--mime-type` 을 함께 주어야 적용된다.
+
 전체 명령과 옵션은 `--help` 로 본다.
 
 ```bash
@@ -183,6 +207,15 @@ dooray post comment file upload <project> <number> <comment-id> <path>
 이미지 확장자는 이미지 마크다운으로, 그 외 파일은 일반 링크로 댓글 본문에 추가한다.
 `comment file list`는 웹 UI 첨부와 CLI 업로드 파일을 함께 보여주며 `출처` 열로 구분한다.
 CLI로 올린 파일은 댓글의 첨부 카드가 아니라 본문 링크로 표시된다.
+
+본문 형식에 따라 두 명령이 멈추는 조건이 있다.
+
+- `comment file upload` 는 댓글 본문이 `text/html` 이면 파일을 올리기 전에 종료 코드 3 으로 멈춘다.
+  그 형식의 첨부 표기가 확인되지 않아, 올려도 본문에서 그 파일에 닿을 수 없다
+- `comment file delete` 는 댓글 본문에서 그 파일의 참조를 찾지 못하면
+  본문도 파일도 건드리지 않고 종료 코드 3 으로 멈춘다.
+  종전에는 참조를 찾지 못해도 파일을 지워 본문에 대상이 사라진 링크가 남았다.
+  파일만 지우려면 `dooray post file delete` 를 쓴다
 
 ### 삭제 명령의 확인
 

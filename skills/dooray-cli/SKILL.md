@@ -158,6 +158,9 @@ dooray post edit <project> 42 --mime-type text/html
 
 그룹 지정(`--cc-group`, `--mention-group`)은 15자리 이상 numeric 이면 ID 로, 그 외에는 code 부분일치로 찾는다.
 
+본문 형식이 `text/html` 인 업무와 댓글에서는 `--mention`, `--mention-group`, `--link-task` 가 종료 코드 3 으로 멈춘다.
+그 형식의 표기가 확인되지 않아서다. `--mime-type text/x-markdown` 으로 형식을 바꾸면 쓸 수 있다.
+
 ## 업무 댓글
 
 | 의도 | 커맨드 |
@@ -184,9 +187,9 @@ dooray post edit <project> 42 --mime-type text/html
 | 첨부 업로드 | `dooray post file upload <project> <number> <file-path>` |
 | 첨부 삭제 | `dooray post file delete <project> <number> <file-id>` — 확인 있음, `-y`/`--yes`로 생략 |
 | 댓글 첨부 목록 | `dooray post comment file list <project> <number> <comment-id>` |
-| 댓글 첨부 업로드 | `dooray post comment file upload <project> <number> <comment-id> <path>` |
+| 댓글 첨부 업로드 | `dooray post comment file upload <project> <number> <comment-id> <path>` — 댓글 본문이 `text/html` 이면 파일을 올리기 전에 종료 코드 3 으로 멈춘다 |
 | 댓글 첨부 다운로드 | `dooray post comment file download <project> <number> <comment-id> <file-id>` — 저장 경로는 `--out <path>` 다. 다른 download 명령의 `-o, --output <dir>` 와 옵션 이름이 다르다 |
-| 댓글 첨부 삭제 | `dooray post comment file delete <project> <number> <comment-id> <file-id>` — 확인 있음, `-y`/`--yes`로 생략 |
+| 댓글 첨부 삭제 | `dooray post comment file delete <project> <number> <comment-id> <file-id>` — 확인 있음, `-y`/`--yes`로 생략. 본문에서 그 파일의 참조를 찾지 못하면 본문도 파일도 건드리지 않고 종료 코드 3 으로 멈춘다 |
 
 - 댓글 파일 업로드는 이미지 확장자면 이미지 마크다운을, 그 외에는 일반 링크를 만든다.
 - `comment file list`의 `출처`는 다음과 같다.
