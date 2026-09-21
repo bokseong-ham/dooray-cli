@@ -44,11 +44,11 @@ export const wikiPageEditCommand = new Command("edit")
       project: opts.project,
     });
 
-    // 해석 다음에 spinner — $EDITOR flow와 순서 통일 (page-create와 비대칭은 의도적)
-    startSpinner("위키 정보 조회 중...");
-
     if (!nonInteractive) {
       // 기존 $EDITOR flow
+      // spinner 는 이 분기 안에서만 켠다. 비대화형은 여기서 조회하지 않으므로
+      // 바깥에 두면 하지 않은 조회를 완료했다고 보고하게 된다.
+      startSpinner("위키 정보 조회 중...");
       const res = await client.getWikiPage(wikiId, pageId);
       const page = res.result;
       stopSpinner(true, "위키 페이지 조회 완료");
@@ -76,8 +76,7 @@ export const wikiPageEditCommand = new Command("edit")
       return;
     }
 
-    // 비대화형 분기
-    stopSpinner(true, "위키 정보 조회 완료");
+    // 비대화형 분기. 아래 각 API 호출이 자기 spinner 를 따로 켠다.
 
     // $EDITOR flow 와 달리 원본을 들고 있지 않아 필요할 때만 한 번 더 조회한다.
     // 조회가 필요한 경우는 둘이다.
