@@ -29,7 +29,8 @@
 
 `src/commands/post/edit.ts` 는 `resolveBodyMimeType(post.body.mimeType, opts.mimeType)` 으로
 본문 형식을 이미 `bodyMimeType` 에 담아 두고도 위 두 함수에 넘기지 않는다.
-그 변수는 `client.updatePost` 에만 쓰인다.
+그 변수는 세 곳에 쓰인다. `--dry-run --json` 출력의 `mimeType`,
+비대화형 경로의 `client.updatePost`, `$EDITOR` 경로의 `client.updatePost` 다.
 
 `src/utils/body-input.ts` 의 `BODY_MIME_TYPES` 가 받는 값 목록을 소유한다.
 
@@ -41,6 +42,9 @@
 - 판정을 순수 함수로 뺀다. `post edit` 본체는 네트워크와 편집기를 타서 단위 테스트가 어렵다.
 - 거절 문구는 `--mime-type` 으로 형식을 바꾸는 방법을 함께 적는다.
   ADR-053 이 그 옵션을 이미 만들어 두었으므로 사용자가 쓸 수 있는 경로가 있다.
+- `post edit` 의 `$EDITOR` 분기가 `--dry-run` 을 보지 않고 `client.updatePost` 를 부르는 것을 확인했다.
+  이 plan 의 범위가 아니라 고치지 않는다. 대신 이 phase 의 검증 명령이 그 분기로 들어가지 않게 한다.
+  마치고 나서 별도 이슈 후보로 보고한다.
 
 ## 작업 항목
 
@@ -70,9 +74,30 @@ export function buildLink(
   `image` 가 참이면 앞에 `!` 를 붙인다
 - `text/html` — phase 01 이 ADR-055 에 적은 표기를 쓴다
 
-`text` 와 `title` 의 특수문자 처리는 형식마다 다르다.
-마크다운은 지금 `escapeLinkText` 가 하는 처리를 그대로 쓴다.
-HTML 은 `&`, `<`, `>`, `"` 를 각각 실체 참조로 바꾼다. 바꾸지 않으면 사용자 이름에 든 문자가 태그를 깬다.
+#### `text` 와 `title` 의 특수문자 처리
+
+**지금 셋이 서로 다르다.** 하나로 모아 일괄 escape 하면 동작이 바뀐다.
+
+| 지금 | 무엇을 escape 하나 |
+| --- | --- |
+| `buildMemberMention` / `buildGroupMention` | 아무것도 하지 않는다. 이름과 코드를 그대로 넣는다 |
+| `buildTaskLink` 의 `text` | `subject` 에만 `escapeLinkText` 를 적용한다. `<projectCode>/<number> ` 접두는 그대로다 |
+| `buildTaskLink` 의 `title` | `workflowClass` 의 `"` 를 `&quot;` 로 바꾼다. `escapeLinkText` 에는 `"` 처리가 없다 |
+
+그래서 `buildLink` 는 아래대로 한다.
+
+| 인자 | `text/x-markdown` | `text/html` |
+| --- | --- | --- |
+| `text` | **손대지 않는다.** 호출부가 필요한 escape 를 이미 마쳤다 | `&`, `<`, `>` 를 실체 참조로 바꾼다 |
+| `title` | `"` 를 `&quot;` 로 바꾼다 | `&`, `<`, `>`, `"` 를 실체 참조로 바꾼다 |
+
+`escapeLinkText` 를 호출하는 자리는 `buildTaskLink` 안에 그대로 둔다.
+`subject` 에만 걸리던 것이 접두까지 걸리면 `/` 앞뒤 문자가 달라진다.
+
+**멘션 이름은 마크다운에서 escape 하지 않는다.** 지금 그렇고, 이 phase 는 그것을 바꾸지 않는다.
+`text/html` 분기에서만 실체 참조로 바꾼다. 바꾸지 않으면 이름에 든 `<` 가 태그를 깬다.
+
+#### 거절 판정
 
 `checkMarkupSupport` 는 ADR-055 의 표에서 그 형식과 종류의 근거가 `확인 못함` 인 조합에만 거절을 돌려준다.
 거절 문구는 이렇다.
@@ -92,8 +117,9 @@ HTML 은 `&`, `<`, `>`, `"` 를 각각 실체 참조로 바꾼다. 바꾸지 않
 | 마크다운 링크 | `text/x-markdown`, `title` 있음 | `[text](url "title")` |
 | 마크다운 링크, title 없음 | `text/x-markdown`, `title` 없음 | `[text](url)` |
 | 마크다운 이미지 | `text/x-markdown`, `image` 참 | 앞에 `!` 가 붙는다 |
-| 마크다운 특수문자 | `text` 에 `[`, `]`, `&` 포함 | 지금 `escapeLinkText` 와 같은 결과 |
-| HTML 특수문자 | `text/html`, `text` 에 `<`, `&`, `"` 포함 | 실체 참조로 바뀌어 태그가 깨지지 않는다 |
+| 마크다운은 text 를 건드리지 않는다 | `text` 에 `[`, `]`, `&` 포함 | 그대로 나온다 |
+| 마크다운 title 의 따옴표 | `title` 에 `"` 포함 | `&quot;` 로 바뀐다 |
+| HTML 특수문자 | `text/html`, `text` 에 `<`, `&` 포함 | 실체 참조로 바뀌어 태그가 깨지지 않는다 |
 | 알 수 없는 형식 | `application/json` | 마크다운과 같은 결과 |
 | 지원 판정 | ADR-055 가 `확인 못함` 으로 적은 조합 | `supported` 가 거짓이고 문구에 `--mime-type` 이 들어 있다 |
 
@@ -116,7 +142,18 @@ export function appendTaskLinks(body, links, me, mimeType?: string): string
 세 `build*` 함수의 본문을 `buildLink` 호출로 바꾼다. `dooray://` 주소를 만드는 부분은 그대로 둔다.
 형식에 따라 달라지는 것은 링크를 감싸는 문법뿐이다.
 
-`escapeLinkText` 는 `body-markup.ts` 로 옮기고 `task-link.ts` 에서는 그것을 import 한다.
+`escapeLinkText` 는 `body-markup.ts` 로 옮긴다.
+**`task-link.ts` 가 그것을 다시 export 한다.**
+
+```ts
+export { escapeLinkText } from "./body-markup.js";
+```
+
+`src/utils/task-link.test.ts` 가 그 이름을 `./task-link.js` 에서 import 해 그 동작을 확인하므로,
+다시 export 하지 않으면 그 테스트가 깨진다. 테스트의 import 를 고치는 대신 재export 를 고른다.
+`escapeLinkText` 는 이 저장소 밖에서도 링크 텍스트 escape 의 이름으로 굳어 있어
+`task-link.ts` 에서 사라지면 읽는 사람이 다시 찾아야 한다.
+
 이 함수를 쓰는 다른 곳이 있는지 먼저 확인한다.
 
 ```bash
@@ -127,8 +164,8 @@ grep -rn "escapeLinkText" src/
 `appendTaskLinks` 와 `prependMentions` 의 **줄바꿈 처리는 형식과 무관하게 지금 그대로** 둔다.
 HTML 본문에서 줄바꿈이 어떻게 보이는지는 이 plan 이 정하지 않는다.
 
-기존 테스트 `src/utils/mention.test.ts` 와 `src/utils/task-link.test.ts` 가 있으면
-형식 인자를 주지 않는 기존 확인이 그대로 통과해야 한다. 통과하지 않으면 기본값이 잘못된 것이다.
+기존 테스트 `src/utils/mention.test.ts` 와 `src/utils/task-link.test.ts` 는
+형식 인자를 주지 않는 확인이라 그대로 통과해야 한다. 통과하지 않으면 기본값이 잘못된 것이다.
 
 ### 4. `src/commands/post/edit.ts` 가 형식을 넘기게 한다
 
@@ -152,6 +189,9 @@ if (mentionInputs.length > 0 || groupInputs.length > 0) {
 
 `--dry-run` 경로도 같은 문자열을 만들게 된다. 그 경로는 판정을 거쳐 온 뒤이므로 따로 손대지 않는다.
 
+**`$EDITOR` 분기는 손대지 않는다.** 그 분기는 멘션과 링크를 버린다는 경고만 내고 끝난다.
+거절 판정을 그 분기에 두면 종전에 경고로 끝나던 호출이 실패로 바뀐다.
+
 ### 5. `src/commands/post/comment/edit.ts` 도 같은 형태로 고친다
 
 이 명령도 멘션과 `--link-task` 를 본문에 넣는다. 구조가 `post edit` 과 다른 곳이 둘이다.
@@ -167,7 +207,7 @@ if (mentionInputs.length > 0 || groupInputs.length > 0) {
 
 거절 판정은 `post edit` 과 같이 멤버와 업무를 해석하기 전에 둔다.
 
-### 6. `src/commands/post/edit.test.ts` 에 확인 넷을 더한다
+### 6. `src/commands/post/edit.test.ts` 와 `comment/edit.test.ts` 에 확인 넷씩을 더한다
 
 | 확인할 것 | 상황 | 기대 |
 | --- | --- | --- |
@@ -178,8 +218,9 @@ if (mentionInputs.length > 0 || groupInputs.length > 0) {
 
 네 번째는 mock 호출 횟수로 확인한다. 거절만 확인하면 왕복을 아꼈는지 알 수 없다.
 
-`post comment edit` 의 테스트 파일이 있으면 같은 넷을 그 파일에도 더한다.
-없으면 `src/commands/post/comment/edit.test.ts` 를 만들고 `post edit` 쪽 테스트의 mock 방식을 따른다.
+두 테스트 파일은 이미 있다. 같은 넷을 각각에 더한다.
+`post edit` 쪽 확인은 `--mention` 만 주면 `$EDITOR` 분기로 가므로
+`--mime-type` 이나 `--title` 을 함께 주어 비대화형 경로로 들어가게 한다.
 
 ## 검증
 
@@ -204,24 +245,36 @@ pnpm vitest run src/utils/body-markup.test.ts src/commands/post/edit.test.ts src
 ```bash
 # cwd: <repo root>
 ls src/utils/body-markup.ts src/utils/body-markup.test.ts
-grep -c "checkMarkupSupport" src/commands/post/edit.ts   # >= 2
-grep -c "bodyMimeType" src/commands/post/edit.ts         # >= 5
-grep -c "checkMarkupSupport" src/commands/post/comment/edit.ts   # >= 2
+grep -c "checkMarkupSupport" src/commands/post/edit.ts              # >= 2
+grep -c "checkMarkupSupport" src/commands/post/comment/edit.ts      # >= 2
+grep -n "prependMentions\|appendTaskLinks" src/commands/post/edit.ts
+grep -n "prependMentions\|appendTaskLinks" src/commands/post/comment/edit.ts
 ```
 
-`text/html` 본문의 미리보기를 실제로 확인한다.
-대상 업무는 사용자에게 받는다. `--dry-run` 이라 본문을 고치지 않는다.
+뒤의 두 명령이 내는 각 호출 줄에 형식 변수가 인자로 들어 있어야 한다.
+`bodyMimeType` 이 몇 번 나오는지로는 판정하지 않는다. 고치기 전에도 넷이 나와 절반만 들어가도 통과한다.
+
+`text/html` 본문의 미리보기를 실제로 확인한다. 대상 업무는 사용자에게 받는다.
 
 ```bash
 # cwd: <repo root>
-node dist/index.js post edit <프로젝트> <업무번호> --mention <이름> --dry-run ; echo "종료코드=$?"
+node dist/index.js post edit <프로젝트> <업무번호> --mention <이름> --mime-type text/html --dry-run ; echo "종료코드=$?"
 ```
+
+**`--mime-type` 을 반드시 함께 준다.** `--mention` 만 주면 `src/commands/post/edit.ts` 의
+`nonInteractive` 가 거짓이 되어 `$EDITOR` 분기로 간다.
+그 분기는 `opts.dryRun` 을 보지 않고 `client.updatePost` 를 불러 **실제 업무를 수정한다.**
+`--mime-type` 은 그 판정에 들어 있어 비대화형 경로로 들어가고, 거기서는 `--dry-run` 이 지켜진다.
+명령을 치기 전에 `nonInteractive` 가 무엇을 보는지 그 파일에서 직접 읽어 확인한다.
+
+기존 형식과 같은 값을 `--mime-type` 에 준다. 다른 값을 주면 형식이 바뀐 상태를 미리 보게 된다.
 
 본문이 `text/html` 인 업무에서 ADR-055 의 표대로 동작해야 한다.
 표기가 확인된 항목이면 `종료코드=0` 이고 출력의 첫 줄이 그 표기다.
 `확인 못함` 인 항목이면 `종료코드=3` 이고 stderr 에 `--mime-type` 안내가 있다.
 
-**대상 업무를 임의로 고르지 않는다.** `--dry-run` 이 없는 호출을 실수로 실행하면 본문이 바뀐다.
+**대상 업무를 임의로 고르지 않는다.** 사용자에게 물을 수 없는 실행 환경이면 이 확인을 건너뛰고,
+건너뛴 사실을 보고한다. 단위 테스트가 같은 동작을 이미 판정한다.
 
 개인 식별 정보를 확인한다.
 
@@ -236,11 +289,13 @@ node scripts/check-pii.mjs
 
 | 파일 | 변경 |
 |---|---|
-| `src/utils/body-markup.ts` | 신규 — 형식별 링크 문법과 지원 판정 |
+| `src/utils/body-markup.ts` | 신규 — 형식별 링크 문법과 지원 판정, `escapeLinkText` 이동 |
 | `src/utils/body-markup.test.ts` | 신규 |
 | `src/utils/mention.ts` | 수정 — 형식 인자 추가, `buildLink` 사용 |
-| `src/utils/task-link.ts` | 수정 — 형식 인자 추가, `escapeLinkText` 이동 |
+| `src/utils/task-link.ts` | 수정 — 형식 인자 추가, `escapeLinkText` 재export |
+| `src/utils/task-link.test.ts` | 무변경 — 재export 로 그대로 통과해야 한다 |
+| `src/utils/mention.test.ts` | 무변경 — 기본값으로 그대로 통과해야 한다 |
 | `src/commands/post/edit.ts` | 수정 — 형식 전달과 거절 판정 |
 | `src/commands/post/edit.test.ts` | 수정 — 확인 4건 추가 |
 | `src/commands/post/comment/edit.ts` | 수정 — 형식 전달과 거절 판정 |
-| `src/commands/post/comment/edit.test.ts` | 신규 또는 수정 — 확인 4건 추가 |
+| `src/commands/post/comment/edit.test.ts` | 수정 — 확인 4건 추가 |

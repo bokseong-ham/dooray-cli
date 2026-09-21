@@ -8,10 +8,15 @@ import { decodeDoorayIdTimeMs } from "../utils/dooray-id.js";
 import { sanitizeFileName } from "../utils/attachment-check.js";
 import { toMailConnectionError } from "./mailErrors.js";
 
-// ADR-040 실측의 약 0.3초 차이와 초 단위 도착 시각을 고려한 탐색 여유.
-const MAIL_ID_SEARCH_TIME_MARGIN_MS = 2000;
-// 탐색 위치의 메일과 앞뒤 8통을 확인한다(최대 17통).
-const MAIL_ID_CANDIDATE_NEIGHBORS = 8;
+// SEARCH SINCE/BEFORE 는 일자 단위라 질의에 앞뒤 하루씩을 준다 (ADR-040 의 보강 절).
+// imapflow 가 정각이 아닌 BEFORE 를 하루 밀므로 실제로 받는 것은 UTC 사흘치다.
+const MAIL_ID_SEARCH_DAY_MARGIN_MS = 24 * 60 * 60 * 1000;
+// 후보 UID 를 fetch 에 넘길 때 한 번에 묶는 개수. UID 문자열이 길어져 서버가 거절하는 것을 막는다.
+const MAIL_ID_FETCH_BATCH = 500;
+// 후보가 이보다 많으면 UID 를 고르지 않고 중단한다.
+// ADR-040 의 측정에서 후보가 8통에서 14통이었으므로 2000 은 그보다 충분히 크고,
+// 상한에서의 왕복 1 + 2000/500 = 5 회가 종전 방식의 14회보다 적다.
+const MAIL_ID_CANDIDATE_LIMIT = 2000;
 const INBOX_SEARCH_HINT = '받은 메일함(INBOX) 대체 조회: dooray mail list --search "<제목 일부>"';
 
 export interface MailMessage {
@@ -293,6 +298,19 @@ function buildNoMatchError(mailId: string, mailbox: string): DoorayCliError {
   );
 }
 
+function buildTooManyCandidatesError(
+  mailId: string,
+  mailbox: string,
+  candidateCount: number,
+): DoorayCliError {
+  return new DoorayCliError(
+    `사서함 ${sanitizeCandidateText(mailbox)}의 mail id ${mailId} 조회 범위에 메일이 ` +
+      `${candidateCount}통이라 UID를 결정하지 않았습니다(상한 ${MAIL_ID_CANDIDATE_LIMIT}통).\n` +
+      mailboxLookupHint(mailbox),
+    EXIT_API_ERROR,
+  );
+}
+
 function buildIncompleteLookupError(mailbox: string): DoorayCliError {
   return new DoorayCliError(
     `사서함 ${sanitizeCandidateText(mailbox)}의 도착 시각이나 조회 결과가 불완전해 UID를 결정할 수 없습니다. 다시 조회하세요.\n` +
@@ -331,50 +349,34 @@ export async function resolveUidByMailId(
     const lock = await client.getMailboxLock(mailbox);
 
     try {
-      const uids = await client.search({ all: true }, { uid: true });
+      const uids = await client.search(
+        {
+          since: new Date(wantMs - MAIL_ID_SEARCH_DAY_MARGIN_MS),
+          before: new Date(wantMs + MAIL_ID_SEARCH_DAY_MARGIN_MS),
+        },
+        { uid: true },
+      );
       if (!Array.isArray(uids) || uids.length === 0) {
         throw buildNoMatchError(mailId, mailbox);
       }
-
-      const sortedUids = [...uids].sort((a: number, b: number) => a - b);
-      let lo = 0;
-      let hi = sortedUids.length;
-
-      while (lo < hi) {
-        const mid = Math.floor((lo + hi) / 2);
-        const msg = await client.fetchOne(
-          String(sortedUids[mid]),
-          { uid: true, internalDate: true },
-          { uid: true },
-        );
-        if (!msg || msg.uid !== sortedUids[mid]) throw buildIncompleteLookupError(mailbox);
-        const internalDateMs = readInternalDate(msg.internalDate, mailbox).getTime();
-
-        if (internalDateMs < wantMs - MAIL_ID_SEARCH_TIME_MARGIN_MS) {
-          lo = mid + 1;
-        } else {
-          hi = mid;
-        }
+      if (uids.length > MAIL_ID_CANDIDATE_LIMIT) {
+        throw buildTooManyCandidatesError(mailId, mailbox, uids.length);
       }
 
-      const start = Math.max(0, lo - MAIL_ID_CANDIDATE_NEIGHBORS);
-      const end = Math.min(sortedUids.length, lo + MAIL_ID_CANDIDATE_NEIGHBORS + 1);
-      const candidates = (await fetchMailIdCandidates(
-        client,
-        sortedUids.slice(start, end),
-        mailbox,
-      )).filter((candidate) => isCandidateMatch(candidate, wantSec));
+      const sortedUids = [...uids].sort((a: number, b: number) => a - b);
+      const fetched: MailIdCandidate[] = [];
+      for (let offset = 0; offset < sortedUids.length; offset += MAIL_ID_FETCH_BATCH) {
+        fetched.push(
+          ...(await fetchMailIdCandidates(
+            client,
+            sortedUids.slice(offset, offset + MAIL_ID_FETCH_BATCH),
+            mailbox,
+          )),
+        );
+      }
+      const candidates = fetched.filter((candidate) => isCandidateMatch(candidate, wantSec));
 
       if (candidates.length === 1) {
-        // 범위 끝이 일치하면 다음 UID도 같은 초에 도착했을 수 있다.
-        if (end < sortedUids.length && candidates[0].uid === sortedUids[end - 1]) {
-          throw new DoorayCliError(
-            "조회 범위 밖에도 같은 시각의 메일이 있을 수 있어 UID를 결정할 수 없습니다.\n" +
-              `${formatMailCandidate(candidates[0])}\n` +
-              mailboxLookupHint(mailbox),
-            EXIT_API_ERROR,
-          );
-        }
         return candidates[0].uid;
       }
 

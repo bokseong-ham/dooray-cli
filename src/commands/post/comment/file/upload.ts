@@ -6,9 +6,10 @@ import { basename } from "node:path";
 import { printJson, type OutputOptions } from "../../../../formatters/table.js";
 import { startSpinner, stopSpinner } from "../../../../utils/spinner.js";
 import { DoorayCliError } from "../../../../utils/errors.js";
-import { EXIT_API_ERROR } from "../../../../utils/exit-codes.js";
+import { EXIT_API_ERROR, EXIT_PARAM_ERROR } from "../../../../utils/exit-codes.js";
 import { appendFileReference } from "../../../../utils/comment-files.js";
 import { resolveBodyMimeType } from "../../../../utils/body-input.js";
+import { checkMarkupSupport } from "../../../../utils/body-markup.js";
 
 export const uploadCommentFileCommand = new Command("upload")
   .description("댓글에 파일 업로드 (첨부 카드가 아닌 본문 링크로 표시)")
@@ -36,6 +37,23 @@ export const uploadCommentFileCommand = new Command("upload")
       secondaryLabel: { positional: "4번째", option: "--file", identifier: "<path>" },
     });
 
+    // Step 0: 댓글 본문 형식을 먼저 판정한다. 업로드 뒤에 거절하면 어디에도
+    // 참조되지 않는 파일이 업무에 남는다 (ADR-055).
+    startSpinner("댓글 조회 중...");
+    let commentRes: Awaited<ReturnType<typeof client.getPostComment>>;
+    try {
+      commentRes = await client.getPostComment(projectId, postId, commentId);
+    } catch (error) {
+      stopSpinner(false, "");
+      throw error;
+    }
+    const currentBody = commentRes.result.body.content;
+    const bodyMimeType = resolveBodyMimeType(commentRes.result.body.mimeType);
+    stopSpinner(true, "댓글 조회 완료");
+
+    const check = checkMarkupSupport(bodyMimeType, "file-reference");
+    if (!check.supported) throw new DoorayCliError(check.message, EXIT_PARAM_ERROR);
+
     // Step 1: 파일 업로드
     startSpinner("파일 업로드 중...");
     const uploadRes = await client.uploadPostFile(projectId, postId, filePath);
@@ -46,11 +64,9 @@ export const uploadCommentFileCommand = new Command("upload")
     // Step 2: 댓글 본문에 reference 추가
     startSpinner("댓글 reference 추가 중...");
     try {
-      const commentRes = await client.getPostComment(projectId, postId, commentId);
-      const currentBody = commentRes.result.body.content;
-      const newBody = appendFileReference(currentBody, fileName, fileId);
+      const newBody = appendFileReference(currentBody, fileName, fileId, bodyMimeType);
       await client.updatePostComment(projectId, postId, commentId, {
-        body: { mimeType: resolveBodyMimeType(commentRes.result.body.mimeType), content: newBody },
+        body: { mimeType: bodyMimeType, content: newBody },
       });
       stopSpinner(true, "reference 추가 완료");
     } catch {

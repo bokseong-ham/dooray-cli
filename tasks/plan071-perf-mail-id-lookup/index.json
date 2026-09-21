@@ -1,20 +1,22 @@
 {
   "name": "plan071-perf-mail-id-lookup",
   "description": "mail id 로 IMAP UID 를 찾는 경로를 이분 탐색에서 서버측 일자 필터로 바꾼다",
-  "status": "pending",
+  "status": "completed",
   "created_at": "2026-09-20",
   "total_phases": 2,
-  "current_phase": 1,
+  "current_phase": 2,
   "phases": [
     {
       "number": 1,
       "file": "phase-01.md",
-      "execution_profile": "standard"
+      "execution_profile": "standard",
+      "status": "completed"
     },
     {
       "number": 2,
       "file": "phase-02.md",
-      "execution_profile": "fast"
+      "execution_profile": "fast",
+      "status": "completed"
     }
   ]
 }

@@ -1,5 +1,7 @@
 # workflow
 
+워크플로우는 업무 상태·진행 상태를 가리키는 다른 이름이다. `dooray post workflow` 로 상태를 옮기고, `dooray post done` 으로 완료 상태로 바꾼다.
+
 ## 모르는 값을 먼저 찾는 순서
 
 | 모르는 것 | 먼저 실행 |

@@ -1,7 +1,11 @@
 import { Command } from "commander";
 import { getConfigOrThrow } from "../../../config/store.js";
 import { DoorayApiClient } from "../../../api/client.js";
-import { resolveWikiPageInput } from "../../../resolvers/wiki-page-input.js";
+import {
+  resolveWikiPageInput,
+  WIKI_PAGE_ID_OPTION_DESC,
+  WIKI_PAGE_PROJECT_OPTION_DESC,
+} from "../../../resolvers/wiki-page-input.js";
 import { output, type OutputOptions } from "../../../formatters/table.js";
 import { startSpinner, stopSpinner } from "../../../utils/spinner.js";
 import { formatSize } from "../../../utils/format-size.js";
@@ -10,9 +14,9 @@ export const wikiPageFileListCommand = new Command("list")
   .description("위키 페이지 첨부파일 목록 조회 (general + inline image)")
   .argument("[project]", "프로젝트 코드 (또는 첫 인자에 Dooray Wiki URL)")
   .argument("[page-id]", "위키 페이지 ID (project와 함께 사용)")
-  .option("--id <pageId>", "위키 페이지 ID (--project 동반 필요)")
+  .option("--id <pageId>", WIKI_PAGE_ID_OPTION_DESC)
   .option("--url <url>", "Dooray Wiki URL")
-  .option("--project <code>", "프로젝트 코드 (--id 모드에서 wikiId 해석용)")
+  .option("--project <code>", WIKI_PAGE_PROJECT_OPTION_DESC)
   .action(async (project, pageIdArg, opts) => {
     const globalOpts = wikiPageFileListCommand.optsWithGlobals() as OutputOptions;
     const config = await getConfigOrThrow();

@@ -9,7 +9,7 @@ import { EXIT_PARAM_ERROR } from "../../utils/exit-codes.js";
 import { isLikelyDoorayUrl } from "../../utils/dooray-url.js";
 
 export const postWorkflowCommand = new Command("workflow")
-  .description("업무 워크플로우 변경")
+  .description("업무 워크플로우 변경 (업무 상태·진행 상태 변경)")
   .argument("[project]", "프로젝트 코드 (또는 첫 인자에 Dooray URL)")
   .argument("[post-number]", "업무 번호 (project와 함께 사용)")
   .argument("[workflow]", "워크플로우 이름 또는 클래스 (또는 --workflow 사용)")

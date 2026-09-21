@@ -1,11 +1,12 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { fetchAllWikis, filterWikisByName, resolveWiki } from "./wiki.js";
+import { getProjects, getPrivateProjects, isExpired } from "../cache/store.js";
 import type { DoorayApiClient } from "../api/client.js";
 import type { Wiki } from "../api/types.js";
 import { EXIT_PARAM_ERROR } from "../utils/exit-codes.js";
 
 vi.mock("../cache/store.js", () => ({
-  getProjects: vi.fn().mockResolvedValue({ data: [], updatedAt: 0 }),
+  getProjects: vi.fn().mockResolvedValue({ data: [], updatedAt: new Date(0).toISOString() }),
   setProjects: vi.fn().mockResolvedValue(undefined),
   getPrivateProjects: vi.fn().mockResolvedValue(null),
   setPrivateProjects: vi.fn().mockResolvedValue(undefined),
@@ -67,7 +68,14 @@ describe("fetchAllWikis", () => {
   });
 });
 
-describe("resolveWiki 오류 안내", () => {
+describe("resolveWiki", () => {
+  // 확인마다 캐시 mock 의 반환값을 바꾸므로 시작값을 여기서 되돌린다
+  beforeEach(() => {
+    vi.mocked(isExpired).mockReturnValue(true);
+    vi.mocked(getProjects).mockResolvedValue({ data: [], updatedAt: new Date(0).toISOString() });
+    vi.mocked(getPrivateProjects).mockResolvedValue(null);
+  });
+
   function mockProjectClient(): DoorayApiClient {
     return {
       getProjects: vi.fn().mockResolvedValue({ result: [], totalCount: 0 }),
@@ -83,6 +91,35 @@ describe("resolveWiki 오류 안내", () => {
     await expect(resolveWiki(mockProjectClient(), orgId)).rejects.toMatchObject({
       message: expect.stringContaining("wiki page get --id"),
     });
+  });
+
+  it("공용 캐시에 없고 private 캐시에 있으면 그 wikiId 를 돌려준다", async () => {
+    vi.mocked(isExpired).mockReturnValue(false);
+    vi.mocked(getProjects).mockResolvedValue({ data: [], updatedAt: new Date().toISOString() });
+    vi.mocked(getPrivateProjects).mockResolvedValue({
+      data: [{ id: "3333444455556666777", code: "@my-account", wikiId: "wiki-9" }],
+      updatedAt: new Date().toISOString(),
+    });
+
+    await expect(resolveWiki(mockProjectClient(), "@my-account")).resolves.toBe("wiki-9");
+  });
+
+  it("projectId 를 직접 넣고 private 캐시가 비어 있으면 목록을 받아 wikiId 를 찾는다", async () => {
+    vi.mocked(isExpired).mockReturnValue(false);
+    vi.mocked(getProjects).mockResolvedValue({ data: [], updatedAt: new Date().toISOString() });
+    vi.mocked(getPrivateProjects).mockResolvedValue(null);
+    const projectId = "3333444455556666777";
+    const client = {
+      getProjects: vi.fn().mockResolvedValue({
+        result: [{ id: projectId, code: "@my-account", wiki: { id: "wiki-9" } }],
+        totalCount: 1,
+      }),
+    } as unknown as DoorayApiClient;
+
+    await expect(resolveWiki(client, projectId)).resolves.toBe("wiki-9");
+    expect(client.getProjects).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "private" }),
+    );
   });
 
   it("비숫자 project 코드를 찾지 못하면 orgId 안내를 붙이지 않는다", async () => {

@@ -51,6 +51,9 @@
   - 감당할 것: 존재하지 않는 프로젝트 코드를 넣으면 오류가 나기 전에 private 목록 조회가 한 번 나간다.
     오타를 낸 호출마다 왕복이 하나 붙는다. 조회 결과는 캐시에 남으므로 같은 세션에서 반복되지는 않는다.
     private 프로젝트가 많은 계정에서는 그 조회가 목록 크기를 100으로 나눈 만큼의 호출이 된다.
+    `--link-task` 는 링크마다 `resolveProject` 를 병렬로 부르므로(`src/resolvers/task-link.ts`)
+    private 캐시가 비어 있으면 그 목록 조회가 링크 수만큼 동시에 나갈 수 있다.
+    `api/rate-limiter` 가 요청 간격을 조절하고(ADR-039) 받은 목록이 캐시에 남으므로 그대로 둔다.
 
 - **적용 범위**: `src/resolvers/project.ts` 의 `resolveProject`,
   `src/resolvers/wiki.ts` 의 `resolveWiki`, `src/commands/wiki/page-edit.ts` 의 입력 모드.

@@ -1,4 +1,4 @@
-# PRD — dooray-cli
+# dooray-cli PRD
 
 ## 한 줄 정의
 
@@ -40,6 +40,7 @@ CLI는 터미널이 있는 환경이면 어디서든 동작하고, 자연스러�
   - 참조자·담당자: `--cc`, `--cc-group`, `--cc-clear`, `--to`, `--to-group`, `--to-clear` (post edit; post create 는 `--*-group` 만 — ADR-025)
   - 상위 업무 변경: `post edit --parent <ref>` (dedicated `set-parent-post` endpoint, top-level 해제는 웹 UI)
   - 정형 task: `post create --template <name|id>` (ADR-027, `project templates` 명령으로 목록 조회)
+  - 태그 확인과 태그 필터: `post get` 의 태그 줄과 `post get --with-tag-names`, `post list --tag <이름>` (ADR-056)
 - `dooray post comment` — 목록·추가·수정($EDITOR)·삭제
 - `dooray post file` — 목록·다운로드·전체다운로드·업로드·삭제 (v0.3.0)
 - `dooray post comment file` — 댓글 첨부 파일 목록·업로드·다운로드·삭제 (댓글 조회·수정 API와 post-level files API 조합, ADR-024)
