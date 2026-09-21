@@ -2,9 +2,11 @@ import { Command } from "commander";
 import { getConfigOrThrow } from "../../config/store.js";
 import { DoorayApiClient } from "../../api/client.js";
 import { resolveMessengerChannel } from "../../resolvers/messenger-channel.js";
+import { buildOrganizationMemberNameMap } from "../../resolvers/member.js";
 import type { MessengerLog } from "../../api/types.js";
 import type { OutputOptions } from "../../formatters/table.js";
-import { output, truncate } from "../../formatters/table.js";
+import { output, printJson, truncate } from "../../formatters/table.js";
+import { sanitizeForTerminal } from "../../utils/sanitize.js";
 import { startSpinner, stopSpinner } from "../../utils/spinner.js";
 import { DoorayCliError } from "../../utils/errors.js";
 import { EXIT_PARAM_ERROR } from "../../utils/exit-codes.js";
@@ -12,15 +14,19 @@ import { EXIT_PARAM_ERROR } from "../../utils/exit-codes.js";
 // 서버가 받아주는 size 상한. 넘겨도 1000 건만 오므로 조용히 자르지 않고 거부한다.
 export const MAX_LOG_COUNT = 1000;
 const DEFAULT_LOG_COUNT = 20;
+const TEXT_MAX_LEN = 60;
 
 /**
  * `2026-09-18T11:38:11+09:00` → `2026-09-18 11:38`.
- * 문자열을 자르기만 한다 — Date 로 파싱하면 서버가 준 offset 기준 시각이
+ *
+ * `Date` 로 파싱하지 않는다 — 파싱하면 서버가 준 offset 기준 시각이
  * 실행 장비의 타임존으로 밀려 보인다.
+ * 다만 offset 을 떼는 것은 `+09:00` 일 때뿐이다. 다른 offset 이나 `Z` 를
+ * 떼면 그 시각을 KST 로 오독하므로 원형을 그대로 보여준다.
  */
 export function formatSentAt(sentAt?: string): string {
   if (!sentAt) return "";
-  const m = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/.exec(sentAt);
+  const m = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}):\d{2}(?:\.\d+)?\+09:00$/.exec(sentAt);
   return m ? `${m[1]} ${m[2]}` : sentAt;
 }
 
@@ -29,30 +35,12 @@ function senderId(log: MessengerLog): string | undefined {
   return log.sender?.member?.organizationMemberId;
 }
 
-/**
- * 발신자 id → 표시명. 고유 id 마다 한 번씩만 조회하고,
- * 실패한 id 는 map 에 넣지 않아 호출자가 id 를 그대로 보여주게 한다.
- */
-export async function buildSenderNameMap(
-  client: DoorayApiClient,
-  logs: MessengerLog[],
-): Promise<Map<string, string>> {
-  const ids = new Set<string>();
-  for (const log of logs) {
-    const id = senderId(log);
-    if (id) ids.add(id);
-  }
-
-  const map = new Map<string, string>();
-  for (const id of ids) {
-    try {
-      const detail = await client.getMemberDetail(id);
-      if (detail.result?.name) map.set(id, detail.result.name);
-    } catch {
-      // 이름 조회 실패는 명령 전체를 실패시키지 않는다 — 표에 id 를 그대로 쓴다.
-    }
-  }
-  return map;
+// 더 오래된 메시지가 있어도 이 API 로는 갈 수 없다 (ADR-061). 데이터가 아니라 안내이므로 stderr.
+function warnHasMore(hasMore: boolean | undefined): void {
+  if (hasMore !== true) return;
+  process.stderr.write(
+    `⚠  이보다 오래된 메시지가 더 있지만 이 API 는 그 이전으로 갈 수단을 주지 않습니다.\n`,
+  );
 }
 
 export const messengerLogsCommand = new Command("logs")
@@ -81,10 +69,11 @@ export const messengerLogsCommand = new Command("logs")
 
     startSpinner("메시지 조회 중...");
     let logs: MessengerLog[];
+    let hasMore: boolean | undefined;
     try {
       const res = await client.getChannelLogs(channelId, n);
       logs = res.result ?? [];
-      stopSpinner(true, "조회 완료");
+      hasMore = res.hasMore;
     } catch (e) {
       stopSpinner(false);
       throw e;
@@ -92,7 +81,9 @@ export const messengerLogsCommand = new Command("logs")
 
     if (globalOpts.json) {
       // 서버 응답 result 원형 (ADR-031 의 raw 출력과 같은 취지) — 이름을 끼워넣지 않는다.
-      output(globalOpts, { headers: [], rows: [], raw: logs, ids: [] });
+      stopSpinner(true, "조회 완료");
+      printJson(logs);
+      warnHasMore(hasMore);
       return;
     }
 
@@ -100,15 +91,39 @@ export const messengerLogsCommand = new Command("logs")
     const ordered = [...logs].reverse();
 
     if (globalOpts.quiet) {
-      output(globalOpts, { headers: [], rows: [], raw: ordered, ids: ordered.map((l) => l.id) });
+      stopSpinner(true, ordered.length > 0 ? "조회 완료" : "메시지 없음");
+      // 빈 배열에 printQuiet 를 부르면 빈 줄 하나가 나간다. 아무것도 내지 않는다.
+      if (ordered.length > 0) {
+        output(globalOpts, { headers: [], rows: [], raw: ordered, ids: ordered.map((l) => l.id) });
+      }
+      warnHasMore(hasMore);
       return;
     }
 
-    const nameMap = await buildSenderNameMap(client, ordered);
+    if (ordered.length === 0) {
+      stopSpinner(true, "메시지 없음");
+      process.stdout.write("메시지가 없습니다.\n");
+      warnHasMore(hasMore);
+      return;
+    }
+
+    // 이름 해석까지 끝난 뒤에 완료를 찍는다 — 조회 직후에 찍으면 뒤따르는
+    // 멤버 조회 동안 멈춘 것처럼 보인다.
+    const nameMap = await buildOrganizationMemberNameMap(
+      client,
+      ordered.map(senderId).filter((id): id is string => !!id),
+    );
+    stopSpinner(true, "조회 완료");
+
     const rows = ordered.map((log) => {
       const id = senderId(log);
       const sender = (id && nameMap.get(id)) || id || log.sender?.type || "";
-      return [formatSentAt(log.sentAt), sender, truncate(log.text ?? "", 60)];
+      // 서버가 준 문자열은 외부 통제 값이라 출력 직전 control char 를 없앤다.
+      return [
+        formatSentAt(log.sentAt),
+        sanitizeForTerminal(sender),
+        sanitizeForTerminal(truncate(log.text ?? "", TEXT_MAX_LEN)),
+      ];
     });
 
     output(globalOpts, {
@@ -117,4 +132,5 @@ export const messengerLogsCommand = new Command("logs")
       raw: ordered,
       ids: ordered.map((l) => l.id),
     });
+    warnHasMore(hasMore);
   });

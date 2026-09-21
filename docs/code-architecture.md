@@ -37,7 +37,7 @@ src/
   resolvers/
     me.ts                   # /common/v1/members/me → CachedMe (id·name·orgId; orgId 없으면 캐시 갱신)
     project.ts              # code·id → projectId. 입력 자동 분기: numeric 15+자리 → cache 우회 + 그대로 반환 / 그 외 → cache 매칭 (code+id). 공용 목록에서 못 찾으면 private 목록을 받아 다시 찾는다 (ADR-054). 권한 검증은 후속 API 4xx 위임 (ADR-030, Issue #78)
-    member.ts               # 입력 자동 분기: 15자리 숫자 / 이메일 / 이름. lookupMemberName + buildMemberNameMap (ADR-021)
+    member.ts               # 입력 자동 분기: 15자리 숫자 / 이메일 / 이름. lookupMemberName + buildMemberNameMap (ADR-021) + buildOrganizationMemberNameMap — project 스코프 없는 곳(messenger)의 id→이름, 중복 제거 후 병렬 조회 (ADR-061)
     workflow.ts             # name·class → workflowId
     post.ts                 # postNumber → postId (API 호출)
     wiki.ts                 # projectCode → wikiId / wikiId → homePageId (캐시). 공용과 private 두 프로젝트 캐시를 모두 보고, 거기서도 못 찾으면 private 목록을 받아 다시 찾는다 (ADR-054). fetchAllWikis 가 size 100 씩 totalCount 까지 순회 (ADR-043)
@@ -111,6 +111,7 @@ src/
     config-value.ts         # `config set <key> <value>` 의 값 확정 — "-" 는 stdin 에서 읽고 양끝 공백을 제거하며 빈 값은 에러
     dooray-id.ts            # Dooray 식별자의 상위 비트에 담긴 생성 시각을 밀리초로 푼다 (BigInt, mail id → UID 조회에 사용)
     inline-file-refs.ts     # 본문에서 /files/<id> 참조를 뽑는다 — 순서 유지, 중복 제거 (ADR-057)
+    sanitize.ts             # sanitizeForTerminal — 서버 문자열의 control char 를 출력 직전 ? 로 바꾼다. attachment-check 의 sanitizeFileName 과 messenger logs 표가 공유
     unknown-option-hint.ts  # 알 수 없는 옵션 오류에 인자 사용법을 붙이고, 명령 나무 전체에 그 후크를 건다 (ADR-058)
 
   commands/
@@ -126,6 +127,7 @@ src/
       channel-send.ts       # 대화방 — channels/{id}/logs (--channel id/이름 resolveMessengerChannel + body)
       thread-send.ts        # 스레드 생성 — --log 유무로 두 endpoint 를 가르고 --quiet 은 스레드 채널 channelId 를 낸다 (ADR-052)
       thread-options.ts     # thread-send 옵션 조합 판정 — --log 와 --thread-body 충돌 경고, stdin 중복 지정 차단 (ADR-052)
+      logs.ts               # 대화방 읽기 — GET channels/{id}/logs. -n 상한 1000 초과는 거부, 표·--quiet 은 대화 순서로 뒤집고 --json 은 서버 순서 유지, hasMore 는 stderr 안내 (ADR-061)
 
     project/
       list.ts

@@ -32,6 +32,9 @@ vi.mock("../../utils/spinner.js", () => ({
   stopSpinner: mocks.stopSpinner,
 }));
 
+// ANSI escape 시작 바이트. 리터럴로 두면 편집기에서 보이지 않아 escape 표기로 쓴다.
+const ESC = "\u001b";
+
 const CHANNEL_ID = "1234567890123456789";
 const ALICE_ID = "1111222233334444555";
 const BOB_ID = "2222333344445555666";
@@ -81,18 +84,28 @@ async function createCommandTree(): Promise<Command> {
   return program;
 }
 
+let lastStderr = "";
+
 async function run(argv: string[]): Promise<string> {
   const program = await createCommandTree();
   exitOverrideAll(program);
   const chunks: string[] = [];
+  const errChunks: string[] = [];
+  lastStderr = "";
   const spy = vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
     chunks.push(String(chunk));
+    return true;
+  });
+  const errSpy = vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+    errChunks.push(String(chunk));
     return true;
   });
   try {
     await program.parseAsync(["node", "dooray", ...argv]);
   } finally {
     spy.mockRestore();
+    errSpy.mockRestore();
+    lastStderr = errChunks.join("");
   }
   return chunks.join("");
 }
@@ -188,13 +201,114 @@ describe("messenger logs", () => {
     const out = await run(["--quiet", "messenger", "logs", CHANNEL_ID]);
     expect(out.trim().split("\n")).toEqual(["log-1", "log-2", "log-3"]);
   });
+
+  it("이름 해석이 끝난 뒤에 완료 표시를 낸다", async () => {
+    await run(["messenger", "logs", CHANNEL_ID]);
+    const lastLookup = Math.max(
+      ...mocks.client.getMemberDetail.mock.invocationCallOrder,
+    );
+    expect(mocks.stopSpinner.mock.invocationCallOrder[0]).toBeGreaterThan(lastLookup);
+  });
+
+  it("본문의 control char 를 출력 직전에 없앤다", async () => {
+    mocks.client.getChannelLogs.mockResolvedValue({
+      header: { isSuccessful: true, resultCode: 0, resultMessage: "" },
+      result: [
+        {
+          id: "log-9",
+          sender: { type: "member", member: { organizationMemberId: ALICE_ID } },
+          sentAt: "2026-09-18T11:38:11+09:00",
+          text: `정상${ESC}[31m빨강`,
+        },
+      ],
+    });
+    const out = await run(["messenger", "logs", CHANNEL_ID]);
+    // cli-table3 이 테두리에 쓰는 escape 와 섞이므로, 주입한 escape 가 ? 로 바뀌었는지로 판정한다.
+    expect(out).toContain("정상?[31m빨강");
+    expect(out).not.toContain(`정상${ESC}`);
+  });
+
+  it("발신자 이름의 control char 도 없앤다", async () => {
+    mocks.client.getMemberDetail.mockResolvedValue({
+      header: { isSuccessful: true, resultCode: 0, resultMessage: "" },
+      result: { id: ALICE_ID, name: `앨${ESC}[31m리스` },
+    });
+    const out = await run(["messenger", "logs", CHANNEL_ID]);
+    expect(out).toContain("앨?[31m리스");
+    expect(out).not.toContain(`앨${ESC}`);
+  });
+
+  describe("hasMore", () => {
+    it("true 면 stderr 로 알린다", async () => {
+      await run(["messenger", "logs", CHANNEL_ID]);
+      expect(lastStderr).toContain("오래된 메시지가 더 있지만");
+    });
+
+    it("--json 과 --quiet 에서도 stderr 안내가 나가고 stdout 은 깨끗하다", async () => {
+      const jsonOut = await run(["--json", "messenger", "logs", CHANNEL_ID]);
+      expect(lastStderr).toContain("오래된 메시지가 더 있지만");
+      expect(() => JSON.parse(jsonOut)).not.toThrow();
+
+      const quietOut = await run(["--quiet", "messenger", "logs", CHANNEL_ID]);
+      expect(lastStderr).toContain("오래된 메시지가 더 있지만");
+      expect(quietOut.trim().split("\n")).toEqual(["log-1", "log-2", "log-3"]);
+    });
+
+    it("false 거나 없으면 아무 안내도 하지 않는다", async () => {
+      mocks.client.getChannelLogs.mockResolvedValue({
+        header: { isSuccessful: true, resultCode: 0, resultMessage: "" },
+        result: logs,
+        hasMore: false,
+      });
+      await run(["messenger", "logs", CHANNEL_ID]);
+      expect(lastStderr).toBe("");
+    });
+  });
+
+  describe("결과가 0건", () => {
+    beforeEach(() => {
+      mocks.client.getChannelLogs.mockResolvedValue({
+        header: { isSuccessful: true, resultCode: 0, resultMessage: "" },
+        result: [],
+        hasMore: false,
+      });
+    });
+
+    it("표 모드는 빈 표 대신 안내를 낸다", async () => {
+      const out = await run(["messenger", "logs", CHANNEL_ID]);
+      expect(out).toBe("메시지가 없습니다.\n");
+      expect(out).not.toContain("보낸이");
+    });
+
+    it("--quiet 은 아무것도 출력하지 않는다", async () => {
+      const out = await run(["--quiet", "messenger", "logs", CHANNEL_ID]);
+      expect(out).toBe("");
+    });
+
+    it("--json 은 빈 배열을 낸다", async () => {
+      const out = await run(["--json", "messenger", "logs", CHANNEL_ID]);
+      expect(JSON.parse(out)).toEqual([]);
+    });
+  });
 });
 
 describe("formatSentAt", () => {
-  it("ISO8601 을 offset 변환 없이 분 단위로 자른다", async () => {
+  it("+09:00 이면 분 단위로 자른다", async () => {
     const { formatSentAt } = await import("./logs.js");
     expect(formatSentAt("2026-09-18T11:38:11+09:00")).toBe("2026-09-18 11:38");
-    expect(formatSentAt(undefined)).toBe("");
+    expect(formatSentAt("2026-09-18T11:38:11.123+09:00")).toBe("2026-09-18 11:38");
+  });
+
+  it("+09:00 이 아닌 offset 이나 Z 는 원형을 그대로 둔다", async () => {
+    const { formatSentAt } = await import("./logs.js");
+    expect(formatSentAt("2026-09-18T11:38:11Z")).toBe("2026-09-18T11:38:11Z");
+    expect(formatSentAt("2026-09-18T11:38:11+00:00")).toBe("2026-09-18T11:38:11+00:00");
+    expect(formatSentAt("2026-09-18T11:38:11-05:00")).toBe("2026-09-18T11:38:11-05:00");
+  });
+
+  it("비-ISO 와 undefined 를 견딘다", async () => {
+    const { formatSentAt } = await import("./logs.js");
     expect(formatSentAt("이상한값")).toBe("이상한값");
+    expect(formatSentAt(undefined)).toBe("");
   });
 });

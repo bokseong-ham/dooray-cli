@@ -104,6 +104,33 @@ export async function buildMemberNameMap(
 }
 
 /**
+ * organizationMemberId 목록 → 표시명 map.
+ * project 스코프가 없는 곳(messenger 등)에서 쓴다 — `buildMemberNameMap` 은
+ * `ensureMembers` 로 프로젝트 멤버 목록을 받으므로 projectId 없이는 쓸 수 없다.
+ *
+ * 중복 id 는 한 번만 조회하고, 호출은 `fetchAllMembers` 와 같게 병렬이다.
+ * 조회에 실패한 id 는 map 에 넣지 않아 호출자가 id 를 그대로 표시하게 한다.
+ */
+export async function buildOrganizationMemberNameMap(
+  client: DoorayApiClient,
+  organizationMemberIds: string[],
+): Promise<Map<string, string>> {
+  const unique = [...new Set(organizationMemberIds)];
+  const entries = await Promise.all(
+    unique.map(async (id): Promise<[string, string] | null> => {
+      try {
+        const detail = await client.getMemberDetail(id);
+        return detail.result?.name ? [id, detail.result.name] : null;
+      } catch {
+        // 개별 조회 실패는 전체를 실패시키지 않는다.
+        return null;
+      }
+    }),
+  );
+  return new Map(entries.filter((e): e is [string, string] => e !== null));
+}
+
+/**
  * id(15+자리 numeric) / 이메일 입력을 organizationMemberId 로 해석.
  * 어느 쪽에도 매칭 안 되면 null 반환 (=이름 입력 — 호출자가 matchByName 등으로 폴백).
  * id/email 로 매칭됐으나 404·모호이면 여기서 throw (null 반환 아님).

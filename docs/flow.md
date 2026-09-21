@@ -496,7 +496,7 @@ dooray wiki page get --id <page-id> --project my-project
 하위 페이지는 기본으로 함께 이동한다.
 이동할 때는 새 부모 페이지를 `--parent` 로 반드시 지정한다.
 
-## 메신저 흐름 (Issue #88, ADR-033, 스레드는 ADR-052)
+## 메신저 흐름 (Issue #88, ADR-033, 스레드는 ADR-052, 읽기는 ADR-061)
 
 빠른 알림·배포 요청을 CLI/에이전트가 메일보다 즉시성 있게 전송.
 
@@ -528,6 +528,25 @@ THREAD=$(dooray messenger thread-send --channel "배포알림" --body "v1.2.3 �
 dooray messenger channel-send --channel "$THREAD" --body "테스트 통과"
 dooray messenger channel-send --channel "$THREAD" --body "배포 완료"
 ```
+
+대화방에 쌓인 메시지를 읽는다. 대상은 `channel-send` 와 같게 channelId 나 대화방 이름을 받는다.
+
+```
+# 최근 N건 (기본 20, 상한 1000). 표는 오래된 것이 위, 최신이 아래
+dooray messenger logs "배포알림"
+dooray messenger logs <channelId> -n 200
+
+# 전문이 필요하면 --json. 표의 내용 열은 60자에서 자른다
+dooray messenger logs "배포알림" --json
+```
+
+가져오는 범위는 최근 1000건이 전부다. 페이징도 날짜 필터도 API 에 없어
+`-n` 상한 초과는 클램프하지 않고 `EXIT_PARAM_ERROR` 로 거부한다.
+더 오래된 메시지가 남아 있다는 `hasMore` 는 stderr 로만 알려 stdout 파싱을 건드리지 않는다.
+
+발신자는 id 로만 오므로 표 모드에서만 `common/v1/members/{id}` 를 불러 이름으로 바꾼다.
+고유 id 마다 한 번씩 병렬로 부르고, 실패한 id 는 그 자리에 id 를 그대로 둔다.
+`--json` 은 서버 응답 원형이라 이름을 끼워넣지 않고 정렬도 서버가 준 대로 최신이 앞이다.
 
 ## 위키 페이지 첨부파일 흐름 (Issue #70, ADR-029)
 
