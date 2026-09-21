@@ -203,4 +203,28 @@ describe("post get --with-tag-names 를 --json 없이 준 경우", () => {
     expect(out).toContain("태그: 긴급, 버그");
     stderr.mockRestore();
   });
+
+  it("이름을 못 찾은 태그가 있어도 던지지 않고 (이름 없음) 으로 낸다", async () => {
+    mocks.attachTagNames.mockResolvedValue({
+      tags: [{ id: "tag-1", name: "긴급" }, { id: "tag-2" }],
+      missing: ["tag-2"],
+    });
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    const out = await run(["--id", "post-1", "--with-tag-names"]);
+
+    expect(out).toContain("(이름 없음)");
+    stderr.mockRestore();
+  });
+
+  it("태그 조회가 실패해도 던지지 않고 경고를 낸 뒤 상세를 그대로 낸다", async () => {
+    mocks.attachTagNames.mockRejectedValue(new Error("네트워크 오류"));
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    const out = await run(["--id", "post-1", "--with-tag-names"]);
+
+    expect(stderr.mock.calls.map((c) => String(c[0])).join("")).toContain("네트워크 오류");
+    expect(out).toContain("#42 기존 제목");
+    stderr.mockRestore();
+  });
 });
