@@ -15,6 +15,31 @@ const officialSnapshot = parseOfficialEndpoints(
   readFileSync(join(repoRoot, "docs/api/official-endpoints.txt"), "utf8"),
 );
 
+describe("compareEndpoints 의 문서에 없는 줄 알고 쓰는 목록", () => {
+  it("등록된 경로는 missingInOfficial 이 아니라 knownUndocumented 로 간다", () => {
+    const result = compareEndpoints(["GET messenger/v1/channels/{id}/logs"], []);
+
+    expect(result.missingInOfficial).toEqual([]);
+    expect(result.knownUndocumented).toEqual(["GET messenger/v1/channels/{id}/logs"]);
+  });
+
+  it("등록되지 않은 경로는 그대로 missingInOfficial 에 남는다", () => {
+    const result = compareEndpoints(["GET messenger/v1/channels/{id}/unknown"], []);
+
+    expect(result.missingInOfficial).toEqual(["GET messenger/v1/channels/{id}/unknown"]);
+    expect(result.knownUndocumented).toEqual([]);
+  });
+
+  it("공식에도 있으면 어느 목록에도 넣지 않는다", () => {
+    const entry = "GET messenger/v1/channels/{id}/logs";
+    const result = compareEndpoints([entry], [entry]);
+
+    expect(result.matched).toBe(1);
+    expect(result.missingInOfficial).toEqual([]);
+    expect(result.knownUndocumented).toEqual([]);
+  });
+});
+
 describe("extractImplEndpoints", () => {
   it("평문 경로를 뽑는다", () => {
     const source = `return await this.api.get("wiki/v1/wikis").json<WikiListResponse>();`;
@@ -142,7 +167,7 @@ describe("parseOfficialEndpoints", () => {
 });
 
 describe("compareEndpoints", () => {
-  it("셋으로 갈라 낸다", () => {
+  it("넷으로 나눠 낸다", () => {
     const impl = ["GET a/v1/x", "GET a/v1/only-impl"];
     const official = ["GET a/v1/x", "GET a/v1/only-official"];
 
@@ -150,14 +175,16 @@ describe("compareEndpoints", () => {
       matched: 1,
       missingInImpl: ["GET a/v1/only-official"],
       missingInOfficial: ["GET a/v1/only-impl"],
+      knownUndocumented: [],
     });
   });
 
-  it("양쪽이 비면 셋 다 비어 있다", () => {
+  it("양쪽이 비면 넷 다 비어 있다", () => {
     expect(compareEndpoints([], [])).toEqual({
       matched: 0,
       missingInImpl: [],
       missingInOfficial: [],
+      knownUndocumented: [],
     });
   });
 });
