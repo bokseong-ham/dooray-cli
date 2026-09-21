@@ -430,6 +430,10 @@ dooray post done my-project 42                  # 완료 상태로
 dooray post workflow my-project 42 "review"     # 임의 상태로 (이름 또는 class)
 ```
 
+`post done` 은 `set-done` endpoint 를 불러 완료 클래스의 대표 워크플로우로 옮기고,
+완료 이전 담당자들의 상태도 함께 바꾼다. `post workflow` 는 `set-workflow` 로 임의 워크플로우로 옮기므로
+완료 클래스로 옮기고 싶으면 `post done` 을, 그 밖의 상태로 옮기고 싶으면 `post workflow` 를 쓴다.
+
 ## 위키 흐름
 
 ```

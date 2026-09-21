@@ -5,7 +5,7 @@ import { resolvePostInput } from "../../resolvers/post-input.js";
 import { startSpinner, stopSpinner } from "../../utils/spinner.js";
 
 export const postDoneCommand = new Command("done")
-  .description("업무 완료 처리")
+  .description("업무 완료 처리 (업무 상태를 완료로 바꾼다)")
   .argument("[project]", "프로젝트 코드 (또는 첫 인자에 Dooray URL)")
   .argument("[post-number]", "업무 번호 (project와 함께 사용)")
   .option("--id <postId>", "Dooray post ID (project/post-number 대신)")

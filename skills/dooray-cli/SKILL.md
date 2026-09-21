@@ -116,8 +116,8 @@ NHN Dooray REST API 를 래핑한 CLI 다. 이 파일은 라우터이므로, 작
 | 업무 생성 | `dooray post create <project> --title "..." [--body "..." \| --body-file <path>]` — 담당자는 `--to <name\|email>`, 참조자는 `--cc`, 둘 다 여러 명 가능 |
 | 템플릿으로 생성 | `dooray post create <project> --template <name\|id>` — 본문·담당자·태그가 채워지고 사용자 옵션이 우선한다 |
 | 제목·본문 수정 | `dooray post edit <project> <number> --title "..." --body "..."` — 본문 형식이 기존과 다르면 `--mime-type` 을 함께 준다 |
-| 완료 처리 | `dooray post done <project> <number>` |
-| 워크플로우 변경 | `dooray post workflow <project> <number> <workflow>` |
+| 완료 처리 (업무 상태를 완료로) | `dooray post done <project> <number>` |
+| 워크플로우 변경 (업무 상태·진행 상태 변경) | `dooray post workflow <project> <number> <workflow>` |
 
 ## 본문 형식
 
