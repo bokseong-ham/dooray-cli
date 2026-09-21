@@ -58,7 +58,15 @@ export const deleteCommentFileCommand = new Command("delete")
     // 조회와 판정은 try 밖에 둔다. 안에 두면 그 catch 가 "제거 실패" 한 문구로
     // 덮어, 참조를 찾지 못한 것과 호출이 실패한 것이 구별되지 않는다.
     startSpinner("댓글 본문 reference 제거 중...");
-    const commentRes = await client.getPostComment(projectId, postId, commentId);
+    // 조회 실패는 여기서만 잡아 spinner 를 내리고 그대로 다시 던진다.
+    // 아래 try 에 넣으면 그 catch 의 "제거 실패" 문구가 조회 실패를 덮는다.
+    let commentRes: Awaited<ReturnType<typeof client.getPostComment>>;
+    try {
+      commentRes = await client.getPostComment(projectId, postId, commentId);
+    } catch (error) {
+      stopSpinner(false, "");
+      throw error;
+    }
     const currentBody = commentRes.result.body.content;
     const bodyMimeType = resolveBodyMimeType(commentRes.result.body.mimeType);
     const { body: newBody, removed } = removeFileReference(currentBody, fileId, bodyMimeType);

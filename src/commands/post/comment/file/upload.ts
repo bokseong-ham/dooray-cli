@@ -40,7 +40,13 @@ export const uploadCommentFileCommand = new Command("upload")
     // Step 0: 댓글 본문 형식을 먼저 판정한다. 업로드 뒤에 거절하면 어디에도
     // 참조되지 않는 파일이 업무에 남는다 (ADR-055).
     startSpinner("댓글 조회 중...");
-    const commentRes = await client.getPostComment(projectId, postId, commentId);
+    let commentRes: Awaited<ReturnType<typeof client.getPostComment>>;
+    try {
+      commentRes = await client.getPostComment(projectId, postId, commentId);
+    } catch (error) {
+      stopSpinner(false, "");
+      throw error;
+    }
     const currentBody = commentRes.result.body.content;
     const bodyMimeType = resolveBodyMimeType(commentRes.result.body.mimeType);
     stopSpinner(true, "댓글 조회 완료");

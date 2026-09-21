@@ -142,6 +142,34 @@ describe("post comment file upload mimeType 보존", () => {
     expect(request.body.mimeType).toBe("text/x-markdown");
     stdout.mockRestore();
   });
+
+  it("댓글 조회가 실패하면 스피너를 멈추고 파일을 올리지 않는다", async () => {
+    const error = new Error("ECONNRESET");
+    mocks.client.getPostComment.mockRejectedValueOnce(error);
+    const program = await createCommandTree();
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await expect(
+      program.parseAsync([
+        "node",
+        "dooray",
+        "post",
+        "comment",
+        "file",
+        "upload",
+        "--id",
+        "post-1",
+        "--comment-id",
+        "comment-1",
+        "--file",
+        "/tmp/report.txt",
+      ]),
+    ).rejects.toBe(error);
+
+    expect(mocks.stopSpinner).toHaveBeenCalledWith(false, "");
+    expect(mocks.client.uploadPostFile).not.toHaveBeenCalled();
+    stdout.mockRestore();
+  });
 });
 
 describe("post comment file upload mimeType 폴백", () => {
@@ -169,6 +197,34 @@ describe("post comment file upload mimeType 폴백", () => {
 
     const request = mocks.client.updatePostComment.mock.calls[0]?.[3];
     expect(request.body.mimeType).toBe("text/x-markdown");
+    stdout.mockRestore();
+  });
+
+  it("댓글 조회가 실패하면 스피너를 멈추고 파일을 올리지 않는다", async () => {
+    const error = new Error("ECONNRESET");
+    mocks.client.getPostComment.mockRejectedValueOnce(error);
+    const program = await createCommandTree();
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await expect(
+      program.parseAsync([
+        "node",
+        "dooray",
+        "post",
+        "comment",
+        "file",
+        "upload",
+        "--id",
+        "post-1",
+        "--comment-id",
+        "comment-1",
+        "--file",
+        "/tmp/report.txt",
+      ]),
+    ).rejects.toBe(error);
+
+    expect(mocks.stopSpinner).toHaveBeenCalledWith(false, "");
+    expect(mocks.client.uploadPostFile).not.toHaveBeenCalled();
     stdout.mockRestore();
   });
 });

@@ -162,4 +162,18 @@ describe("post comment file delete reference 를 찾지 못했을 때", () => {
     expect(mocks.client.deletePostFile).toHaveBeenCalledOnce();
     stdout.mockRestore();
   });
+
+  it("댓글 조회가 실패하면 스피너를 멈추고 오류를 그대로 낸다", async () => {
+    const error = new Error("ECONNRESET");
+    mocks.client.getPostComment.mockRejectedValueOnce(error);
+    const program = await createCommandTree();
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await expect(program.parseAsync(args)).rejects.toBe(error);
+
+    expect(mocks.stopSpinner).toHaveBeenCalledWith(false, "");
+    expect(mocks.client.updatePostComment).not.toHaveBeenCalled();
+    expect(mocks.client.deletePostFile).not.toHaveBeenCalled();
+    stdout.mockRestore();
+  });
 });
