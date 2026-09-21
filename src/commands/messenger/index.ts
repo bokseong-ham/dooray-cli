@@ -2,6 +2,7 @@ import { Command } from "commander";
 import { messengerSendCommand } from "./send.js";
 import { messengerChannelSendCommand } from "./channel-send.js";
 import { messengerThreadSendCommand } from "./thread-send.js";
+import { messengerLogsCommand } from "./logs.js";
 
 export const messengerCommand = new Command("messenger")
   .description("메신저 관련 명령");
@@ -9,3 +10,4 @@ export const messengerCommand = new Command("messenger")
 messengerCommand.addCommand(messengerSendCommand);
 messengerCommand.addCommand(messengerChannelSendCommand);
 messengerCommand.addCommand(messengerThreadSendCommand);
+messengerCommand.addCommand(messengerLogsCommand);

@@ -65,6 +65,7 @@ import type {
   ChannelLogRequest,
   MessengerSendResponse,
   MessengerChannelListResponse,
+  MessengerLogListResponse,
 } from "./types.js";
 
 export interface GetPostsParams {
@@ -1065,6 +1066,22 @@ export class DoorayApiClient {
           json: { text } satisfies ChannelLogRequest,
         })
         .json<MessengerSendResponse>();
+    } catch (e) {
+      throw await toDoorayCliError(e);
+    }
+  }
+
+  /**
+   * 대화방 메시지 목록. seq 내림차순(최신이 앞)으로 온다.
+   * 페이징 수단이 없어 최근 size 건만 가져올 수 있고 그 이전으로는 갈 수 없다 (size 상한 1000).
+   */
+  async getChannelLogs(channelId: string, size: number): Promise<MessengerLogListResponse> {
+    try {
+      return await this.api
+        .get(`messenger/v1/channels/${channelId}/logs`, {
+          searchParams: { size },
+        })
+        .json<MessengerLogListResponse>();
     } catch (e) {
       throw await toDoorayCliError(e);
     }

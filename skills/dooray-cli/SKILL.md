@@ -264,6 +264,12 @@ dooray post get <project> <number> --json --with-tag-names
 | 1:1 다이렉트 메시지 | `dooray messenger send --to "<id\|email>" --body "..."` — `--to` 는 ID 나 이메일만 받고 이름은 지원하지 않는다 |
 | 대화방 메시지 | `dooray messenger channel-send --channel "<channelId\|이름>" --body "..."` — 이름으로는 자신이 속한 방만 찾는다 |
 | 대화방 스레드 열기 | `dooray messenger thread-send --channel "<channelId\|이름>" --body "..."` — `--thread-body` 나 `--thread-body-file` 로 첫 메시지를 함께 보내고, `--log <log-id>` 로 이미 올라간 메시지에 연다 |
+| 대화방 메시지 읽기 | `dooray messenger logs "<channelId\|이름>" [-n <개수>]` — 최근 N건(기본 20, 최대 1000). 표는 오래된 것이 위, 최신이 아래 |
+
+`logs` 가 가져올 수 있는 것은 최근 1000건까지다. 그 이전으로 거슬러 갈 수단이 API 에 없어
+`-n` 에 1000 을 넘기면 조용히 잘리지 않고 에러로 끝난다. 날짜 필터도 없다.
+표에는 발신자 이름이 나오지만 `--json` 은 서버 응답 원형이라 발신자가 id 로만 들어 있다.
+정렬도 원형을 따라 최신이 앞이다. 표와 `--quiet` 은 대화 순서대로 뒤집어 내보내므로 둘을 나란히 대조하지 않는다.
 
 진행 상황을 여러 번 보고할 때는 대화방 본문에 늘어놓지 말고 스레드에 쌓는다.
 `thread-send --quiet` 이 내는 값은 log-id 가 아니라 새로 만들어진 스레드 채널의 id 이고,

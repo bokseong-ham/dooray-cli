@@ -319,6 +319,21 @@ dooray messenger channel-send --channel "$THREAD" --body "테스트 통과"
 dooray messenger thread-send --channel "배포알림" --log <logId> --body "빌드 로그"
 ```
 
+대화방에 올라온 메시지는 `logs` 로 읽는다. 대화방 인자는 `channel-send` 와 같게 channelId 나 이름을 받는다.
+
+```bash
+dooray messenger logs "배포알림"              # 최근 20건
+dooray messenger logs "배포알림" -n 200       # 최근 200건
+dooray messenger logs "배포알림" --json       # 서버 응답 원형
+```
+
+표는 오래된 메시지가 위, 최신이 아래로 나오고 발신자는 이름으로 보여준다.
+이름 조회에 실패한 발신자는 id 로 남는다. `--json` 은 서버 응답 그대로라 이름이 들어가지 않고,
+정렬도 서버가 주는 대로 최신이 앞이다. 표와 `--quiet` 은 대화 순서대로 뒤집는다.
+
+가져올 수 있는 범위는 최근 1000건까지다. 그 이전으로 거슬러 갈 수단이 API 에 없어
+`-n` 에 1000 을 넘기면 조용히 잘리는 대신 에러로 끝난다. 날짜로 거르는 옵션도 없다.
+
 ## 프로젝트 구조
 
 ```

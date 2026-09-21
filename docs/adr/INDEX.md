@@ -69,3 +69,4 @@ ADR-NNN 내용은 `docs/adr/NNN-*.md` (번호 glob) 또는 아래 목록 링크�
 - [ADR-058](058-unknown-option-usage-hint.md) — 알 수 없는 옵션 오류에 그 이름의 실제 사용법을 붙인다 (Issue #170)
 - [ADR-059](059-plan-check-owned-by-skill.md) — plan 검사는 `planning` 스킬의 `verify_task.py` 가 소유하고 저장소 검사기와 CI 스텝을 없앤다
 - [ADR-060](060-mail-reply-confirmation-policy.md) — 메일 답장은 입력 형식과 무관하게 확인을 거친다 (UID 직접 입력 포함, Issue #179)
+- [ADR-061](061-messenger-logs-read.md) — 메신저 대화방 읽기를 `messenger logs` 로 두고 최근 N건(상한 1000)까지만 지원한다 (페이징·날짜 필터 부재 실측)
