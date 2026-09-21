@@ -36,11 +36,11 @@ src/
 
   resolvers/
     me.ts                   # /common/v1/members/me → CachedMe (id·name·orgId; orgId 없으면 캐시 갱신)
-    project.ts              # code·id → projectId. 입력 자동 분기: numeric 15+자리 → cache 우회 + 그대로 반환 / 그 외 → cache 매칭 (code+id). 권한 검증은 후속 API 4xx 위임 (ADR-030, Issue #78)
+    project.ts              # code·id → projectId. 입력 자동 분기: numeric 15+자리 → cache 우회 + 그대로 반환 / 그 외 → cache 매칭 (code+id). 공용 목록에서 못 찾으면 private 목록을 받아 다시 찾는다 (ADR-054). 권한 검증은 후속 API 4xx 위임 (ADR-030, Issue #78)
     member.ts               # 입력 자동 분기: 15자리 숫자 / 이메일 / 이름. lookupMemberName + buildMemberNameMap (ADR-021)
     workflow.ts             # name·class → workflowId
     post.ts                 # postNumber → postId (API 호출)
-    wiki.ts                 # projectCode → wikiId / wikiId → homePageId (캐시). fetchAllWikis 가 size 100 씩 totalCount 까지 순회 (ADR-043)
+    wiki.ts                 # projectCode → wikiId / wikiId → homePageId (캐시). 공용과 private 두 프로젝트 캐시를 모두 보고, 거기서도 못 찾으면 private 목록을 받아 다시 찾는다 (ADR-054). fetchAllWikis 가 size 100 씩 totalCount 까지 순회 (ADR-043)
     postRef.ts              # "code/number" 또는 raw postId → postId (post create / post edit --parent 공용)
     tag.ts                  # name[] → tagIds + mandatory/selectOne 검증, 그룹 이름 → groupId (태그 목록의 tagGroup 에서 파생, ADR-041)
     milestone.ts            # name → milestoneId

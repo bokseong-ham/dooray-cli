@@ -21,7 +21,8 @@ NHN Dooray REST API 를 래핑한 CLI 다. 이 파일은 라우터이므로, 작
 ## 대상 지정 방법
 
 `post get`/`edit`/`done`/`workflow`, `post comment` 전체, `post file` 전체, `post comment file` 전체,
-`wiki page get`, `wiki page file` 과 `wiki page comment` 전체, 그리고 `wiki page delete` 와 `wiki page move` 가 네 가지 형태를 모두 받는다.
+`wiki page get` 과 `wiki page edit`, `wiki page file` 과 `wiki page comment` 전체,
+그리고 `wiki page delete` 와 `wiki page move` 가 네 가지 형태를 모두 받는다.
 
 - `<project> <number>` — 업무는 번호, 위키는 `<project> <page-id>`
 - `--id <postId>` / `--id <pageId>` — 위키는 `--project` 없이도 조회된다. 함께 주면 wikiId 를 해석하는 호출을 한 번 아낀다
@@ -205,10 +206,10 @@ dooray post edit <project> 42 --mime-type text/html
 | 페이지 목록 | `dooray wiki pages <project>` |
 | 페이지 트리 | `dooray wiki tree <project>` (`--depth N` 으로 상한, `--json` 은 flat) |
 | 페이지 상세 | `dooray wiki page get --id <page-id>` — project 없이 조회된다. `<project> <page-id>` 와 `--url` 도 받는다 |
-| 페이지 ID 로 바로 조회 | `wiki page file`, `wiki page comment`, `wiki page delete` 도 `--id` 만으로 동작한다 |
+| 페이지 ID 로 바로 조회 | `wiki page edit`, `wiki page file`, `wiki page comment`, `wiki page delete` 도 `--id` 만으로 동작한다 |
 | 페이지 생성 | `dooray wiki page create <project> --title "..." [--parent <page-id>] [--body "..."]` — `--parent` 를 생략하면 위키 home 아래에 만든다 |
-| 페이지 제목 수정 | `dooray wiki page edit <project> <page-id> --title "..."` |
-| 페이지 본문 수정 | `dooray wiki page edit <project> <page-id> --body "..."` 또는 `--body-file ./new.md` — 본문 형식이 기존과 다르면 `--mime-type` 을 함께 준다 |
+| 페이지 제목 수정 | `dooray wiki page edit <project> <page-id> --title "..."` — `--id <page-id>` 와 `--url` 도 받는다 |
+| 페이지 본문 수정 | `dooray wiki page edit <project> <page-id> --body "..."` 또는 `--body-file ./new.md` — `--id <page-id>` 와 `--url` 도 받는다. 본문 형식이 기존과 다르면 `--mime-type` 을 함께 준다 |
 | 페이지 에디터로 수정 | `dooray wiki page edit <project> <page-id>` — 플래그가 없으면 `$EDITOR` 가 열린다 |
 | 페이지 이동 | `dooray wiki page move <project> <page-id> --parent <parent-page-id>` — `--parent` 는 필수다. 하위 페이지는 기본으로 함께 이동하고, `--no-children` 으로 페이지 하나만 옮긴다. `--to-wiki <project-or-wiki-id>` 로 다른 위키로 옮기며, `--first` 와 `--before <page-id>` 로 형제 사이 정렬을 바꾼다 |
 | 페이지 삭제 | `dooray wiki page delete <project> <page-id>` — 확인 있음, `-y`/`--yes`로 생략. 하위 페이지는 삭제한 페이지의 부모 아래로 재부착되어 orphan 이 생기지 않는다 |
