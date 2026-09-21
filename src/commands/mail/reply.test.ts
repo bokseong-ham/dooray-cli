@@ -163,17 +163,45 @@ describe("mailReplyCommand", () => {
     expect(mocks.sendMail).toHaveBeenCalledOnce();
   });
 
-  it.each([true, false])("TTY %s에서 UID 직접 입력은 탐색과 확인을 생략한다", async (isTTY) => {
-    setTTY(isTTY);
+  it("UID 도 확인을 거친다", async () => {
     await runMailReply(["337", "--body", "답장 본문"]);
 
     expect(mocks.resolveUidByMailId).not.toHaveBeenCalled();
-    expect(mocks.confirm).not.toHaveBeenCalled();
-    expect(mocks.getMail).toHaveBeenCalledExactlyOnceWith(config, 337, "INBOX");
-    expect(mocks.connectImapClient).not.toHaveBeenCalled();
-    // 확인이 없는 경로는 조회 완료 문구를 그대로 쓴다.
-    expect(mocks.stopSpinner).toHaveBeenCalledWith(true, "원본 메일 조회 완료");
+    expect(mocks.confirm).toHaveBeenCalledOnce();
     expect(mocks.sendMail).toHaveBeenCalledOnce();
+  });
+
+  it("UID 의 확인 머리말은 되돌릴 수 없다는 것을 알린다", async () => {
+    await runMailReply(["337", "--body", "답장 본문"]);
+
+    expect(mocks.confirm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining("되돌릴 수 없습니다"),
+      }),
+      { output: process.stderr },
+    );
+  });
+
+  it("UID 확인을 거절하면 보내지 않는다", async () => {
+    mocks.confirm.mockResolvedValueOnce(false);
+
+    await expect(runMailReply(["337", "--body", "답장 본문"]))
+      .resolves.toBeUndefined();
+
+    expect(mocks.sendMail).not.toHaveBeenCalled();
+  });
+
+  it("non-TTY의 UID도 차단한다", async () => {
+    setTTY(false);
+
+    await expect(runMailReply(["337", "--body", "답장 본문"]))
+      .rejects.toMatchObject({
+        exitCode: EXIT_PARAM_ERROR,
+        message: expect.stringContaining("--yes(-y)"),
+      });
+
+    expect(mocks.getConfigOrThrow).not.toHaveBeenCalled();
+    expect(mocks.getMail).not.toHaveBeenCalled();
   });
 
   it.each([

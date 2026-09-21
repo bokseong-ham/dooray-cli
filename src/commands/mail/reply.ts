@@ -22,15 +22,15 @@ export const mailReplyCommand = new Command("reply")
   .option("--body-file <path>", "답장 본문 파일 경로")
   .option("--cc <addresses...>", "참조")
   .option("--html", "본문을 HTML로 전송")
-  .option("-y, --yes", "시간으로 찾은 원본 메일 확인 생략 (자동화용)")
+  .option("-y, --yes", "원본 메일 확인 생략 (자동화용)")
   .action(async (target, opts) => {
     const globalOpts = mailReplyCommand.optsWithGlobals() as OutputOptions;
     const mailTarget = resolveMailTarget(target);
-    const needsConfirmation = mailTarget.kind === "mailId" && !opts.yes;
+    const needsConfirmation = !opts.yes;
     if (needsConfirmation && !process.stdin.isTTY) {
       throw new DoorayCliError(
-        "non-TTY 환경에서는 시간으로 찾은 원본 메일을 확인할 수 없습니다. " +
-          "메일 웹 주소나 mail id로 답장하려면 --yes(-y) 플래그로 다시 실행하세요.",
+        "non-TTY 환경에서는 원본 메일을 확인할 수 없습니다. " +
+          "발송은 되돌릴 수 없으므로 --yes(-y) 플래그로 다시 실행하세요.",
         EXIT_PARAM_ERROR,
       );
     }
@@ -75,7 +75,9 @@ export const mailReplyCommand = new Command("reply")
       const { confirm } = await import("@inquirer/prompts");
       const confirmed = await confirm({
         message: [
-          "도착 시각으로 찾은 원본 메일입니다.",
+          mailTarget.kind === "mailId"
+            ? "도착 시각으로 찾은 원본 메일입니다."
+            : "이 메일에 답장합니다. 발송은 되돌릴 수 없습니다.",
           `  제목: ${sanitizeReplyPreview(original.subject)}`,
           `  보낸사람: ${sanitizeReplyPreview(original.from)}`,
           `  IMAP 도착 시각: ${original.internalDate?.toISOString() ?? "알 수 없음"}`,
