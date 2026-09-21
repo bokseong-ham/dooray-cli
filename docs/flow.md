@@ -137,10 +137,12 @@ dooray skill update --force  # 관리되지 않은 기존 파일을 백업한 �
 ```
 dooray project list                         # 1) 프로젝트 목록 (캐시 자동 갱신)
 dooray post list my-project                 # 2) 업무 목록 (postNumber 포함)
+dooray post list my-project --tag "<태그 이름>"  # 2-1) 태그로 거르기 (여러 번 주면 모두 가진 업무)
 dooray post get my-project 42              # 3) 업무 상세 (#42번)
 dooray post get --id <postId>              # 3-1) internal postId 로 (create 출력값)
 dooray post get https://x.dooray.com/task/to/<postId>        # 3-2) URL 직접 입력 (task/to)
 dooray post get https://x.dooray.com/project/tasks/<postId>  # 3-3) URL 직접 입력 (project/tasks, #83)
+dooray post get my-project 42 --json --with-tag-names        # 3-4) 태그 이름까지 채워서 (ADR-056)
 dooray post search my-project "스프린트"   # 4) 제목 검색
 ```
 

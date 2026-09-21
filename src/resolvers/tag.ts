@@ -38,6 +38,44 @@ export async function ensureTags(client: DoorayApiClient, projectId: string): Pr
   return items;
 }
 
+export interface TagNameResult {
+  tags: { id: string; name?: string }[];
+  missing: string[];
+}
+
+/**
+ * 업무 응답의 태그에 프로젝트 태그 캐시의 이름을 붙인다. 찾지 못한 id 는 missing 에 담는다.
+ *
+ * 찾지 못했을 때 던지지 않는 이유는 호출부마다 처리가 갈리기 때문이다.
+ * 일반 출력은 `(이름 없음)` 으로 내고 끝내지만 `--with-tag-names` 는 실패로 끝낸다 (ADR-056).
+ */
+export async function attachTagNames(
+  client: DoorayApiClient,
+  projectId: string,
+  tags: ReadonlyArray<{ id: string; name?: string }>,
+): Promise<TagNameResult> {
+  // 태그가 없는 업무마다 목록을 받으면 왕복이 낭비된다.
+  if (tags.length === 0) return { tags: [], missing: [] };
+
+  const all = await ensureTags(client, projectId);
+  const byId = new Map(all.map((t) => [t.id, t.name]));
+
+  const missing: string[] = [];
+  const result = tags.map((tag) => {
+    // 서버가 이름을 내려주면 그쪽이 맞다. 덮어쓰지 않는다.
+    if (tag.name) return { ...tag };
+    // fetchAllTags 가 `t.name ?? ""` 로 채우므로 빈 문자열이 "이름이 없다" 는 뜻이다.
+    const name = byId.get(tag.id);
+    if (!name) {
+      missing.push(tag.id);
+      return { ...tag };
+    }
+    return { ...tag, name };
+  });
+
+  return { tags: result, missing };
+}
+
 /** 누락 그룹별 후보 태그 추출 헬퍼 */
 function buildMandatoryHint(allTags: CachedTag[], missingGroupIds: string[]): string {
   const lines: string[] = [];
@@ -158,6 +196,8 @@ export async function lookupTagIds(
       n,
       "태그",
       (t) => (t.groupName ? `${t.groupName} / ${t.name} (${t.id})` : `${t.name} (${t.id})`),
+      // 이름을 찾지 못하면 후보 다섯 줄만 나온다. 전체 목록을 보는 방법을 함께 알린다.
+      { helpHint: "dooray project tags <project>" },
     ).id
   );
 }

@@ -115,6 +115,7 @@ Claude 데스크톱 앱은 사용자 컴퓨터의 파일과 명령을 기본 상
 ```bash
 dooray project list                          # 내 프로젝트
 dooray post list <project>                   # 업무 목록
+dooray post list <project> --tag "<태그 이름>"  # 태그로 거르기
 dooray post get <project> 42                 # 업무 상세
 dooray post create <project> --title "제목"  # 업무 생성
 dooray post comment add <project> 42 --body "댓글"
@@ -133,6 +134,24 @@ dooray post edit <project> 42 --cc-group <group-code>  # 제목·본문 없이 �
 ```
 
 참조자·담당자 옵션만 지정하면 `$EDITOR`를 열지 않고 기존 제목·본문·태그를 보존한 채 참여자만 바꾼다.
+
+### 태그 확인과 태그로 찾기
+
+업무 상세를 그냥 조회하면 붙어 있는 태그가 이름으로 함께 나온다.
+
+`--json` 은 서버 응답을 그대로 내므로 태그에 `id` 만 들어 있다.
+이름이 필요하면 `--with-tag-names` 를 함께 준다.
+
+```bash
+dooray post get <project> 42 --json --with-tag-names
+dooray post list <project> --tag "<태그 이름>"
+dooray post list <project> --tag "<이름 A>" --tag "<이름 B>"
+```
+
+`--with-tag-names` 는 이름을 채우지 못한 태그가 하나라도 있으면 멈춘다.
+옵션을 주지 않으면 출력이 서버 응답 그대로다.
+
+`--tag` 를 여러 번 주면 그 태그를 모두 가진 업무만 온다.
 
 ### 본문 형식
 
