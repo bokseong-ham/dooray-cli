@@ -22,7 +22,7 @@ const KNOWN_UNDOCUMENTED = new Map([
   ],
   [
     "GET calendar/v1/calendars/{id}/events",
-    "기간 안의 일정 목록 읽기. 같은 경로의 POST(생성)와 하위의 GET 일정 상세는 문서에 있고 목록만 없다. 공식 문서 Calendar 절 확인 결과와 실측은 이 endpoint 의 ADR 이 소유한다 (ADR-062 의 조건 1·2)",
+    "기간 안의 일정 목록 읽기. **화면 확인 미완** — 스냅샷에만 대조했고 공식 문서를 열어보지 못했다 (ADR-062 조건 1 미충족). 같은 경로의 POST(생성)와 하위의 GET 일정 상세는 스냅샷에 있고 목록만 없다. 실측과 남은 절차는 ADR-063 이 소유한다",
   ],
 ]);
 

@@ -132,9 +132,10 @@ src/
     calendar/               # dooray calendar — 읽기 전용
       index.ts              # calendarCommand 조립 + event 서브커맨드 그룹
       list.ts               # 캘린더 목록 — GET calendar/v1/calendars
-      event-list.ts         # 기간 일정 — GET calendars/*/events. calendarId 자리의 * 로 전체를 훑고 timeMin·timeMax 를 항상 함께 보낸다. 페이징 없음, 서버 순서 유지. formatEventTime 은 종일 일정의 날짜만 형식(2026-09-18+09:00)을 따로 받고 endedAt 이 exclusive 라 마지막 날을 하루 앞으로 잡는다. 목록 endpoint 는 공식 문서에 없다 (ADR-062)
+      event-list.ts         # 기간 일정 — GET calendars/*/events. calendarId 자리의 * 로 전체를 훑고 timeMin·timeMax 를 항상 함께 보낸다. 페이징 없음, 서버 순서 유지. 목록 endpoint 는 공식 문서에 없다 (ADR-062)
       event-get.ts          # 일정 상세 — GET calendars/{id}/events/{id}. * 를 쓸 수 없어 두 id 가 모두 필요하다. 참석자 이름이 응답에 있어 멤버를 따로 조회하지 않는다
-      date-range.ts         # --from/--to 를 timeMin·timeMax 로 확정하는 순수 함수. 날짜만 주면 로컬 offset 으로 하루의 시작·끝까지 늘리고, 형식이 어긋나면 API 호출 전에 EXIT_PARAM_ERROR (서버에 형식 검증이 없어 500 이 온다)
+      event-time.ts         # formatEventTime — event-list 와 event-get 이 공유하는 시각 열 빌더. 종일 일정의 날짜만 형식(2026-09-18+09:00)을 따로 받고 endedAt 이 exclusive 라 마지막 날을 하루 앞으로 잡는다. 폴백이 서버 문자열을 그대로 돌려주므로 반환 직전 sanitizeForTerminal 을 거친다
+      date-range.ts         # --from/--to 를 timeMin·timeMax 로 확정하는 순수 함수. 날짜만 주면 로컬 offset 으로 하루의 시작·끝까지 늘리되 서머타임이 자정에 시작하는 날은 Date 가 옮긴 실제 시각을 되읽는다. 한쪽만 주면 빠진 쪽을 준 값과 같은 날로 채워 범위가 뒤집히지 않게 하고, 형식·실재성·뒤집힘을 API 호출 전에 EXIT_PARAM_ERROR 로 거른다 (서버에 형식 검증이 없어 500 이 온다)
 
     project/
       list.ts

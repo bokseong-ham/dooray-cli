@@ -125,12 +125,27 @@ describe("calendar event list", () => {
     );
   });
 
-  it("--from 만 줘도 --to 를 채워 항상 둘 다 보낸다", async () => {
+  it("--from 만 줘도 그 날 하루로 채워 항상 둘 다 보낸다", async () => {
     await run(["calendar", "event", "list", "--from", "2026-09-18"]);
     expect(mocks.client.getCalendarEvents).toHaveBeenCalledWith(
       `2026-09-18T00:00:00${await offsetOn(2026, 9, 18, 0)}`,
-      `2026-09-20T23:59:59${await offsetOn(2026, 9, 20, 23)}`,
+      `2026-09-18T23:59:59${await offsetOn(2026, 9, 18, 23)}`,
     );
+  });
+
+  it("--from 만 준 미래 날짜도 뒤집히지 않고 그 날 하루를 본다", async () => {
+    await run(["calendar", "event", "list", "--from", "2026-10-01"]);
+    expect(mocks.client.getCalendarEvents).toHaveBeenCalledWith(
+      `2026-10-01T00:00:00${await offsetOn(2026, 10, 1, 0)}`,
+      `2026-10-01T23:59:59${await offsetOn(2026, 10, 1, 23)}`,
+    );
+  });
+
+  it("뒤집힌 범위는 거부하고 API 를 부르지 않는다", async () => {
+    await expect(
+      run(["calendar", "event", "list", "--from", "2026-10-01", "--to", "2026-09-20"]),
+    ).rejects.toThrow(/--from 이 --to 보다 뒤/);
+    expect(mocks.client.getCalendarEvents).not.toHaveBeenCalled();
   });
 
   it("ISO8601 은 그대로 보낸다", async () => {
@@ -217,102 +232,5 @@ describe("calendar event list", () => {
       const out = await run(["--json", "calendar", "event", "list"]);
       expect(JSON.parse(out)).toEqual([]);
     });
-  });
-});
-
-describe("formatEventTime", () => {
-  async function format(event: CalendarEvent): Promise<string> {
-    const { formatEventTime } = await import("./event-list.js");
-    return formatEventTime(event);
-  }
-
-  it("같은 날에 끝나면 날짜를 한 번만 적는다", async () => {
-    expect(
-      await format({
-        id: "e",
-        startedAt: "2026-09-20T10:00:00+09:00",
-        endedAt: "2026-09-20T11:30:00+09:00",
-      }),
-    ).toBe("2026-09-20 10:00-11:30");
-  });
-
-  it("날을 넘기면 양쪽 날짜를 모두 적는다", async () => {
-    expect(
-      await format({
-        id: "e",
-        startedAt: "2026-09-20T23:00:00+09:00",
-        endedAt: "2026-09-21T01:00:00+09:00",
-      }),
-    ).toBe("2026-09-20 23:00 ~ 2026-09-21 01:00");
-  });
-
-  it("하루짜리 종일 일정은 날짜 하나로 적는다", async () => {
-    // endedAt 은 그 날을 포함하지 않는다 — 09-19 로 끝나는 일정의 마지막 날은 09-18 이다.
-    expect(
-      await format({
-        id: "e",
-        startedAt: "2026-09-18+09:00",
-        endedAt: "2026-09-19+09:00",
-        wholeDayFlag: true,
-      }),
-    ).toBe("2026-09-18 (종일)");
-  });
-
-  it("여러 날 종일 일정은 마지막 날까지 기간으로 적는다", async () => {
-    expect(
-      await format({
-        id: "e",
-        startedAt: "2026-09-18+09:00",
-        endedAt: "2026-09-21+09:00",
-        wholeDayFlag: true,
-      }),
-    ).toBe("2026-09-18 ~ 2026-09-20 (종일)");
-  });
-
-  it("달을 넘기는 종일 일정도 마지막 날을 바르게 낸다", async () => {
-    expect(
-      await format({
-        id: "e",
-        startedAt: "2026-09-21+09:00",
-        endedAt: "2026-10-01+09:00",
-        wholeDayFlag: true,
-      }),
-    ).toBe("2026-09-21 ~ 2026-09-30 (종일)");
-  });
-
-  it("+09:00 이 아닌 종일 일정은 원형을 그대로 둔다", async () => {
-    expect(
-      await format({
-        id: "e",
-        startedAt: "2026-09-18Z",
-        endedAt: "2026-09-19Z",
-        wholeDayFlag: true,
-      }),
-    ).toBe("2026-09-18Z (종일)");
-  });
-
-  it("종료값만 해석되지 않으면 시작 날짜만 적는다", async () => {
-    expect(
-      await format({
-        id: "e",
-        startedAt: "2026-09-18+09:00",
-        endedAt: "2026-09-19Z",
-        wholeDayFlag: true,
-      }),
-    ).toBe("2026-09-18 (종일)");
-  });
-
-  it("+09:00 이 아닌 offset 은 원형을 그대로 둔다", async () => {
-    expect(
-      await format({
-        id: "e",
-        startedAt: "2026-09-20T10:00:00Z",
-        endedAt: "2026-09-20T11:00:00Z",
-      }),
-    ).toBe("2026-09-20T10:00:00Z ~ 2026-09-20T11:00:00Z");
-  });
-
-  it("시각이 없으면 빈 문자열을 낸다", async () => {
-    expect(await format({ id: "e" })).toBe("");
   });
 });

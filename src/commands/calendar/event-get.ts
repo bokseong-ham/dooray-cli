@@ -6,7 +6,7 @@ import type { OutputOptions } from "../../formatters/table.js";
 import { printJson, printTable } from "../../formatters/table.js";
 import { sanitizeForTerminal } from "../../utils/sanitize.js";
 import { startSpinner, stopSpinner } from "../../utils/spinner.js";
-import { formatEventTime } from "./event-list.js";
+import { formatEventTime } from "./event-time.js";
 
 /** 상세 응답의 참석자에는 이름이 들어 있다. 없으면 id 로 대신한다 — 멤버를 따로 조회하지 않는다. */
 function userLabel(user: CalendarEventUser): string {
