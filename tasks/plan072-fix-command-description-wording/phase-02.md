@@ -23,7 +23,7 @@ positional 인자의 설명도 손대지 않는다. `<project> <pageId>` 두 개
 
 | 현재 문구 | 명령 수 | 실제 동작과 |
 | --- | --- | --- |
-| `위키 페이지 ID (project 없이 조회)` | 1 | 맞다 |
+| `위키 페이지 ID (project 없이 단독 지정)` | 1 | 맞다 |
 | `위키 페이지 ID` | 5 | 모자라다 |
 | `위키 페이지 ID (--project 동반)` / `(--project 동반 필요)` | 4 | 어긋난다 |
 | `위키 페이지 ID (positional 대신)` | 4 | 모자라다 |
@@ -61,7 +61,7 @@ positional 인자의 설명도 손대지 않는다. `<project> <pageId>` 두 개
 파일 상단의 기존 상수 곁에 둔다.
 
 ```ts
-export const WIKI_PAGE_ID_OPTION_DESC = "위키 페이지 ID (project 없이 조회)";
+export const WIKI_PAGE_ID_OPTION_DESC = "위키 페이지 ID (project 없이 단독 지정)";
 export const WIKI_PAGE_PROJECT_OPTION_DESC =
   "프로젝트 코드 (선택, 주면 wikiId 해석 호출을 아낀다)";
 ```

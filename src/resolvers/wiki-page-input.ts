@@ -17,7 +17,7 @@ export interface ResolvedWikiPageInput {
   pageId: string;
 }
 
-export const WIKI_PAGE_ID_OPTION_DESC = "위키 페이지 ID (project 없이 조회)";
+export const WIKI_PAGE_ID_OPTION_DESC = "위키 페이지 ID (project 없이 단독 지정)";
 export const WIKI_PAGE_PROJECT_OPTION_DESC =
   "프로젝트 코드 (선택, 주면 wikiId 해석 호출을 아낀다)";
 
