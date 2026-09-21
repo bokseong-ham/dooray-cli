@@ -40,12 +40,28 @@ export const fileDownloadAllCommand = new Command("download-all")
       name: f.name,
     }));
     if (opts.inline) {
-      const detail = await client.getPost(projectId, postId);
-      const seen = new Set(targets.map((t) => t.id));
-      for (const id of extractInlineFileIds(detail.result.body?.content ?? "")) {
-        if (seen.has(id)) continue;
-        seen.add(id);
-        targets.push({ id });
+      // 본문 조회가 실패해도 이미 받아 둔 첨부 목록은 그대로 받는다.
+      // 여기서 멈추면 이 변경 전에는 받아지던 파일이 받아지지 않는다.
+      let detail: Awaited<ReturnType<typeof client.getPost>> | undefined;
+      try {
+        detail = await client.getPost(projectId, postId);
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        if (!globalOpts.json) {
+          process.stderr.write(`경고: 본문을 조회하지 못해 첨부 목록만 받습니다: ${msg}\n`);
+        }
+      }
+      if (detail) {
+        // 본문의 /files/<id> 가 모두 이 업무의 파일은 아니다.
+        // 다른 업무 주소나 메신저 링크가 섞이면 그 id 로 받으려다 404 가 난다.
+        // 응답의 fileIdList 에 있는 것만 남긴다.
+        const owned = new Set(detail.result.fileIdList ?? []);
+        const seen = new Set(targets.map((t) => t.id));
+        for (const id of extractInlineFileIds(detail.result.body?.content ?? "")) {
+          if (seen.has(id) || !owned.has(id)) continue;
+          seen.add(id);
+          targets.push({ id });
+        }
       }
     }
 
