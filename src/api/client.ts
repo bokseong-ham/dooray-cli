@@ -66,6 +66,9 @@ import type {
   MessengerSendResponse,
   MessengerChannelListResponse,
   MessengerLogListResponse,
+  CalendarListResponse,
+  CalendarEventListResponse,
+  CalendarEventDetailResponse,
 } from "./types.js";
 
 export interface GetPostsParams {
@@ -148,6 +151,12 @@ async function toDoorayCliError(error: unknown): Promise<never> {
   }
   throw error;
 }
+
+/**
+ * 일정 목록에서 calendarId 자리에 넣는 값. 접근 가능한 캘린더 전체를 훑는다.
+ * 상세 조회에는 쓸 수 없다 — 그쪽은 실제 calendarId 를 요구한다.
+ */
+const ALL_CALENDARS = "*";
 
 export class DoorayApiClient {
   private readonly api: KyInstance;
@@ -1118,6 +1127,50 @@ export class DoorayApiClient {
       return await this.api
         .get("messenger/v1/channels")
         .json<MessengerChannelListResponse>();
+    } catch (e) {
+      throw await toDoorayCliError(e);
+    }
+  }
+
+  // ─── Calendar ───────────────────────────────────────
+
+  async getCalendars(): Promise<CalendarListResponse> {
+    try {
+      return await this.api
+        .get("calendar/v1/calendars")
+        .json<CalendarListResponse>();
+    } catch (e) {
+      throw await toDoorayCliError(e);
+    }
+  }
+
+  /**
+   * 기간 안의 일정 목록. 접근 가능한 캘린더 전체를 훑는다.
+   *
+   * `timeMin` 하나만 주면 무시되므로 부르는 쪽이 항상 둘 다 채운다.
+   * `size` 와 `page` 는 먹지 않아 페이징 수단이 없고, 범위를 좁히는 것이 유일한 조절 수단이다.
+   * 서버에 날짜 형식 검증이 없어 어긋난 값에는 500 이 오므로 부르기 전에 형식을 거른다.
+   */
+  async getCalendarEvents(timeMin: string, timeMax: string): Promise<CalendarEventListResponse> {
+    try {
+      return await this.api
+        .get(`calendar/v1/calendars/${ALL_CALENDARS}/events`, {
+          searchParams: { timeMin, timeMax },
+        })
+        .json<CalendarEventListResponse>();
+    } catch (e) {
+      throw await toDoorayCliError(e);
+    }
+  }
+
+  async getCalendarEvent(
+    calendarId: string,
+    eventId: string,
+  ): Promise<CalendarEventDetailResponse> {
+    try {
+      return await this.api
+        .get(`calendar/v1/calendars/${calendarId}/events/${eventId}`)
+        .json<CalendarEventDetailResponse>();
     } catch (e) {
       throw await toDoorayCliError(e);
     }

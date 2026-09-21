@@ -129,6 +129,13 @@ src/
       thread-options.ts     # thread-send 옵션 조합 판정 — --log 와 --thread-body 충돌 경고, stdin 중복 지정 차단 (ADR-052)
       logs.ts               # 대화방 읽기 — GET channels/{id}/logs. -n 상한 1000 초과는 거부, 표·--quiet 은 대화 순서로 뒤집고 --json 은 서버 순서 유지, hasMore 는 stderr 안내 (ADR-061)
 
+    calendar/               # dooray calendar — 읽기 전용
+      index.ts              # calendarCommand 조립 + event 서브커맨드 그룹
+      list.ts               # 캘린더 목록 — GET calendar/v1/calendars
+      event-list.ts         # 기간 일정 — GET calendars/*/events. calendarId 자리의 * 로 전체를 훑고 timeMin·timeMax 를 항상 함께 보낸다. 페이징 없음, 서버 순서 유지. formatEventTime 은 종일 일정의 날짜만 형식(2026-09-18+09:00)을 따로 받고 endedAt 이 exclusive 라 마지막 날을 하루 앞으로 잡는다. 목록 endpoint 는 공식 문서에 없다 (ADR-062)
+      event-get.ts          # 일정 상세 — GET calendars/{id}/events/{id}. * 를 쓸 수 없어 두 id 가 모두 필요하다. 참석자 이름이 응답에 있어 멤버를 따로 조회하지 않는다
+      date-range.ts         # --from/--to 를 timeMin·timeMax 로 확정하는 순수 함수. 날짜만 주면 로컬 offset 으로 하루의 시작·끝까지 늘리고, 형식이 어긋나면 API 호출 전에 EXIT_PARAM_ERROR (서버에 형식 검증이 없어 500 이 온다)
+
     project/
       list.ts
       members.ts

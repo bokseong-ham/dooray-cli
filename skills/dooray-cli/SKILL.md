@@ -286,6 +286,28 @@ dooray messenger channel-send --channel "$THREAD" --body "빌드 통과"
 dooray messenger channel-send --channel "$THREAD" --body "배포 완료"
 ```
 
+## 캘린더
+
+| 의도 | 커맨드 |
+| --- | --- |
+| 캘린더 목록 | `dooray calendar list` — `--quiet` 은 캘린더 id |
+| 오늘 일정 | `dooray calendar event list` |
+| 기간 일정 | `dooray calendar event list --from <일시> --to <일시>` — `YYYY-MM-DD` 또는 `2026-09-20T09:00:00+09:00` |
+| 일정 상세 | `dooray calendar event get <calendar-id> <event-id>` — 두 id 가 모두 필요하다 |
+
+읽기 전용이다. 일정을 만들거나 고치거나 지우는 명령은 없다.
+`--from` 과 `--to` 에 날짜만 주면 실행 장비의 시간대로 하루의 시작과 끝까지 늘어난다.
+둘 다 생략하면 오늘 하루를 보고, 한쪽만 줘도 나머지를 오늘 기준으로 채워 항상 둘 다 보낸다.
+서버는 한쪽만 받으면 그것을 무시하고 기간을 걸지 않은 것과 같은 결과를 준다.
+형식이 어긋난 값은 API 를 부르기 전에 종료 코드 3 으로 거부한다.
+**일정 목록은 페이징이 없다.** 결과가 많으면 기간을 좁히는 것 말고 줄일 방법이 없다.
+**참석자 이름은 `event get` 에만 있다.** 목록 응답의 참석자 항목은 비어 있으니 목록만 보고 참석자를 말하지 않는다.
+`event get` 에 넘길 캘린더 id 는 `calendar list --quiet` 이나 `event list --json` 의 `calendar.id` 에서 얻는다.
+**`event list` 가 부르는 endpoint 는 공식 API 문서에 없다.** 만드는 쪽과 하나를 읽는 쪽은 문서에 있고 목록만 없다.
+동작은 실제 호출로 확인했지만 호환을 약속받은 것이 아니므로 예고 없이 막힐 수 있다.
+멈추면 곤란한 자동화라면 실패했을 때의 경로를 함께 둔다.
+`calendar list` 와 `event get` 은 문서에 있어 이 경고에 해당하지 않는다.
+
 ## 옵션 이름
 
 `post` 와 `wiki page` 모두 제목은 `--title` 이다.

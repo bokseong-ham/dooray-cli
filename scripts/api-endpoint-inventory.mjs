@@ -20,6 +20,10 @@ const KNOWN_UNDOCUMENTED = new Map([
     "GET messenger/v1/channels/{id}/logs",
     "대화방 메시지 읽기. 2026-09-21 에 공식 문서 Messenger > Channels 절에 없는 것을 확인했다 (ADR-061)",
   ],
+  [
+    "GET calendar/v1/calendars/{id}/events",
+    "기간 안의 일정 목록 읽기. 같은 경로의 POST(생성)와 하위의 GET 일정 상세는 문서에 있고 목록만 없다. 공식 문서 Calendar 절 확인 결과와 실측은 이 endpoint 의 ADR 이 소유한다 (ADR-062 의 조건 1·2)",
+  ],
 ]);
 
 /**

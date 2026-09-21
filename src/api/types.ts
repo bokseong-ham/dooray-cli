@@ -683,3 +683,63 @@ export interface MessengerLog {
 // 목록 응답에 totalCount 는 없고 hasMore 만 온다.
 export type MessengerLogListResponse = DoorayApiResponse<MessengerLog[]> & { hasMore?: boolean };
 export type TemplateDetailResponse = DoorayApiResponse<TemplateDetail>;
+
+// ─── Calendar ───────────────────────────────────────────
+
+export interface Calendar {
+  id: string;
+  name?: string;
+  type?: string;
+  me?: boolean;
+  ownerOrganizationMemberId?: string;
+  createdAt?: string;
+}
+
+export type CalendarListResponse = DoorayApiResponse<Calendar[]> & { totalCount?: number };
+
+export interface CalendarEventMember {
+  organizationMemberId?: string;
+  name?: string;
+  emailAddress?: string;
+}
+
+export interface CalendarEventUser {
+  type?: string;
+  status?: string;
+  member?: CalendarEventMember;
+}
+
+/** 목록 응답에서는 세 키가 모두 null 로 온다. 채워진 값은 상세 조회에서만 얻는다. */
+export interface CalendarEventUsers {
+  from?: CalendarEventUser | null;
+  to?: CalendarEventUser[] | null;
+  cc?: CalendarEventUser[] | null;
+}
+
+export interface CalendarEventCalendar {
+  id?: string;
+  name?: string;
+}
+
+export interface CalendarEvent {
+  id: string;
+  subject?: string;
+  startedAt?: string;
+  endedAt?: string;
+  wholeDayFlag?: boolean;
+  calendar?: CalendarEventCalendar;
+  category?: string;
+  location?: string;
+  users?: CalendarEventUsers;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/** 상세는 목록 항목에 body 가 더해진 형태다. body 의 스키마는 확인하지 않아 좁히지 않는다. */
+export interface CalendarEventDetail extends CalendarEvent {
+  body?: unknown;
+}
+
+// 목록 응답에 totalCount 는 없다.
+export type CalendarEventListResponse = DoorayApiResponse<CalendarEvent[]>;
+export type CalendarEventDetailResponse = DoorayApiResponse<CalendarEventDetail>;

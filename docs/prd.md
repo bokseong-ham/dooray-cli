@@ -52,6 +52,7 @@ CLI는 터미널이 있는 환경이면 어디서든 동작하고, 자연스러�
 - `dooray mail` — 목록·조회·검색·발송·답장·인증정보 제거 (v0.2.0)
 - `dooray feedback` — `gh` CLI 위임으로 GitHub 이슈 자동 생성 (`--last` 옵션으로 직전 명령 sanitized argv와 에러 자동 첨부, ADR-022/023)
 - `dooray messenger` — 1:1 다이렉트 메시지 (`send`) / 대화방 메시지 (`channel-send`) / 대화방 스레드 생성 (`thread-send`) 전송 + 대화방 메시지 조회 (`logs`) (`--to` id·email, `--channel` id·이름, ADR-033, 스레드는 ADR-052, 조회는 ADR-061 — 최근 N건·상한 1000·페이징 없음)
+- `dooray calendar` — 캘린더 목록 (`list`) + 기간 일정 조회 (`event list`) + 일정 상세 (`event get`). 읽기 전용이며 `--from`·`--to` 는 날짜만 주면 로컬 시간대로 하루 시작·끝까지 늘어나고 기본값은 오늘 하루다. 목록은 페이징이 없고 참석자 이름은 상세에만 있다. 목록 endpoint 는 공식 문서에 없어 ADR-062 의 조건 아래 쓴다
 - `skills/dooray-persona` — Dooray 에 쌓인 본인 글을 수집해 업무 글 문체 문서를 만드는 워크플로우 스킬. CLI 명령이 아니라 저장소를 내려받아 쓰는 자산이다 (ADR-038)
 
 ### 제외 (v1)

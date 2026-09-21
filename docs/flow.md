@@ -548,6 +548,40 @@ dooray messenger logs "배포알림" --json
 고유 id 마다 한 번씩 병렬로 부르고, 실패한 id 는 그 자리에 id 를 그대로 둔다.
 `--json` 은 서버 응답 원형이라 이름을 끼워넣지 않고 정렬도 서버가 준 대로 최신이 앞이다.
 
+## 캘린더 조회 흐름 (ADR-062)
+
+내 일정과 팀 일정을 CLI 에서 읽는다. 읽기 전용이라 생성·수정·삭제 명령은 두지 않는다.
+
+```
+# 접근 가능한 캘린더 목록 (event get 에 넘길 calendar-id 를 여기서 얻는다)
+dooray calendar list
+dooray calendar list --quiet
+
+# 기간 안의 일정 — 옵션이 없으면 오늘 하루
+dooray calendar event list
+dooray calendar event list --from 2026-09-20 --to 2026-09-26
+dooray calendar event list --from 2026-09-20T09:00:00+09:00 --to 2026-09-20T18:00:00+09:00
+
+# 일정 상세 — calendar-id 와 event-id 가 모두 필요하다
+dooray calendar event get <calendarId> <eventId>
+```
+
+`event list` 는 calendarId 자리에 `*` 를 넣어 접근 가능한 캘린더 전체를 훑는다.
+`event get` 은 그 자리에 `*` 를 받지 않아 두 id 를 모두 요구한다.
+목록의 id 는 `--quiet` 이, 그 일정이 속한 캘린더의 id 는 `--json` 의 `calendar.id` 가 준다.
+
+`--from`·`--to` 는 날짜만 주면 실행 장비의 시간대로 `00:00:00`·`23:59:59` 까지 늘어난다.
+한쪽만 주거나 둘 다 생략해도 나머지를 오늘 기준으로 채워 **항상 둘 다 보낸다**.
+서버가 `timeMin` 하나만 받으면 그것을 무시하고 기간을 걸지 않은 것과 같은 결과를 주기 때문이다.
+형식이 어긋난 값에는 서버가 500 을 주므로 `date-range.ts` 가 API 호출 전에 `EXIT_PARAM_ERROR` 로 끊는다.
+
+`size` 와 `page` 는 먹지 않아 페이징 수단이 없다. 결과를 줄이려면 기간을 좁힌다.
+정렬 기준을 확인하지 않아 표·`--quiet`·`--json` 모두 서버가 주는 순서를 그대로 둔다.
+
+목록 응답의 `users` 는 비어 있어 참석자는 상세 조회에서만 얻는다.
+상세의 참석자 항목에는 이름이 들어 있어 `common/v1/members/{id}` 를 따로 부르지 않는다.
+이름이 없는 항목만 organizationMemberId 로 대신한다.
+
 ## 위키 페이지 첨부파일 흐름 (Issue #70, ADR-029)
 
 페이지 첨부파일을 CLI 로 관리.
