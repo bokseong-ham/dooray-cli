@@ -236,6 +236,17 @@ CLI로 올린 파일은 댓글의 첨부 카드가 아니라 본문 링크로 �
   종전에는 참조를 찾지 못해도 파일을 지워 본문에 대상이 사라진 링크가 남았다.
   파일만 지우려면 `dooray post file delete` 를 쓴다
 
+### 첨부 파일 내려받기
+
+```bash
+dooray post file download-all <project> 42 -o ./files
+dooray post file download-all <project> 42 -o ./files --no-inline
+```
+
+첨부 목록에 있는 파일과 본문에 삽입된 파일을 함께 받는다.
+본문에 이미지를 붙여 넣기만 한 업무는 첨부 목록이 비어 있어도 그 이미지를 받는다.
+본문 쪽을 제외하려면 `--no-inline` 을 준다.
+
 ### 삭제 명령의 확인
 
 | 영역 | 삭제 명령 |
@@ -247,6 +258,10 @@ CLI로 올린 파일은 댓글의 첨부 카드가 아니라 본문 링크로 �
 자동화·파이프 등 non-TTY 실행에서는 `-y` 또는 `--yes`로 확인을 생략해야 한다.
 플래그가 없으면 삭제 API를 호출하기 전에 종료 코드 3으로 끝난다.
 기존 삭제 자동화에는 명시적인 yes 플래그를 추가해야 한다.
+
+`post comment delete` 와 `post file delete` 는 `--json` 과 `--quiet` 을 함께 받는다.
+`--json` 은 삭제한 식별자와 `status` 를 내고, `--quiet` 은 식별자 한 줄만 낸다.
+식별자의 키 이름은 명령마다 다르다. 댓글 삭제는 `commentId`, 파일 삭제는 `fileId` 다.
 
 ### 프로젝트 태그 만들기
 

@@ -1,11 +1,17 @@
 # Phase 03. 출력이 문서와 어긋난 두 곳을 고친다
 
-**Execution profile**: fast
+**Execution profile**: standard
 
 ## 목표
 
 `post comment delete --json` 이 JSON 을 내게 하고, `feedback` 이 붙이는 환경 블록의 버전이
 `dooray --version` 과 같은 값이 되게 한다.
+
+앞의 것은 `--json` 불일치이고, 뒤의 것은 `feedback` 명령의 덧붙임이다.
+두 번째는 출력 모드 불일치가 아니라 환경 블록에 담기는 값이 틀린 것이다.
+
+이 phase 는 `npm link` 로 전역 설치를 바꾸고 되돌리는 단계를 포함한다.
+되돌리기가 실패하면 사용자의 전역 설치가 바뀐 채로 남으므로 profile 을 `standard` 로 둔다.
 
 **범위 외**: 인라인 파일 다운로드는 phase 01, 알 수 없는 옵션 안내는 phase 02 다. 문서는 phase 04 다.
 `post file upload --json` 은 **코드를 고치지 않는다.** 서버가 `id` 하나만 내려주는 것이고,
@@ -25,16 +31,17 @@
 process.stdout.write(`댓글이 삭제되었습니다: ${commentId}\n`);
 ```
 
-같은 성격의 `post file delete` 는 세 모드를 모두 다룬다.
-그 파일의 출력 분기를 읽어 형태를 맞춘다.
+같은 성격의 `post file delete` 는 세 모드를 모두 다루고,
+그 분기를 직접 쓰지 않고 `src/formatters/file-output.ts` 의 `emitDeleteResult` 에 맡긴다.
 
 ```bash
 # cwd: <repo root>
-grep -n "globalOpts" src/commands/post/file/delete.ts
+grep -n "globalOpts\|emitDeleteResult" src/commands/post/file/delete.ts
 ```
 
 이 명령은 `globalOpts` 를 아직 읽지 않는다. `optsWithGlobals()` 호출을 더해야 한다.
-같은 디렉터리의 다른 명령이 그것을 어떻게 부르는지 보고 같은 형태로 쓴다.
+`post file delete` 는 확인을 통과한 **뒤**에 그것을 부른다. 같은 자리에 둔다.
+동작 차이는 없지만 선례를 따라야 두 파일을 나란히 읽을 수 있다.
 
 ### `feedback` 의 버전
 
@@ -73,24 +80,35 @@ $ dooray feedback --dry-run --title t --body b
 
 ## 작업 항목
 
-### 1. `src/commands/post/comment/delete.ts` 에 출력 분기를 넣는다
+### 1. `src/commands/post/comment/delete.ts` 가 `emitDeleteResult` 를 쓰게 한다
 
-`action` 의 첫머리에서 `commentDeleteCommand.optsWithGlobals() as OutputOptions` 를 받는다.
+확인을 통과한 뒤에 `commentDeleteCommand.optsWithGlobals() as OutputOptions` 를 받는다.
 
-마지막 출력을 세 모드로 나눈다.
+마지막 출력을 공용 함수에 맡긴다.
 
 ```ts
-if (globalOpts.json) {
-  printJson({ commentId, status: "deleted" });
-} else if (globalOpts.quiet) {
-  process.stdout.write(`${commentId}\n`);
-} else {
-  process.stdout.write(`댓글이 삭제되었습니다: ${commentId}\n`);
-}
+emitDeleteResult(globalOpts, {
+  id: commentId,
+  jsonKey: "commentId",
+  message: `댓글이 삭제되었습니다: ${commentId}`,
+});
 ```
 
-`post file delete` 의 `--json` 이 `{ fileId, status: "deleted" }` 를 낸다.
-키 이름만 그 명령이 다루는 식별자에 맞춘다. `status` 값은 같은 `"deleted"` 를 쓴다.
+**분기를 손으로 다시 쓰지 않는다.** 쓰면 삭제 출력 형식이 두 곳으로 갈라진다.
+
+`DeleteResult` 의 `jsonKey` 와 `message` 가 선택 필드인지 먼저 확인한다.
+
+```bash
+# cwd: <repo root>
+grep -n "jsonKey\|message" src/formatters/file-output.ts
+```
+
+둘 다 `?` 가 붙어 있어야 이 호출이 타입 검사를 통과한다.
+붙어 있지 않으면 `src/formatters/file-output.ts` 의 `DeleteResult` 를 먼저 고친다.
+
+`jsonKey` 의 기본값은 `fileId` 이고 `message` 의 기본값은 파일 문구다.
+댓글 명령은 둘 다 넘겨 `{ commentId, status: "deleted" }` 와 종전 평문을 그대로 낸다.
+`status` 값은 파일 명령과 같은 `"deleted"` 다.
 
 **취소 경로의 출력은 바꾸지 않는다.** 확인에서 거절하면 지금처럼 stderr 에 `취소되었습니다.` 를 내고 끝낸다.
 JSON 으로 바꾸면 삭제하지 않은 것을 삭제 결과처럼 읽을 수 있다.
@@ -154,10 +172,17 @@ pnpm test
 
 ```bash
 # cwd: <repo root>
-grep -rc "readCliVersion" src/ | grep -v ":0" ; echo "남은파일=$?"
+grep -rn "readCliVersion" src/ ; echo "종료코드=$?"
 ```
 
-`남은파일=1` 이어야 한다. `grep` 이 아무것도 찾지 못했다는 뜻이다.
+`종료코드=1` 이어야 한다. `grep` 이 아무것도 찾지 못했다는 뜻이다.
+
+`emitDeleteResult` 를 쓰는지 본다.
+
+```bash
+# cwd: <repo root>
+grep -c "emitDeleteResult" src/commands/post/comment/delete.ts   # >= 1
+```
 
 `CLI_VERSION` 을 쓰는지 본다.
 
