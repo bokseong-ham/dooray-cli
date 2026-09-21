@@ -660,7 +660,9 @@ dooray mail get https://<tenant>.dooray.com/mail/systems/inbox/<mail-id>  # 메�
 dooray mail get <mail-id>                                               # 주소에서 뽑은 19자리 id
 ```
 
-뒤의 두 형태는 id 에서 도착 시각을 꺼낸 뒤 UID 를 이분 탐색해 찾는다 (ADR-040).
+뒤의 두 형태는 id 에서 도착 시각을 꺼낸 뒤, 그 시각의 앞뒤 하루를 `SEARCH` 로 조회하고
+받은 후보의 도착 시각을 한 번에 받아 UID 를 결정한다 (ADR-040).
+후보가 상한을 넘으면 UID 를 고르지 않고 대체 조회를 안내한다.
 시간 일치는 원본 메일의 동일성을 보장하지 않는다.
 대상이 이동되거나 삭제된 뒤 같은 시각의 다른 메일만 남으면 그 메일이 조회될 수 있다.
 웹 주소나 mail id 로 답장할 때는 제목, 발신자, IMAP 도착 시각과 UID 를 확인한다.

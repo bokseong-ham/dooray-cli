@@ -68,6 +68,28 @@ function makeMessage(
   };
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function utcDayStart(date: Date): number {
+  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+}
+
+// imapflow 의 processDateField 가 BEFORE 를 다루는 방식과 같다.
+// 정각이 아닌 BEFORE 는 하루 밀려 그 일자까지 결과에 들어온다.
+function beforeBoundMs(date: Date): number {
+  const bumped = date.toISOString().substring(11) === "00:00:00.000Z"
+    ? date
+    : new Date(date.getTime() + DAY_MS);
+  return utcDayStart(bumped);
+}
+
+function internalDateMs(msg: FetchMessageObject): number {
+  const value = typeof msg.internalDate === "string"
+    ? new Date(msg.internalDate)
+    : msg.internalDate;
+  return value instanceof Date ? value.getTime() : NaN;
+}
+
 function createFakeClient(messages: FetchMessageObject[]) {
   const byUid = new Map(messages.map((msg) => [msg.uid, msg]));
   const lock = { release: vi.fn() };
@@ -79,8 +101,22 @@ function createFakeClient(messages: FetchMessageObject[]) {
     close: vi.fn(),
     release: lock.release,
     getMailboxLock: vi.fn().mockResolvedValue(lock),
-    search: vi.fn<() => Promise<number[] | false>>()
-      .mockResolvedValue(messages.map((msg) => msg.uid)),
+    // 서버가 SINCE/BEFORE 로 거르는 동작을 흉내낸다. 그래야 일자 필터가
+    // 후보를 실제로 좁히는지 확인된다.
+    search: vi.fn(async (query: Record<string, unknown>): Promise<number[] | false> => {
+      const since = query.since instanceof Date ? utcDayStart(query.since) : null;
+      const before = query.before instanceof Date ? beforeBoundMs(query.before) : null;
+      if (since === null && before === null) return messages.map((msg) => msg.uid);
+      return messages
+        .filter((msg) => {
+          const ms = internalDateMs(msg);
+          if (!Number.isFinite(ms)) return true;
+          if (since !== null && ms < since) return false;
+          if (before !== null && ms >= before) return false;
+          return true;
+        })
+        .map((msg) => msg.uid);
+    }),
     fetchOne: vi.fn(async (uid: string): Promise<FetchMessageObject | false> =>
       byUid.get(Number(uid)) ?? false,
     ),
@@ -132,8 +168,80 @@ describe("resolveUidByMailId", () => {
     await expect(resolveUidByMailId(config, mailId, "sent")).resolves.toBe(103);
     expect(client.getMailboxLock).toHaveBeenCalledWith("sent");
     expect(client.search).toHaveBeenCalledOnce();
-    expect(client.search).toHaveBeenCalledWith({ all: true }, { uid: true });
-    expect(client.fetchOne.mock.calls.length).toBeGreaterThan(0);
+    expect(client.search).toHaveBeenCalledWith(
+      { since: new Date(baseMs - DAY_MS), before: new Date(baseMs + DAY_MS) },
+      { uid: true },
+    );
+    expect(client.fetchOne).not.toHaveBeenCalled();
+    expect(client.release).toHaveBeenCalled();
+    expect(client.logout).toHaveBeenCalled();
+  });
+
+  it("질의에 찾는 시각의 앞뒤 하루를 준다", async () => {
+    const baseMs = Date.UTC(2026, 3, 15, 9, 30, 0);
+    const client = setClient([makeMessage(10, baseMs, "target")]);
+
+    await expect(resolveUidByMailId(config, makeMailId(baseMs), "INBOX")).resolves.toBe(10);
+    const [query] = client.search.mock.calls[0];
+    expect(query.since).toEqual(new Date(baseMs - DAY_MS));
+    expect(query.before).toEqual(new Date(baseMs + DAY_MS));
+    // imapflow 가 정각이 아닌 BEFORE 를 하루 밀어 실제로 받는 것은 UTC 사흘치다.
+    expect(beforeBoundMs(query.before as Date) - utcDayStart(query.since as Date))
+      .toBe(3 * DAY_MS);
+  });
+
+  it("왕복은 search 한 번과 fetch 한 번이다", async () => {
+    const baseMs = Date.UTC(2026, 0, 1, 12, 0, 0);
+    const messages = Array.from({ length: 10 }, (_, index) =>
+      makeMessage(index + 1, baseMs + (index - 5) * 3000, `subject-${index + 1}`),
+    );
+    const client = setClient(messages);
+
+    await expect(resolveUidByMailId(config, makeMailId(baseMs), "INBOX")).resolves.toBe(6);
+    expect(client.search).toHaveBeenCalledOnce();
+    expect(client.fetch).toHaveBeenCalledOnce();
+    expect(client.fetchOne).not.toHaveBeenCalled();
+  });
+
+  it("조회 범위 밖에 있는 같은 초의 메일은 후보에 들어오지 않는다", async () => {
+    const baseMs = Date.UTC(2026, 5, 10, 12, 0, 0);
+    const client = setClient([
+      makeMessage(10, baseMs, "target"),
+      makeMessage(20, baseMs - 5 * DAY_MS, "old"),
+      makeMessage(30, baseMs + 5 * DAY_MS, "new"),
+    ]);
+
+    await expect(resolveUidByMailId(config, makeMailId(baseMs), "INBOX")).resolves.toBe(10);
+    expect(client.fetch.mock.calls[0][0]).toBe("10");
+  });
+
+  it("후보가 배치 크기를 넘으면 나눠 조회한다", async () => {
+    const baseMs = Date.UTC(2026, 0, 15, 12, 0, 0);
+    // 같은 UTC 일자 안에 1200통을 둔다. 배치 크기 500 이면 fetch 가 세 번이다.
+    const messages = Array.from({ length: 1200 }, (_, index) =>
+      makeMessage(index + 1, baseMs + (index - 600) * 10, `subject-${index + 1}`),
+    );
+    const client = setClient(messages);
+
+    await expect(resolveUidByMailId(config, makeMailId(baseMs), "INBOX"))
+      .rejects.toThrow("여러 건");
+    expect(client.search).toHaveBeenCalledOnce();
+    expect(client.fetch).toHaveBeenCalledTimes(3);
+    for (const call of client.fetch.mock.calls) {
+      expect(String(call[0]).split(",").length).toBeLessThanOrEqual(500);
+    }
+  });
+
+  it("후보가 상한을 넘으면 조회하지 않고 대체 조회를 안내한다", async () => {
+    const baseMs = Date.UTC(2026, 0, 1);
+    const client = setClient([makeMessage(10, baseMs, "target")]);
+    client.search.mockResolvedValue(Array.from({ length: 2001 }, (_, index) => index + 1));
+
+    const error = await catchError(resolveUidByMailId(config, makeMailId(baseMs), "INBOX"));
+    expect(error.message).toContain("2001통");
+    expect(error.message).toContain("상한 2000통");
+    expect(error.message).toContain("--search");
+    expect(client.fetch).not.toHaveBeenCalled();
     expect(client.release).toHaveBeenCalled();
     expect(client.logout).toHaveBeenCalled();
   });
@@ -231,14 +339,15 @@ describe("resolveUidByMailId", () => {
     expect(messages[0].envelope?.from?.[0].name).toBe(fromName);
   });
 
-  it.each(["불완전한 날짜", "조회 범위 끝"])("sent의 %s 오류도 웹 폴더 확인을 안내한다", async (failure) => {
+  it("sent의 불완전한 날짜 오류도 웹 폴더 확인을 안내한다", async () => {
     const baseMs = Date.UTC(2026, 0, 1);
     const client = setClient([
-      ...Array.from({ length: 8 }, (_, index) => makeMessage(index + 1, baseMs - 1000, "before")),
       makeMessage(9, baseMs, "first"),
       makeMessage(10, baseMs, "second"),
     ]);
-    if (failure === "불완전한 날짜") client.fetchOne.mockResolvedValue(false);
+    client.fetch.mockImplementation(async function* () {
+      yield { seq: 9, uid: 9 } as FetchMessageObject;
+    });
 
     const error = await catchError(resolveUidByMailId(config, makeMailId(baseMs), "sent"));
 
@@ -247,20 +356,22 @@ describe("resolveUidByMailId", () => {
     expect(error.message).not.toContain("UID 하나를 골라 다시 조회");
   });
 
-  it("4000통 입력에서 fetchOne 조회는 로그 수준에 머문다", async () => {
+  it("4000통 사서함에서도 왕복은 두 번에 머문다", async () => {
     const baseMs = Date.UTC(2026, 0, 1, 0, 0, 0);
+    // 10분에 한 통씩 약 28일치다. 조회 범위 사흘에는 그중 약 432통만 들어온다.
     const messages = Array.from({ length: 4000 }, (_, index) =>
-      makeMessage(index + 1, baseMs + index * 3000, `subject-${index + 1}`),
+      makeMessage(index + 1, baseMs + index * 600000, `subject-${index + 1}`),
     );
     const client = setClient(messages);
     const target = messages[2345];
     const mailId = makeMailId(target.internalDate.getTime());
 
     await expect(resolveUidByMailId(config, mailId, "INBOX")).resolves.toBe(2346);
-    expect(client.fetchOne.mock.calls.length).toBeLessThanOrEqual(20);
+    // 사서함 크기가 아니라 조회 범위의 후보 수가 왕복을 정한다.
+    expect(client.fetchOne).not.toHaveBeenCalled();
     expect(client.search).toHaveBeenCalledOnce();
     expect(client.fetch).toHaveBeenCalledOnce();
-    expect(client.fetch.mock.calls[0][0].split(",").length).toBeLessThanOrEqual(17);
+    expect(client.fetch.mock.calls[0][0].split(",").length).toBeLessThan(messages.length);
   });
 
   it("초 경계를 넘은 도착 시각과 문자열 날짜를 처리한다", async () => {
@@ -271,9 +382,6 @@ describe("resolveUidByMailId", () => {
 
     await expect(resolveUidByMailId(config, makeMailId(baseMs + 800), "INBOX"))
       .resolves.toBe(10);
-    expect(client.fetchOne).toHaveBeenCalledWith(
-      "10", { uid: true, internalDate: true }, { uid: true },
-    );
     expect(client.fetch).toHaveBeenCalledWith(
       "10", { uid: true, envelope: true, internalDate: true }, { uid: true },
     );
@@ -314,18 +422,18 @@ describe("resolveUidByMailId", () => {
   });
 
   it.each([
-    false,
     { seq: 10, uid: 10 },
     { seq: 10, uid: 10, internalDate: new Date(NaN) },
     { seq: 10, uid: 10, internalDate: "invalid-date" },
-  ] satisfies Array<FetchMessageObject | false>)("탐색 응답 %j로 도착 시각을 알 수 없으면 중단한다", async (response) => {
+  ] satisfies FetchMessageObject[])("후보 응답 %j로 도착 시각을 알 수 없으면 중단한다", async (response) => {
     const baseMs = Date.UTC(2026, 0, 1);
     const client = setClient([makeMessage(10, baseMs, "target")]);
-    client.fetchOne.mockResolvedValue(response);
+    client.fetch.mockImplementation(async function* () {
+      yield response;
+    });
 
     await expect(resolveUidByMailId(config, makeMailId(baseMs), "INBOX"))
       .rejects.toThrow("불완전");
-    expect(client.fetch).not.toHaveBeenCalled();
     expect(client.release).toHaveBeenCalled();
     expect(client.logout).toHaveBeenCalled();
   });
@@ -358,7 +466,7 @@ describe("resolveUidByMailId", () => {
     expect(error.message).toContain("(제목 없음)");
   });
 
-  it("조회 범위 끝의 단일 후보 뒤에 같은 초의 메일이 더 있으면 선택하지 않는다", async () => {
+  it("이웃 창 밖에 있던 같은 초의 메일도 후보에 들어와 모호함으로 알린다", async () => {
     const baseMs = Date.UTC(2026, 0, 1);
     setClient([
       ...Array.from({ length: 8 }, (_, index) => makeMessage(index + 1, baseMs - 1000, "before")),
@@ -366,8 +474,10 @@ describe("resolveUidByMailId", () => {
       makeMessage(10, baseMs, "second"),
     ]);
 
-    await expect(resolveUidByMailId(config, makeMailId(baseMs), "INBOX"))
-      .rejects.toThrow("조회 범위 밖");
+    const error = await catchError(resolveUidByMailId(config, makeMailId(baseMs), "INBOX"));
+    expect(error.message).toContain("여러 건");
+    expect(error.message).toContain("UID: 9");
+    expect(error.message).toContain("UID: 10");
   });
 
   it("후보 조회 중 서버 오류가 나도 잠금과 연결을 해제한다", async () => {
