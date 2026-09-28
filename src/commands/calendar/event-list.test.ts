@@ -38,6 +38,12 @@ const events: CalendarEvent[] = [
     endedAt: "2026-09-20T11:00:00+09:00",
     wholeDayFlag: false,
     calendar: { id: "cal-1", name: "내 캘린더" },
+    me: {
+      type: "member",
+      member: { organizationMemberId: "member-1", name: "홍길동", emailAddress: "user@example.com" },
+      status: "accepted",
+      userType: "to",
+    },
   },
   {
     id: "event-2",
@@ -47,6 +53,8 @@ const events: CalendarEvent[] = [
     endedAt: "2026-09-21+09:00",
     wholeDayFlag: true,
     calendar: { id: "cal-2", name: "팀 캘린더" },
+    // 공유받은 캘린더의 남의 일정은 status·userType 없이 온다.
+    me: { type: "member", member: { organizationMemberId: "member-1" } },
   },
 ];
 
@@ -148,6 +156,13 @@ describe("calendar event list", () => {
     expect(mocks.client.getCalendarEvents).not.toHaveBeenCalled();
   });
 
+  it("50일을 넘는 범위는 거부하고 API 를 부르지 않는다", async () => {
+    await expect(
+      run(["calendar", "event", "list", "--from", "2026-01-01", "--to", "2026-02-21"]),
+    ).rejects.toMatchObject({ exitCode: EXIT_PARAM_ERROR, message: expect.stringMatching(/최대 50일/) });
+    expect(mocks.client.getCalendarEvents).not.toHaveBeenCalled();
+  });
+
   it("ISO8601 은 그대로 보낸다", async () => {
     await run([
       "calendar", "event", "list",
@@ -179,6 +194,15 @@ describe("calendar event list", () => {
     expect(out).toContain("스프린트 계획");
     expect(out).toContain("내 캘린더");
     expect(out).toContain("2026-09-20 (종일)");
+  });
+
+  it("표의 내 참여 열은 참여한 일정에만 채운다", async () => {
+    const out = await run(["calendar", "event", "list"]);
+    expect(out).toContain("내 참여");
+    const lines = out.split("\n");
+    expect(lines.find((l) => l.includes("스프린트 계획"))).toContain("참석·수락");
+    const workshop = lines.find((l) => l.includes("워크숍"))!;
+    expect(workshop).not.toMatch(/주최|참석|참조/);
   });
 
   it("--json 은 서버 응답 result 원형을 낸다", async () => {

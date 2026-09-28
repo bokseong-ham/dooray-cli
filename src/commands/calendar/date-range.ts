@@ -1,9 +1,28 @@
+/**
+ * `--from`·`--to` 를 서버에 보낼 `timeMin`·`timeMax` 로 확정하는 순수 함수.
+ *
+ * 날짜만 주면 그 날짜의 로컬 offset 으로 `--from` 은 그 날 00:00:00, `--to` 는 그 날 23:59:59 로
+ * 늘린다. 서머타임으로 00:00 이 없는 날은 `Date` 가 옮긴 실제 시각을 되읽는다.
+ * 한쪽만 주면 빠진 쪽을 준 값과 같은 날로 채운다.
+ * 형식·실재성·뒤집힘·기간 상한(50일)은 API 를 부르기 전에 `EXIT_PARAM_ERROR` 로 거른다.
+ */
+
 import { DoorayCliError } from "../../utils/errors.js";
 import { EXIT_PARAM_ERROR } from "../../utils/exit-codes.js";
 
 const DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/;
 const ISO_WITH_OFFSET =
   /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
+
+/**
+ * 한 번에 조회할 수 있는 최대 기간(일).
+ *
+ * 공식 문서 표제는 1년치지만 실측으로는 50일까지만 받는다. 51일째에 들어서면 400
+ * `USER_INVALID_EXCEED_MAXIMUM_PERIOD` 가 온다.
+ */
+export const MAX_RANGE_DAYS = 50;
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 const DAY_START = [0, 0, 0] as const;
 const DAY_END = [23, 59, 59] as const;
@@ -97,6 +116,9 @@ function expand(
 /**
  * 날짜만 받은 값을 그 날의 시작(`00:00:00`)이나 끝(`23:59:59`)으로 늘리고
  * 지역 시간대 offset 을 붙인다.
+ *
+ * `timeMax` 는 문서상 포함하지 않지만 다음 날 00:00 으로 보내지 않는다. 서버가 종일 일정을
+ * 날짜 단위로 견줘 다음 날 시작하는 종일 일정이 섞여 나온다(실측).
  */
 export function expandDateOnly(value: string, edge: RangeEdge): string {
   return expandDateOnlyAs(value, edge === "from" ? DAY_START : DAY_END, edge);
@@ -151,6 +173,20 @@ function today(now: Date, edge: RangeEdge): string {
   return expand(now.getFullYear(), now.getMonth() + 1, now.getDate(), edge === "from" ? DAY_START : DAY_END);
 }
 
+/** 서버가 받는 최대 기간을 넘는 범위를 API 를 부르기 전에 거부한다. */
+function checkMaxRange(range: TimeRange): TimeRange {
+  // 서버는 날짜 단위로 세어 50일째 23:59:59 까지 받고 51일째 00:00 부터 거절한다(실측). 그 경계에 맞춘다.
+  if (Date.parse(range.timeMax) - Date.parse(range.timeMin) >= (MAX_RANGE_DAYS + 1) * DAY_MS) {
+    throw new DoorayCliError(
+      `조회 기간이 너무 깁니다: ${range.timeMin} ~ ${range.timeMax}. ` +
+        `한 번에 조회할 수 있는 기간은 최대 ${MAX_RANGE_DAYS}일입니다 ` +
+        `(날짜만 준 --to 는 그 날까지 포함해 셉니다)`,
+      EXIT_PARAM_ERROR,
+    );
+  }
+  return range;
+}
+
 /**
  * `--from` 과 `--to` 를 서버에 보낼 `timeMin`·`timeMax` 로 바꾼다.
  *
@@ -158,7 +194,7 @@ function today(now: Date, edge: RangeEdge): string {
  * 범위를 걸지 않은 것과 같은 결과를 준다. 빠진 쪽은 준 값과 같은 날로 채워
  * `--from` 단독과 `--to` 단독이 모두 "그 날 하루" 가 되게 한다.
  *
- * 형식이 어긋나거나 범위가 뒤집혔으면 API 를 부르기 전에 끝낸다.
+ * 형식이 어긋나거나 범위가 뒤집혔거나 최대 기간을 넘으면 API 를 부르기 전에 끝낸다.
  */
 export function resolveTimeRange(
   from: string | undefined,
@@ -187,5 +223,6 @@ export function resolveTimeRange(
       EXIT_PARAM_ERROR,
     );
   }
-  return { timeMin, timeMax };
+  // 한쪽만 준 범위는 하루라 상한에 걸리지 않는다. 둘 다 준 경우만 본다.
+  return checkMaxRange({ timeMin, timeMax });
 }

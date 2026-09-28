@@ -152,12 +152,6 @@ async function toDoorayCliError(error: unknown): Promise<never> {
   throw error;
 }
 
-/**
- * 일정 목록에서 calendarId 자리에 넣는 값. 접근 가능한 캘린더 전체를 훑는다.
- * 상세 조회에는 쓸 수 없다 — 그쪽은 실제 calendarId 를 요구한다.
- */
-const ALL_CALENDARS = "*";
-
 export class DoorayApiClient {
   private readonly api: KyInstance;
   private readonly authHeader: string;
@@ -1147,6 +1141,11 @@ export class DoorayApiClient {
   /**
    * 기간 안의 일정 목록. 접근 가능한 캘린더 전체를 훑는다.
    *
+   * calendarId 자리에는 `*` 만 들어갈 수 있다(공식 문서). 상세 조회는 거꾸로 `*` 를 받지 않는다.
+   * 경로를 상수로 끼우지 않고 리터럴로 둔다. `pnpm api:inventory` 가 템플릿 보간을 `{id}` 로 바꿔
+   * 공식 목록의 `*` 와 대조하지 못하게 된다.
+   * 기간은 50일까지만 받고 넘으면 400 이 온다(실측).
+   *
    * `timeMin` 하나만 주면 무시되므로 부르는 쪽이 항상 둘 다 채운다.
    * `size` 와 `page` 는 먹지 않아 페이징 수단이 없고, 범위를 좁히는 것이 유일한 조절 수단이다.
    * 서버에 날짜 형식 검증이 없어 어긋난 값에는 500 이 오므로 부르기 전에 형식을 거른다.
@@ -1154,7 +1153,7 @@ export class DoorayApiClient {
   async getCalendarEvents(timeMin: string, timeMax: string): Promise<CalendarEventListResponse> {
     try {
       return await this.api
-        .get(`calendar/v1/calendars/${ALL_CALENDARS}/events`, {
+        .get("calendar/v1/calendars/*/events", {
           searchParams: { timeMin, timeMax },
         })
         .json<CalendarEventListResponse>();

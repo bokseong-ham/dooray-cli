@@ -1,3 +1,10 @@
+/**
+ * `formatEventTime` — `event list` 와 `event get` 이 공유하는 시각 열 빌더.
+ *
+ * 종일 일정의 날짜만 형식(`2026-09-18+09:00`)을 따로 받고, `endedAt` 이 그 날을 포함하지 않아
+ * 마지막 날을 하루 앞으로 잡는다. 폴백이 서버 문자열을 그대로 돌려주므로 반환 직전 control char 를 없앤다.
+ */
+
 import type { CalendarEvent } from "../../api/types.js";
 import { sanitizeForTerminal } from "../../utils/sanitize.js";
 

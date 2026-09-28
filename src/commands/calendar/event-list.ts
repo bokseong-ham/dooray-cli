@@ -1,3 +1,10 @@
+/**
+ * `dooray calendar event list` — 기간 안의 일정 조회. `GET calendar/v1/calendars/{calendar-id}/events`.
+ *
+ * calendar-id 자리에 `*` 를 넣어 접근 가능한 캘린더 전체를 훑고, `timeMin`·`timeMax` 를 항상 함께 보낸다.
+ * 페이징이 없고 서버 순서를 유지한다. 표의 참여 열은 목록 응답의 `me` 로 채워 상세를 따로 부르지 않는다.
+ */
+
 import { Command } from "commander";
 import { getConfigOrThrow } from "../../config/store.js";
 import { DoorayApiClient } from "../../api/client.js";
@@ -8,14 +15,12 @@ import { sanitizeForTerminal } from "../../utils/sanitize.js";
 import { startSpinner, stopSpinner } from "../../utils/spinner.js";
 import { resolveTimeRange } from "./date-range.js";
 import { formatEventTime } from "./event-time.js";
+import { formatParticipation } from "./participation.js";
 
 const SUBJECT_MAX_LEN = 40;
 
 export const calendarEventListCommand = new Command("list")
-  .description(
-    "기간 안의 일정 조회 (기본 오늘 하루). " +
-      "공식 API 문서에 없는 endpoint 라 예고 없이 막힐 수 있다",
-  )
+  .description("기간 안의 일정 조회 (기본 오늘 하루, 한 번에 최대 50일)")
   .option("--from <일시>", "시작 (YYYY-MM-DD 또는 ISO8601). 단독으로 주면 그 날 하루")
   .option("--to <일시>", "끝 (YYYY-MM-DD 또는 ISO8601). 단독으로 주면 그 날 하루")
   .action(async (opts: { from?: string; to?: string }) => {
@@ -50,12 +55,13 @@ export const calendarEventListCommand = new Command("list")
 
     stopSpinner(true, "조회 완료");
     output(globalOpts, {
-      headers: ["시각", "제목", "캘린더"],
+      headers: ["시각", "제목", "캘린더", "내 참여"],
       // 서버가 준 문자열은 외부 통제 값이라 출력 직전 control char 를 없앤다.
       rows: events.map((e) => [
         formatEventTime(e),
         sanitizeForTerminal(truncate(e.subject ?? "", SUBJECT_MAX_LEN)),
         sanitizeForTerminal(e.calendar?.name ?? ""),
+        formatParticipation(e.me),
       ]),
       // 서버가 주는 순서를 그대로 둔다. 정렬 기준을 확인하지 않아 다시 세우지 않는다.
       raw: events,

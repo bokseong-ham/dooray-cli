@@ -1,3 +1,9 @@
+/**
+ * `dooray calendar list` — 접근 가능한 캘린더 목록. `GET calendar/v1/calendars`.
+ *
+ * `event get` 에 넘길 calendar-id 를 여기서 얻는다.
+ */
+
 import { Command } from "commander";
 import { getConfigOrThrow } from "../../config/store.js";
 import { DoorayApiClient } from "../../api/client.js";

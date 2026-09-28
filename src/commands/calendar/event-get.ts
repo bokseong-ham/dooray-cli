@@ -1,10 +1,17 @@
+/**
+ * `dooray calendar event get` — 일정 상세 조회. `GET calendar/v1/calendars/{id}/events/{id}`.
+ *
+ * calendarId 자리에 `*` 를 쓸 수 없어 두 id 가 모두 필요하다. 참석자 이름이 응답에 있어
+ * 멤버를 따로 조회하지 않는다. 본문은 줄바꿈을 살린 채 전문을 표에 싣는다.
+ */
+
 import { Command } from "commander";
 import { getConfigOrThrow } from "../../config/store.js";
 import { DoorayApiClient } from "../../api/client.js";
 import type { CalendarEventDetail, CalendarEventUser } from "../../api/types.js";
 import type { OutputOptions } from "../../formatters/table.js";
 import { printJson, printTable } from "../../formatters/table.js";
-import { sanitizeForTerminal } from "../../utils/sanitize.js";
+import { sanitizeForTerminal, sanitizeMultilineForTerminal } from "../../utils/sanitize.js";
 import { startSpinner, stopSpinner } from "../../utils/spinner.js";
 import { formatEventTime } from "./event-time.js";
 
@@ -49,6 +56,8 @@ export const calendarEventGetCommand = new Command("get")
     }
 
     const cc = joinUsers(event.users?.cc);
+    // 상세 조회의 차별점이라 자르지 않는다. mimeType 이 text/html 이어도 태그를 그대로 둔다.
+    const body = event.body?.content ?? "";
     // 서버가 준 문자열은 외부 통제 값이라 출력 직전 control char 를 없앤다.
     printTable(
       ["Field", "Value"],
@@ -59,6 +68,7 @@ export const calendarEventGetCommand = new Command("get")
         ["등록자", sanitizeForTerminal(event.users?.from ? userLabel(event.users.from) : "")],
         ["참석자", sanitizeForTerminal(joinUsers(event.users?.to))],
         ...(cc === "" ? [] : [["참조", sanitizeForTerminal(cc)]]),
+        ...(body.trim() === "" ? [] : [["본문", sanitizeMultilineForTerminal(body)]]),
       ],
     );
   });

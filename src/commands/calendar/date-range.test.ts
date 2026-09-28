@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { expandDateOnly, localOffset, resolveTimeRange } from "./date-range.js";
+import { EXIT_PARAM_ERROR } from "../../utils/exit-codes.js";
+import { MAX_RANGE_DAYS, expandDateOnly, localOffset, resolveTimeRange } from "./date-range.js";
 
 // 실행 장비의 타임존에 따라 offset 이 달라지므로 기대값을 박지 않고 그 장비의 값을 쓴다.
 function offsetOn(year: number, month: number, day: number, hour: number): string {
@@ -87,6 +88,13 @@ describe("resolveTimeRange", () => {
     });
   });
 
+  it("양끝이 같은 날짜면 그 날 하루가 된다", () => {
+    expect(resolveTimeRange("2026-09-20", "2026-09-20", now)).toEqual({
+      timeMin: `2026-09-20T00:00:00${offsetOn(2026, 9, 20, 0)}`,
+      timeMax: `2026-09-20T23:59:59${offsetOn(2026, 9, 20, 23)}`,
+    });
+  });
+
   it("둘 다 줬는데 뒤집혀 있으면 거부한다", () => {
     expect(() => resolveTimeRange("2026-10-01", "2026-09-20", now)).toThrow(/--from 이 --to 보다 뒤/);
   });
@@ -131,6 +139,35 @@ describe("resolveTimeRange", () => {
 
   it("어느 쪽이 잘못됐는지 옵션 이름으로 알린다", () => {
     expect(() => resolveTimeRange(undefined, "어제", now)).toThrow(/--to 값을 읽을 수 없습니다/);
+  });
+
+  describe(`기간 상한 ${MAX_RANGE_DAYS}일`, () => {
+    // 서버는 50일째 23:59:59 까지 받고 51일째 00:00 부터 거절한다(실측).
+    it("날짜만 준 --to 가 50일째면 통과시킨다", () => {
+      expect(resolveTimeRange("2026-01-01", "2026-02-20", now)).toEqual({
+        timeMin: `2026-01-01T00:00:00${offsetOn(2026, 1, 1, 0)}`,
+        timeMax: `2026-02-20T23:59:59${offsetOn(2026, 2, 20, 23)}`,
+      });
+    });
+
+    it("날짜만 준 --to 가 51일째면 거부한다", () => {
+      expect(() => resolveTimeRange("2026-01-01", "2026-02-21", now)).toThrow(/최대 50일/);
+    });
+
+    it("ISO8601 은 50일째 23:59:59 까지 통과시키고 51일째 00:00 부터 거부한다", () => {
+      expect(() =>
+        resolveTimeRange("2026-01-01T00:00:00+09:00", "2026-02-20T23:59:59+09:00", now),
+      ).not.toThrow();
+      expect(() =>
+        resolveTimeRange("2026-01-01T00:00:00+09:00", "2026-02-21T00:00:00+09:00", now),
+      ).toThrow(/최대 50일/);
+    });
+
+    it("상한 초과의 종료 코드는 EXIT_PARAM_ERROR 다", () => {
+      expect(() => resolveTimeRange("2026-01-01", "2026-03-01", now)).toThrow(
+        expect.objectContaining({ exitCode: EXIT_PARAM_ERROR }),
+      );
+    });
   });
 
   describe("ISO8601 의 값까지 본다", () => {

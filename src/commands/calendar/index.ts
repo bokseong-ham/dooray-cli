@@ -1,3 +1,7 @@
+/**
+ * `dooray calendar` 명령 조립. 읽기 전용이며 `list` 와 `event` 서브커맨드 그룹(`list`·`get`)을 단다.
+ */
+
 import { Command } from "commander";
 import { calendarListCommand } from "./list.js";
 import { calendarEventListCommand } from "./event-list.js";

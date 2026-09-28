@@ -1,7 +1,7 @@
 # Dooray 공식 API 문서에서 뽑은 endpoint 목록 스냅샷 (뽑은 날짜: 2026-09-07)
 # 뽑은 방법: ~/.claude/scripts/browser-driver 로 공식 문서 페이지를 열어
 #   waitjs 로 렌더를 기다린 뒤 js 로 document.body.innerText 를 저장하고,
-#   grep -oE "^(GET|POST|PUT|DELETE|PATCH) /[a-z0-9/{}?=.-]+" | sort -u 로 추출했다.
+#   grep -oE "^(GET|POST|PUT|DELETE|PATCH) /[a-z0-9/{}?=.*-]+" | sort -u 로 추출했다.
 # 경로는 공식 문서 표기를 그대로 둔다. 쿼리 문자열과 placeholder 이름의 정규화는
 #   scripts/api-endpoint-inventory.mjs 가 대조할 때 수행한다.
 # 공식 문서 주소는 CLAUDE.md 의 「API 스펙 확인 절차」가 소유한다.
@@ -20,9 +20,9 @@ DELETE /wiki/v1/wikis/{wiki-id}/pages/{page-id}
 DELETE /wiki/v1/wikis/{wiki-id}/pages/{page-id}/comments/{comment-id}
 DELETE /wiki/v1/wikis/{wiki-id}/pages/{page-id}/files/{file-id}
 GET /calendar/v1/calendars
-GET /calendar/v1/calendars/
 GET /calendar/v1/calendars/{calendar-id}
 GET /calendar/v1/calendars/{calendar-id}/events/{event-id}
+GET /calendar/v1/calendars/*/events
 GET /common/v1/incoming-hooks/{incoming-hook-id}
 GET /common/v1/members
 GET /common/v1/members?external
