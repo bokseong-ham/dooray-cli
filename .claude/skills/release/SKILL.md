@@ -70,6 +70,19 @@ gh issue list --state open --json number,title --jq '.[] | "#\(.number)  \(.titl
 범위가 부분만 겹치는 이슈는 닫지 않고 진행 상황만 댓글로 남긴다.
 확정한 목록이 5단계의 릴리스 노트와 7단계의 close 에 그대로 쓰인다.
 
+PR 본문의 `Closes #N` 으로 머지 때 이미 닫힌 이슈는 위 목록에 나오지 않는다.
+직전 태그 이후에 머지된 PR 이 닫은 이슈를 따로 보고 릴리스 노트에만 적는다. 7단계의 close 대상은 아니다.
+
+```bash
+LAST_TAG="$(git describe --tags --abbrev=0)"
+SINCE="$(git log -1 --format=%cI "$LAST_TAG")"
+gh pr list --state merged --search "merged:>=$SINCE" --limit 200 \
+  --json closingIssuesReferences --jq '.[] | .closingIssuesReferences[] | "#\(.number)"' | sort -u
+```
+
+닫힌 날짜로 찾지 않는다. 직전 릴리스는 태그를 만든 뒤 7단계에서 자기 이슈를 닫으므로,
+날짜로 찾으면 이미 나간 이슈가 이번 노트에 섞인다.
+
 ### 2. 문서 동기화
 
 인자 없이 실행한다. 무엇을 검사할지는 검사기가 정한다.
@@ -154,9 +167,11 @@ VERSION="" # package.json 에 넣은 버전에서 v를 뺀 값을 넣는다.
 node .claude/skills/release/scripts/verify-release.mjs "$VERSION"
 ```
 
-npm 색인 반영만 실패하면 잠시 후 같은 명령을 다시 실행한다.
+npm 은 게시를 접수한 뒤 몇 분 지나서 최신 버전을 바꾼다. 스크립트가 최대 10분 기다린다.
+10분 안에 반영되지 않으면 게시 로그에 `PUT 202` 가 있는지 먼저 본다. 없으면 게시가 되지 않은 것이다.
 
 **종료 코드 0 을 받은 뒤에만** 1단계에서 확정한 이슈를 닫는다.
+close 대상이 없으면 아래 블록을 건너뛴다.
 
 ```bash
 VERSION="" # package.json 에 넣은 버전에서 v를 뺀 값을 넣는다.
