@@ -67,7 +67,7 @@ dooray                # 글로벌 링크 시
   - `<project> <number>` / `--id <id>` / `--url <url>` / 첫 positional 에 Dooray URL 직접 입력
   - wiki 의 `--id` 모드는 project 없이 단독으로 동작한다. `--project` 는 선택이며 주면 wikiId 해석 호출을 아낀다
 - **옵션 이름**
-  - 제목은 post·wiki 모두 `--title` 이다. `post list` 의 `--subject` 는 제목 키워드 필터다. `post create`·`post edit` 의 `--subject` alias 는 0.22.0 에서 제거했다
+  - 제목은 post·wiki 모두 `--title` 이다. `post list` 의 `--subject` 는 제목 키워드 필터다. `post create`·`post edit` 는 `--subject` alias 를 받지 않는다
   - 본문은 `--body` / `--body-file` (둘 다 `-` 로 stdin 을 받는다)
   - `config set <key> <value>` 의 값도 `-` 로 stdin 을 받는다 — 토큰이 셸 기록과 프로세스 목록에 남지 않게 하는 경로다
   - `post edit`, `wiki page edit`, `post`·`wiki page` 의 `comment add`/`edit`, `messenger send`·`channel-send`·`thread-send` 는 둘 다 없으면 `$EDITOR` 가 열린다. 단 `post edit` 의 태그·참조자·담당자 변경 옵션과 `post edit`·`wiki page edit`·`post comment edit` 의 `--mime-type` 은 제목·본문 없이도 비대화형 수정으로 실행한다. `post edit` 은 `--mention`·`--mention-group`·`--link-task`·`--parent`·`--dry-run` 도 편집기를 열지 않는다. `--dry-run` 은 합성한 본문만 출력한다. `create` 계열은 `$EDITOR` 폴백이 없고, 둘 다 없으면 에러 대신 빈 본문으로 생성한다. `post create` 는 `--template` 을 주면 그 템플릿 본문을 채운다
