@@ -264,7 +264,7 @@ dooray post get <project> <number> --json --with-tag-names
 | 1:1 다이렉트 메시지 | `dooray messenger send --to "<id\|email>" --body "..."` — `--to` 는 ID 나 이메일만 받고 이름은 지원하지 않는다 |
 | 대화방 메시지 | `dooray messenger channel-send --channel "<channelId\|이름>" --body "..."` — 이름으로는 자신이 속한 방만 찾는다 |
 | 대화방 스레드 열기 | `dooray messenger thread-send --channel "<channelId\|이름>" --body "..."` — `--thread-body` 나 `--thread-body-file` 로 첫 메시지를 함께 보내고, `--log <log-id>` 로 이미 올라간 메시지에 연다 |
-| 대화방 메시지 읽기 | `dooray messenger logs "<channelId\|이름>" [-n <개수>]` — 최근 N건(기본 20, 최대 1000). 표는 오래된 것이 위, 최신이 아래 |
+| 대화방 메시지 읽기 | `dooray messenger logs "<channelId\|이름>" [-n\|--count <개수>]` — 최근 N건(기본 20, 최대 1000). 표는 오래된 것이 위, 최신이 아래 |
 
 `logs` 가 가져올 수 있는 것은 최근 1000건까지다. 그 이전으로 거슬러 갈 수단이 API 에 없어
 `-n` 에 1000 을 넘기면 조용히 잘리지 않고 에러로 끝난다. 날짜 필터도 없다.

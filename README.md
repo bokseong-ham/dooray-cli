@@ -328,7 +328,7 @@ dooray messenger thread-send --channel "배포알림" --log <logId> --body "빌�
 
 ```bash
 dooray messenger logs "배포알림"              # 최근 20건
-dooray messenger logs "배포알림" -n 200       # 최근 200건
+dooray messenger logs "배포알림" --count 200  # 최근 200건 (-n 200 과 같다)
 dooray messenger logs "배포알림" --json       # 서버 응답 원형
 ```
 
