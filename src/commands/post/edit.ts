@@ -110,10 +110,13 @@ export const postEditCommand = new Command("edit")
     // --mime-type 단독도 비대화형이다. $EDITOR 를 열면 비대화형 환경에서 쓸 수
     // 없고, 열려도 본문이 그대로면 "변경사항 없음" 으로 끝나 형식을 되돌릴
     // 수단이 없다. 본문은 기존 content 를 그대로 다시 보낸다.
-    // --dry-run 도 비대화형이다. $EDITOR 분기는 dry-run 을 보지 않고 updatePost 를
-    // 부르므로, 멘션·링크만 준 미리보기가 실제 수정이 된다 (Issue #183).
+    // 멘션·링크·상위 업무 변경과 --dry-run 도 비대화형이다. $EDITOR 분기는 이 옵션들을
+    // 버리고 dry-run 을 보지 않아, 미리보기가 실제 수정이 되거나 미리보기와 실제
+    // 실행 결과가 달라진다 (Issue #183).
     const nonInteractive = title || opts.body || opts.bodyFile || hasTagChange
-      || hasParticipantChange || opts.mimeType != null || opts.dryRun;
+      || hasParticipantChange || opts.mimeType != null || opts.dryRun
+      || mentionInputs.length > 0 || groupInputs.length > 0 || linkInputs.length > 0
+      || !!opts.parent;
 
     if (nonInteractive) {
       // Non-interactive mode: apply only specified changes
@@ -243,24 +246,7 @@ export const postEditCommand = new Command("edit")
       }
     } else {
       // Interactive mode: $EDITOR
-      if (mentionInputs.length > 0 || groupInputs.length > 0) {
-        process.stderr.write(
-          "⚠  --mention/--mention-group 은 --title/--body 와 함께 사용 시에만 적용됩니다.\n",
-        );
-      }
-      if (linkInputs.length > 0) {
-        process.stderr.write(
-          "⚠  --link-task 는 --title/--body 와 함께 사용 시에만 적용됩니다.\n",
-        );
-      }
-      if (opts.parent) {
-        process.stderr.write(
-          "⚠  --parent 는 --title/--body 와 함께 사용 시에만 적용됩니다.\n",
-        );
-      }
-      // tag 관련 옵션은 nonInteractive 분기에서만 처리됨 (hasTagChange 가
-      // nonInteractive 조건에 포함). 여기 도달은 hasTagChange=false 이므로
-      // 경고 불요 — cc/parent 처럼 nonInteractive 조건에 미포함 옵션과 다름.
+      // 편집기에 반영되지 않는 옵션은 모두 nonInteractive 조건에 있어 여기 도달하지 않는다.
       const original = serializePostFrontmatter(post, members);
       const edited = await openInEditor(original);
 

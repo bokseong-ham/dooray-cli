@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   resolveMember: vi.fn(),
   buildMemberNameMap: vi.fn(),
   resolveTaskLinks: vi.fn(),
+  resolvePostRef: vi.fn(),
   openInEditor: vi.fn(),
   readBodyInputOrNull: vi.fn(),
   startSpinner: vi.fn(),
@@ -18,6 +19,7 @@ const mocks = vi.hoisted(() => ({
   client: {
     getPost: vi.fn(),
     updatePost: vi.fn(),
+    setPostParent: vi.fn(),
   },
 }));
 
@@ -51,6 +53,10 @@ vi.mock("../../resolvers/me.js", () => ({
 
 vi.mock("../../resolvers/task-link.js", () => ({
   resolveTaskLinks: mocks.resolveTaskLinks,
+}));
+
+vi.mock("../../resolvers/postRef.js", () => ({
+  resolvePostRef: mocks.resolvePostRef,
 }));
 
 vi.mock("../../resolvers/post-users.js", async (importOriginal) => {
@@ -572,6 +578,54 @@ describe("post edit --mime-type", () => {
   });
 });
 
+describe("post edit 멘션·링크·상위 업무 단독 호출", () => {
+  const baseArgs = ["node", "dooray", "post", "edit", "--id", "post-1"];
+
+  it("--mention 만 주면 편집기 없이 멘션을 붙여 수정한다", async () => {
+    const program = await createCommandTree();
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await program.parseAsync([...baseArgs, "--mention", "홍길동"]);
+
+    expect(mocks.openInEditor).not.toHaveBeenCalled();
+    expect(mocks.client.updatePost).toHaveBeenCalledWith(
+      "project-1",
+      "post-1",
+      expect.objectContaining({
+        body: {
+          mimeType: "text/x-markdown",
+          content: '[@홍길동](dooray://org-1/members/member-2 "member") 기존 본문',
+        },
+      }),
+    );
+    stdout.mockRestore();
+  });
+
+  it("--link-task 만 주면 편집기 없이 수정한다", async () => {
+    const program = await createCommandTree();
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await program.parseAsync([...baseArgs, "--link-task", "my-project/7"]);
+
+    expect(mocks.openInEditor).not.toHaveBeenCalled();
+    expect(mocks.client.updatePost).toHaveBeenCalledOnce();
+    stdout.mockRestore();
+  });
+
+  it("--parent 만 주면 편집기 없이 상위 업무를 바꾼다", async () => {
+    mocks.resolvePostRef.mockResolvedValue("post-parent");
+    mocks.client.setPostParent.mockResolvedValue({});
+    const program = await createCommandTree();
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await program.parseAsync([...baseArgs, "--parent", "my-project/1"]);
+
+    expect(mocks.openInEditor).not.toHaveBeenCalled();
+    expect(mocks.client.setPostParent).toHaveBeenCalledWith("project-1", "post-1", "post-parent");
+    stdout.mockRestore();
+  });
+});
+
 describe("post edit --dry-run 은 편집기를 열지 않는다", () => {
   const baseArgs = ["node", "dooray", "post", "edit", "--id", "post-1"];
 
@@ -600,8 +654,6 @@ describe("post edit --dry-run 은 편집기를 열지 않는다", () => {
 });
 
 describe("post edit 본문 형식별 마크업", () => {
-  // --mention 만 주면 nonInteractive 가 거짓이라 $EDITOR 분기로 간다.
-  // --mime-type 을 함께 주어 비대화형 경로로 들어간다.
   const baseArgs = ["node", "dooray", "post", "edit", "--id", "post-1"];
 
   it("마크다운 본문의 멘션은 종전 문자열을 본문 앞에 붙인다", async () => {
