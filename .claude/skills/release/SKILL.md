@@ -29,7 +29,7 @@ description: dooray-cli 의 새 버전을 npm 에 내보낸다. "/release", "릴
 태그를 민 뒤인 5~7단계에서 실패하면 멈추고 사용자에게 보고한다.
 
 명령 블록은 저장소 root 에서 붙여넣는다. 스크립트는 그 뒤 root 를 스스로 확인한다.
-실행 규약은 `CLAUDE.md` 의 "저장소 스킬 작성 규약" 이 소유한다.
+실행 규약은 `.claude/rules/skill-authoring.md` 가 소유한다.
 
 ## 워크플로 상세
 

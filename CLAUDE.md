@@ -85,79 +85,31 @@ dooray                # 글로벌 링크 시
 
 ## 개인 식별 정보 / 사내 식별자 노출 금지 (public OSS)
 
-아래 식별자는 git 추적 대상 어디에도 넣지 않는다. 검사 범위는 `scripts/check-pii.mjs` 의 `SCAN` 목록이다.
-`src/` 의 테스트 fixture 와 에러 메시지 예시, 이슈 본문도 포함한다. 항상 placeholder 를 쓴다.
-
+아래 식별자는 git 추적 대상 어디에도 넣지 않는다. 테스트 fixture, 에러 메시지 예시, 이슈 본문도 포함한다.
 구체적인 사내 식별자는 이 파일에도 적지 않는다. CLAUDE.md 자체가 public 이라 나열이 곧 노출이다.
-유형만 기술하고, 검증은 공개 화이트리스트 밖을 검출하는 방식으로 한다.
 
-
-| 노출 금지                                                         | 대체                                       |
-| ------------------------------------------------------------- | ---------------------------------------- |
-| 사내 Dooray 프로젝트 코드                                             | `<project>`                              |
-| 사내 NHN 도메인 (구체 도메인은 public repo 라 여기 명시하지 않음)                 | `<tenant>` / `example.com`               |
-| 사내 이메일                                                        | `user@example.com`                       |
+| 노출 금지 | 대체 |
+| --- | --- |
+| 사내 Dooray 프로젝트 코드 | `<project>` |
+| 사내 NHN 도메인 | `<tenant>` / `example.com` |
+| 사내 이메일 | `user@example.com` |
 | 실제 19자리 numeric ID (postId/pageId/memberId/projectId/groupId) | `<postId>` / `<pageId>` / `<memberId>` 등 |
-| 실명 (사용자 본인, 동료 한국어 이름)                                        | `<사용자A>` 또는 가상 이름(`홍길동`/`김철수`) — 가상은 OK  |
-| Dooray orgId (실제 19자리)                                        | `<orgId>`                                |
+| 실명 (사용자 본인, 동료 한국어 이름) | `<사용자A>` 또는 가상 이름(`홍길동`/`김철수`) |
+| Dooray orgId (실제 19자리) | `<orgId>` |
 
-
-**검증** (commit·이슈 작성·release 전 실행):
-
-```bash
-# cwd: <repo root>
-node scripts/check-pii.mjs
-```
-
-공개 화이트리스트 밖의 도메인, 허용 목록 밖의 15자리 이상 숫자, 예시에 쓰인 낯선 project 값 세 가지를 본다.
-위반을 출력하고 종료 코드 1 로 끝난다. 화이트리스트는 그 스크립트가 소유한다.
-필수 경로가 없거나 파일을 읽지 못하면 오류를 출력하고 종료 코드 2 로 끝난다.
-
+커밋, 이슈 작성, 릴리스 전에 `node scripts/check-pii.mjs` 를 돌린다. CI 가 같은 스크립트로 PR 을 막는다.
+검사 범위와 화이트리스트, 종료 코드는 그 스크립트가 소유한다.
 가상 예시를 새로 쓰려면 스크립트의 `OK_PROJECTS` 나 `OK_DOMAINS` 에 먼저 추가한다.
-도메인 화이트리스트는 정확한 호스트 단위라서 하위 도메인은 해당 호스트를 따로 추가해야 한다.
-CI 가 같은 스크립트를 돌리므로 통과하지 않으면 PR 이 막힌다.
 
-## 공개 문서의 내부 참조 번호 제외
+## 경로별 규칙
 
-`README.md` 와 `skills/` 아래 문서에는 `ADR-NNN`, `Issue #NN`, `task NN` 같은 내부 추적 번호를 넣지 않는다.
-검사 범위는 `scripts/check-public-refs.mjs` 의 `TARGETS` 목록이 소유한다.
-`skills/dooray-cli/references/` 와 `skills/dooray-persona/` 도 그 범위에 들어간다.
-사용자는 ADR 맥락을 모르고, 이 문서를 그대로 LLM 에 붙여 실행을 요청하기도 한다.
+특정 경로를 다룰 때만 필요한 규칙은 `.claude/rules/` 에 두고 frontmatter 의 `paths` 로 범위를 정한다.
+Claude Code 는 그 경로의 파일을 읽을 때 규칙을 불러온다.
 
-- 기능 동작과 사용법만 기술한다. "왜 이렇게 설계했는가" 는 `docs/adr/` 에만 둔다
-- 괄호 참조(`... (ADR-027)`)는 삭제하고, 문장에 녹은 참조는 번호를 빼고 재작성한다
-- 내부 문서(`CLAUDE.md`, `docs/*`, `tasks/*`)는 내부 참조를 그대로 유지한다
-
-**검증** (README·SKILL 작성·수정 후 실행):
-
-```bash
-# cwd: <repo root>
-node scripts/check-public-refs.mjs
-```
-
-CI 가 같은 스크립트를 돌린다.
-필수 경로가 없거나 파일을 읽지 못하면 오류를 출력하고 종료 코드 2 로 끝난다.
-
-## 저장소 스킬 작성 규약
-
-`.claude/skills/` 의 스킬은 기존 스킬(`release`, `health-check`)의 문서 구조를 따른다.
-통과 조건은 관측할 수 있는 사실로 쓰고, 순서가 없는 스킬은 개요 표를 두지 않는다.
-
-- **반복되는 절차와 판정은 그 스킬의 `scripts/*.mjs` 로 옮긴다.**
-  선례는 `.claude/skills/release/scripts/preflight.mjs` 다.
-  저장소 전체가 쓰는 검사는 root 의 `scripts/` 에 두고, `scripts/check-pii.mjs` 와 `scripts/verify-package.mjs` 가 그쪽 선례다
-- **스크립트로 막을 수 있는 실행 함정은 스크립트가 처리한다.**
-  옵션 문자열을 `grep` 에 넘기면 자기 옵션으로 해석되므로 스크립트가 파일을 직접 읽어 찾는다.
-  스크립트로 막을 수 없는 함정은 그 단계 절에 실패 조건과 관측 결과를 함께 적는다
-- 스킬 스크립트는 저장소 root 를 스스로 찾아 이동하고, 각 명령의 종료 코드를 그 자리에서 읽는다.
-  출력을 `tail` 이나 `head` 로 잇지 않는다. 파이프 뒤의 `$?` 는 마지막 명령의 것이라 실패가 0 으로 보인다
-- 명령 블록에서 사용자가 채울 값은 셸 변수로 두고 블록 앞에 무엇을 넣는지 적는다.
-  따옴표 없는 `<이름>` 은 셸이 입력 리다이렉션으로 해석한다
-- pnpm 과 npm 은 Windows 에서 `.cmd` 라서 `shell` 없이 spawn 하면 ENOENT 로 실패한다.
-  이 둘만 `shell: true` 로 실행하고 인자를 큰따옴표로 감싸며, 인자 안의 큰따옴표도 escape 한다.
-  git 과 `process.execPath` 는 shell 없이 실행한다
-- `references/` 에는 특정 상황에서만 필요한 것, 한 단계 안에서만 쓰는 상세 절차, 길고 자주 바뀌는 목록을 둔다.
-  본문에는 그 파일을 읽을 조건과 경로만 남기고 내용을 요약하지 않는다
+| 파일 | 범위 |
+| --- | --- |
+| `.claude/rules/public-docs.md` | `README.md`, `skills/**` 의 내부 참조 번호 제외 |
+| `.claude/rules/skill-authoring.md` | `.claude/skills/**` 의 스킬 작성 규약 |
 
 ## Git
 
