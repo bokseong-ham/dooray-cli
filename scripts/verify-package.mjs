@@ -40,9 +40,12 @@ if (versionResult.status !== 0) {
 
 const requiredFiles = [
   "skills/dooray-cli/SKILL.md",
+  "skills/dooray-cli/references/calendar.md",
   "skills/dooray-cli/references/common.md",
   "skills/dooray-cli/references/comment.md",
+  "skills/dooray-cli/references/mail.md",
   "skills/dooray-cli/references/mention-link.md",
+  "skills/dooray-cli/references/messenger.md",
   "skills/dooray-cli/references/post.md",
   "skills/dooray-cli/references/wiki.md",
   "skills/dooray-cli/references/workflow.md",
