@@ -44,6 +44,11 @@ cd <repo root> && npm publish --access public
 **`--otp=<code>` 를 안내하지 않는다.** 계정의 2단계 인증이 `auth-and-writes` 이면
 npm 이 브라우저 인증 URL 을 띄우고 ENTER 를 기다린다. 코드를 손으로 넣는 흐름이 아니다.
 
+게시가 접수되면 npm 이 `Your package is being processed and may take a few minutes to become available.` 를 낸다.
+최신 버전은 몇 분 뒤에 바뀌고, 그 사이 `npm view` 는 이전 버전을 보여 준다.
+사용자가 게시했다고 하는데 이전 버전이 보이면 `~/.npm/_logs/` 에서 가장 최근 `publish` 로그를 연다.
+`PUT 202` 가 있으면 접수된 것이니 7단계의 스크립트가 반영을 기다리게 둔다.
+
 ## Trusted Publishing 등록
 
 CI 게시를 켜려면 먼저 npm 에 신뢰 관계를 등록하고 변수를 켠다.
