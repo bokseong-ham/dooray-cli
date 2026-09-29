@@ -572,6 +572,33 @@ describe("post edit --mime-type", () => {
   });
 });
 
+describe("post edit --dry-run 은 편집기를 열지 않는다", () => {
+  const baseArgs = ["node", "dooray", "post", "edit", "--id", "post-1"];
+
+  it.each([
+    ["--mention", ["--mention", "홍길동"], '[@홍길동](dooray://org-1/members/member-2 "member") 기존 본문'],
+    ["--link-task", ["--link-task", "my-project/7"], "기존 본문"],
+    ["옵션 없음", [], "기존 본문"],
+  ])("%s: 합성한 본문만 출력하고 수정하지 않는다", async (_label, args, expected) => {
+    const program = await createCommandTree();
+    let output = "";
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+      output += String(chunk);
+      return true;
+    });
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    await program.parseAsync([...baseArgs, ...args, "--dry-run"]);
+
+    expect(output).toContain(expected);
+    expect(output).not.toContain("업무가 수정되었습니다");
+    expect(mocks.openInEditor).not.toHaveBeenCalled();
+    expect(mocks.client.updatePost).not.toHaveBeenCalled();
+    stdout.mockRestore();
+    stderr.mockRestore();
+  });
+});
+
 describe("post edit 본문 형식별 마크업", () => {
   // --mention 만 주면 nonInteractive 가 거짓이라 $EDITOR 분기로 간다.
   // --mime-type 을 함께 주어 비대화형 경로로 들어간다.
