@@ -17,6 +17,9 @@ NHN Dooray REST API 를 래핑한 CLI 다. 이 파일은 라우터이므로, 작
 | 위키 페이지 조회·트리·삭제, 첨부와 인라인 이미지, 위키 댓글 | [wiki.md](references/wiki.md) |
 | 그룹 멘션·cc 판단, 멘션·링크 자동 삽입, Dooray 마크다운 링크 | [mention-link.md](references/mention-link.md) |
 | 워크플로우 판단 기준, 정형 task 자동화, 명령 체이닝 | [workflow.md](references/workflow.md) |
+| 메일 원본 선택, 답장 전 확인 | [mail.md](references/mail.md) |
+| 메신저 메시지 읽기, 스레드 보고 | [messenger.md](references/messenger.md) |
+| 캘린더 기간 조회, 일정 상세, 참석자 | [calendar.md](references/calendar.md) |
 
 ## 대상 지정 방법
 
@@ -252,10 +255,7 @@ dooray post get <project> <number> --json --with-tag-names
 | 메일 답장 | `dooray mail reply <uid\|url\|mail-id> --body "..."` — HTML 본문은 `--html` |
 | 저장된 인증정보 제거 | `dooray mail logout` (비대화형 환경은 `--yes`) |
 
-메일 웹 주소와 mail id 는 도착 시각으로 원본을 추정하므로 다른 메일이 선택될 수 있다.
-답장은 UID 직접 입력을 포함한 세 입력 형식 모두 발송 전에 제목, 발신자, 도착 시각과 UID 를 확인하며 기본값은 아니오다.
-자동화에서 답장하려면 원본이 맞는지 확인한 뒤 `-y` 또는 `--yes` 를 명시한다.
-비대화형 환경에서 이 옵션이 없으면 전송 전에 종료 코드 3으로 중단한다.
+답장하거나 메일 웹 주소로 원본을 고를 때는 [mail.md](references/mail.md) 를 먼저 읽는다.
 
 ## 메신저
 
@@ -266,25 +266,7 @@ dooray post get <project> <number> --json --with-tag-names
 | 대화방 스레드 열기 | `dooray messenger thread-send --channel "<channelId\|이름>" --body "..."` — `--thread-body` 나 `--thread-body-file` 로 첫 메시지를 함께 보내고, `--log <log-id>` 로 이미 올라간 메시지에 연다 |
 | 대화방 메시지 읽기 | `dooray messenger logs "<channelId\|이름>" [-n\|--count <개수>]` — 최근 N건(기본 20, 최대 1000). 표는 오래된 것이 위, 최신이 아래 |
 
-`logs` 가 가져올 수 있는 것은 최근 1000건까지다. 그 이전으로 거슬러 갈 수단이 API 에 없어
-`-n` 에 1000 을 넘기면 조용히 잘리지 않고 에러로 끝난다. 날짜 필터도 없다.
-표에는 발신자 이름이 나오지만 `--json` 은 서버 응답 원형이라 발신자가 id 로만 들어 있다.
-정렬도 원형을 따라 최신이 앞이다. 표와 `--quiet` 은 대화 순서대로 뒤집어 내보내므로 둘을 나란히 대조하지 않는다.
-**표의 내용 열은 60자에서 자른다.** 메시지를 읽어 요약하거나 옮겨 적을 때는 표가 아니라 `--json` 으로 전문을 받는다.
-가져온 것보다 오래된 메시지가 남아 있으면 stderr 로 한 줄 알린다. stdout 에는 섞이지 않으므로 파싱에 영향이 없다.
-**이 명령이 부르는 endpoint 는 공식 API 문서에 없다.** 보내는 쪽은 문서에 있고 읽는 쪽만 없다.
-동작은 실제 호출로 확인했지만 호환을 약속받은 것이 아니므로 예고 없이 막힐 수 있다.
-멈추면 곤란한 자동화라면 실패했을 때의 경로를 함께 둔다.
-
-진행 상황을 여러 번 보고할 때는 대화방 본문에 늘어놓지 말고 스레드에 쌓는다.
-`thread-send --quiet` 이 내는 값은 log-id 가 아니라 새로 만들어진 스레드 채널의 id 이고,
-그 값을 `channel-send --channel` 에 주면 메시지가 스레드에 붙는다.
-
-```bash
-THREAD=$(dooray messenger thread-send --channel "배포알림" --body "v1.2.3 배포" --quiet)
-dooray messenger channel-send --channel "$THREAD" --body "빌드 통과"
-dooray messenger channel-send --channel "$THREAD" --body "배포 완료"
-```
+`logs` 로 메시지를 읽거나 진행 상황을 스레드에 보고할 때는 [messenger.md](references/messenger.md) 를 먼저 읽는다.
 
 ## 캘린더
 
@@ -295,18 +277,7 @@ dooray messenger channel-send --channel "$THREAD" --body "배포 완료"
 | 기간 일정 | `dooray calendar event list --from <일시> --to <일시>` — `YYYY-MM-DD` 또는 `2026-09-20T09:00:00+09:00` |
 | 일정 상세 | `dooray calendar event get <calendar-id> <event-id>` — 두 id 가 모두 필요하다 |
 
-읽기 전용이다. 일정을 만들거나 고치거나 지우는 명령은 없다.
-`--from` 과 `--to` 에 날짜만 주면 실행 장비의 시간대로 하루의 시작과 끝까지 늘어난다.
-둘 다 생략하면 오늘 하루를 보고, **한쪽만 주면 그 값이 가리키는 날 하루**를 본다.
-`--from 2026-10-01` 은 10월 1일 하루다. 오늘부터 그 날까지가 아니다. 기간을 보려면 양쪽을 다 준다.
-서버는 한쪽만 받으면 그것을 무시하고 기간을 걸지 않은 것과 같은 결과를 주므로 CLI 가 언제나 양끝을 채운다.
-형식이 어긋난 값, 실재하지 않는 날짜와 시각, `--from` 이 `--to` 보다 뒤인 범위는
-API 를 부르기 전에 종료 코드 3 으로 거부한다.
-**한 번에 조회할 수 있는 기간은 최대 50일이다.** 더 긴 기간은 50일 이하로 나눠 여러 번 부른다.
-**일정 목록은 페이징이 없다.** 결과가 많으면 기간을 좁히는 것 말고 줄일 방법이 없다.
-**참석자 이름과 본문은 `event get` 에만 있다.** 목록 응답의 참석자 항목은 비어 있으니 목록만 보고 참석자를 말하지 않는다.
-다만 **내가** 참여하는지는 목록 표의 내 참여 열(`참석·수락`, `참조·미응답`, `주최` 등)로 알 수 있다. 빈 칸이면 내가 참여자가 아니다.
-`event get` 에 넘길 캘린더 id 는 `calendar list --quiet` 이나 `event list --json` 의 `calendar.id` 에서 얻는다.
+일정을 조회하기 전에 [calendar.md](references/calendar.md) 를 읽는다. 기간 해석과 조회 상한, 참석자를 확인하는 방법이 거기 있다.
 
 ## 옵션 이름
 
