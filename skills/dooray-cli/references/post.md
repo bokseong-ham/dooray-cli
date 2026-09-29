@@ -155,7 +155,7 @@ dooray post create <project> --to user@example.com        # 통과
 
 ```bash
 CHILD_ID=$(dooray post create <project> --title "subtask A" --json | jq -r '.id')
-dooray post edit --id "$CHILD_ID" --title "subtask A" --parent <project>/<parent-number>
+dooray post edit --id "$CHILD_ID" --parent <project>/<parent-number>
 ```
 
 `--parent` 는 단독으로 동작하지 않는다. `--title`, `--body`, `--body-file`, `--tag` 계열,

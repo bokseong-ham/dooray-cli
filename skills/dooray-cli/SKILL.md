@@ -152,7 +152,7 @@ dooray post edit <project> 42 --mime-type text/html
 | 참조자 전체 교체 | `dooray post edit <project> <number> --cc-clear --cc <name>` |
 | 담당자 전체 교체 | `dooray post edit <project> <number> --to-clear --to <name>` |
 | 생성 시 그룹 참조자 | `dooray post create <project> --title "..." --cc-group <code>` |
-| 상위 업무 지정·변경 | `dooray post edit <project> <number> --title "<원제목>" --parent <ref>` — `--parent` 는 단독으로 동작하지 않아 다른 수정 옵션을 함께 준다. 해제는 지원하지 않는다 |
+| 상위 업무 지정·변경 | `dooray post edit <project> <number> --parent <ref>` — 해제는 지원하지 않는다 |
 | 태그 추가 | `dooray post edit --id <postId> --tag <name>` (반복 가능, 중복 제거) |
 | 태그 전체 교체 | `dooray post edit --id <postId> --tag-clear --tag <name>` |
 | 태그 제거 | `dooray post edit --id <postId> --tag-remove <name>` |
