@@ -65,7 +65,7 @@ export const commentEditCommand = new Command("edit")
       }
       commentId = commentId ?? arg1;
     } else if (arg3) {
-      // positional 3개 모드 (legacy): project + post-number + comment-id
+      // positional 3개 모드 (기본 형식): project + post-number + comment-id
       projectArg = arg1;
       postNumberArg = arg2;
       commentId = commentId ?? arg3;

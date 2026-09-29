@@ -51,7 +51,6 @@ export const postCreateCommand = new Command("create")
   .description("업무 생성")
   .argument("<project>", "프로젝트 코드 또는 ID")
   .option("--title <title>", "업무 제목")
-  .option("--subject <subject>", "--title의 deprecated alias")
   .option("--to <members...>", "담당자 (이름 또는 이메일, 여러 명 가능)")
   .option("--to-group <code>", "담당자(to) 그룹 추가 (반복 가능, 그룹 코드 부분일치)", (v, prev: string[]) => [...prev, v], [] as string[])
   .option("--cc <members...>", "참조자 (이름 또는 이메일, 여러 명 가능)")
@@ -74,12 +73,6 @@ export const postCreateCommand = new Command("create")
     const config = await getConfigOrThrow();
     const client = new DoorayApiClient(config.apiKey, config.baseUrl);
 
-    if (opts.subject && !opts.title) {
-      process.stderr.write(
-        "⚠  --subject는 deprecated입니다. 대신 --title을 사용해주세요.\n",
-      );
-    }
-
     const mentionInputs: string[] = (opts.mention ?? []).filter((s: string) => s.length > 0);
     const groupInputs: string[] = (opts.mentionGroup ?? []).filter((s: string) => s.length > 0);
     const linkInputs: string[] = (opts.linkTask ?? []).filter((s: string) => s.length > 0);
@@ -100,8 +93,8 @@ export const postCreateCommand = new Command("create")
       }
     }
 
-    // subject: 사용자 --title/--subject 우선, 없으면 템플릿
-    const subject = opts.title ?? opts.subject ?? templateDetail?.subject;
+    // subject: 사용자 --title 우선, 없으면 템플릿
+    const subject = opts.title ?? templateDetail?.subject;
     if (!subject) {
       stopSpinner(false);
       const msg = opts.template

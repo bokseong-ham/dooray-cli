@@ -578,6 +578,18 @@ describe("post edit --mime-type", () => {
   });
 });
 
+describe("post edit 제목 옵션", () => {
+  it("제거된 --subject 는 알 수 없는 옵션으로 거절한다", async () => {
+    const program = await createCommandTree();
+    exitOverrideAll(program);
+
+    await expect(
+      program.parseAsync(["node", "dooray", "post", "edit", "--id", "post-1", "--subject", "새 제목"]),
+    ).rejects.toThrow(/unknown option '--subject'/);
+    expect(mocks.client.updatePost).not.toHaveBeenCalled();
+  });
+});
+
 describe("post edit 멘션·링크·상위 업무 단독 호출", () => {
   const baseArgs = ["node", "dooray", "post", "edit", "--id", "post-1"];
 
