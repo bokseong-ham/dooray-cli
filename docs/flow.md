@@ -510,9 +510,7 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A["상위 업무 입력"] --> B{"다른 비대화형 옵션"}
-    B -->|없음| C["대화형 경로에서 경고 후 무시"]
-    B -->|있음| D["대상 업무 해석<br/>ID·URL: GET project/v1/posts/{postId}"]
+    A["상위 업무 입력"] --> D["대상 업무 해석<br/>ID·URL: GET project/v1/posts/{postId}"]
     D --> E["PUT posts/{postId}"]
     E --> E2["상위 업무 해석"]
     E2 --> F["POST set-parent-post"]
@@ -521,6 +519,7 @@ flowchart TD
 
 - 상위 업무는 `project/number` 또는 업무 ID로 해석한다. 없거나 모호하면 종료 코드 3으로 끝난다.
 - 업무 본문 수정과 상위 업무 설정은 서로 다른 요청이다. 두 번째 요청이 실패하면 첫 번째 수정은 남고 오류로 끝난다.
+- `--parent` 만 주어도 편집기를 열지 않는다. 본문을 바꾸지 않아도 첫 번째 요청이 같은 본문을 보내므로 수정 이력이 하나 남는다.
 - 상위 업무 해제 API는 없어 이 명령으로 최상위 업무로 바꿀 수 없다.
 
 ## 업무 메타데이터 흐름 (ADR-019)

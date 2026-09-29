@@ -194,8 +194,8 @@ dooray post comment edit <project> 42 --comment-id <comment-id> --body "확인 �
 `--mime-type text/x-markdown` 으로 형식을 바꾸는 방법을 안내한다.
 추측한 표기를 넣으면 링크로 렌더링되지 않는 문자열이 본문에 남는다.
 
-`post edit` 에서 `--mention` 이나 `--link-task` 만 주면 `$EDITOR` 가 열리고 그 옵션은 무시된다.
-`--title` 이나 `--body` 나 `--mime-type` 을 함께 주어야 적용된다.
+`post edit` 에서 `--mention` 이나 `--link-task` 만 주면 편집기를 열지 않고 기존 본문에 붙여 수정한다.
+`--dry-run` 을 붙이면 수정하지 않고 합성한 본문만 출력한다.
 
 전체 명령과 옵션은 `--help` 로 본다.
 
