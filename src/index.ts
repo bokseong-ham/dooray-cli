@@ -49,6 +49,7 @@ import { mailSendCommand } from "./commands/mail/send.js";
 import { mailReplyCommand } from "./commands/mail/reply.js";
 import { mailLogoutCommand } from "./commands/mail/logout.js";
 import { messengerCommand } from "./commands/messenger/index.js";
+import { calendarCommand } from "./commands/calendar/index.js";
 import { feedbackCommand } from "./commands/feedback.js";
 import { DoorayCliError } from "./utils/errors.js";
 import { sanitizeArgv } from "./utils/argv-sanitize.js";
@@ -157,6 +158,7 @@ program.addCommand(postCommand);
 program.addCommand(wikiCommand);
 program.addCommand(mailCommand);
 program.addCommand(messengerCommand);
+program.addCommand(calendarCommand);
 program.addCommand(feedbackCommand);
 
 // ADR-058: 등록이 끝난 뒤 명령 나무 전체에 오류 안내 후크를 건다.

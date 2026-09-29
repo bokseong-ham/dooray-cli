@@ -683,3 +683,103 @@ export interface MessengerLog {
 // 목록 응답에 totalCount 는 없고 hasMore 만 온다.
 export type MessengerLogListResponse = DoorayApiResponse<MessengerLog[]> & { hasMore?: boolean };
 export type TemplateDetailResponse = DoorayApiResponse<TemplateDetail>;
+
+// ─── Calendar ───────────────────────────────────────────
+
+/** 캘린더에 대한 내 설정과 권한. */
+export interface CalendarMe {
+  default?: boolean;
+  color?: string;
+  listed?: boolean;
+  checked?: boolean;
+  /** 실측 값: `owner`, `view`, `read_write`, `all` */
+  role?: string;
+  order?: number;
+}
+
+export interface Calendar {
+  id: string;
+  name?: string;
+  type?: string;
+  /** boolean 이 아니라 객체다. 객체는 항상 truthy 라 `if (cal.me)` 로 거르면 모든 캘린더가 통과한다. */
+  me?: CalendarMe;
+  ownerOrganizationMemberId?: string;
+  /** project 캘린더에만 붙는다(공식 문서상 추후 제공). 다른 캘린더에는 null 로 온다(실측). */
+  projectId?: string | null;
+  createdAt?: string;
+}
+
+/** 실측은 숫자(`12`)로 오지만 공식 문서 예시는 문자열(`"2"`)이라 둘 다 받는다. */
+export type CalendarListResponse = DoorayApiResponse<Calendar[]> & { totalCount?: number | string };
+
+export interface CalendarEventMember {
+  organizationMemberId?: string;
+  name?: string;
+  emailAddress?: string;
+}
+
+export interface CalendarEventUser {
+  type?: string;
+  status?: string;
+  member?: CalendarEventMember;
+}
+
+/**
+ * 공식 문서는 목록 응답에 users 가 포함되지 않는다고 적지만, 실측으로는 빈 객체 `{}` 로 온다.
+ * 채워진 값은 상세 조회에서만 얻는다.
+ */
+export interface CalendarEventUsers {
+  from?: CalendarEventUser | null;
+  to?: CalendarEventUser[] | null;
+  cc?: CalendarEventUser[] | null;
+}
+
+/**
+ * 그 일정에서의 나. 목록과 상세가 같은 구조다.
+ *
+ * `status` 와 `userType` 은 내가 그 일정의 참여자일 때만 온다. 공유받은 캘린더의 남의 일정은
+ * `{ type, member: { organizationMemberId } }` 뿐이다(실측). 참여자면 `member` 에 이름과 이메일도 온다.
+ */
+export interface CalendarEventMe {
+  type?: string;
+  member?: CalendarEventMember;
+  /** 실측 값: `accepted`, `declined`, `tentative`, `not_confirmed` */
+  status?: string;
+  /** 실측 값: `from`(등록자), `to`(참석자), `cc`(참조) */
+  userType?: string;
+}
+
+export interface CalendarEventCalendar {
+  id?: string;
+  name?: string;
+}
+
+export interface CalendarEvent {
+  id: string;
+  subject?: string;
+  startedAt?: string;
+  endedAt?: string;
+  wholeDayFlag?: boolean;
+  calendar?: CalendarEventCalendar;
+  category?: string;
+  location?: string;
+  users?: CalendarEventUsers;
+  me?: CalendarEventMe;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CalendarEventBody {
+  /** 실측 값: `text/x-markdown` */
+  mimeType: string;
+  content: string;
+}
+
+/** 상세는 목록 항목에 body 가 더해진 형태다. */
+export interface CalendarEventDetail extends CalendarEvent {
+  body?: CalendarEventBody;
+}
+
+// 목록 응답에 totalCount 는 없다.
+export type CalendarEventListResponse = DoorayApiResponse<CalendarEvent[]>;
+export type CalendarEventDetailResponse = DoorayApiResponse<CalendarEventDetail>;

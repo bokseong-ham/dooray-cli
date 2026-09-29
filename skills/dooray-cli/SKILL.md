@@ -286,6 +286,28 @@ dooray messenger channel-send --channel "$THREAD" --body "빌드 통과"
 dooray messenger channel-send --channel "$THREAD" --body "배포 완료"
 ```
 
+## 캘린더
+
+| 의도 | 커맨드 |
+| --- | --- |
+| 캘린더 목록 | `dooray calendar list` — `--quiet` 은 캘린더 id |
+| 오늘 일정 | `dooray calendar event list` |
+| 기간 일정 | `dooray calendar event list --from <일시> --to <일시>` — `YYYY-MM-DD` 또는 `2026-09-20T09:00:00+09:00` |
+| 일정 상세 | `dooray calendar event get <calendar-id> <event-id>` — 두 id 가 모두 필요하다 |
+
+읽기 전용이다. 일정을 만들거나 고치거나 지우는 명령은 없다.
+`--from` 과 `--to` 에 날짜만 주면 실행 장비의 시간대로 하루의 시작과 끝까지 늘어난다.
+둘 다 생략하면 오늘 하루를 보고, **한쪽만 주면 그 값이 가리키는 날 하루**를 본다.
+`--from 2026-10-01` 은 10월 1일 하루다. 오늘부터 그 날까지가 아니다. 기간을 보려면 양쪽을 다 준다.
+서버는 한쪽만 받으면 그것을 무시하고 기간을 걸지 않은 것과 같은 결과를 주므로 CLI 가 언제나 양끝을 채운다.
+형식이 어긋난 값, 실재하지 않는 날짜와 시각, `--from` 이 `--to` 보다 뒤인 범위는
+API 를 부르기 전에 종료 코드 3 으로 거부한다.
+**한 번에 조회할 수 있는 기간은 최대 50일이다.** 더 긴 기간은 50일 이하로 나눠 여러 번 부른다.
+**일정 목록은 페이징이 없다.** 결과가 많으면 기간을 좁히는 것 말고 줄일 방법이 없다.
+**참석자 이름과 본문은 `event get` 에만 있다.** 목록 응답의 참석자 항목은 비어 있으니 목록만 보고 참석자를 말하지 않는다.
+다만 **내가** 참여하는지는 목록 표의 내 참여 열(`참석·수락`, `참조·미응답`, `주최` 등)로 알 수 있다. 빈 칸이면 내가 참여자가 아니다.
+`event get` 에 넘길 캘린더 id 는 `calendar list --quiet` 이나 `event list --json` 의 `calendar.id` 에서 얻는다.
+
 ## 옵션 이름
 
 `post` 와 `wiki page` 모두 제목은 `--title` 이다.
