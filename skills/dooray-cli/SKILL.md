@@ -311,5 +311,5 @@ API 를 부르기 전에 종료 코드 3 으로 거부한다.
 ## 옵션 이름
 
 `post` 와 `wiki page` 모두 제목은 `--title` 이다.
-`post create` 와 `post edit` 의 `--subject` 는 `--title` 의 deprecated alias 로 아직 동작하지만 경고가 나온다.
-`post list` 의 `--subject` 는 제목 키워드 필터라서 별개 옵션이다.
+`post create` 와 `post edit` 는 `--subject` 를 받지 않는다. 제목은 `--title` 로 준다.
+`post list` 의 `--subject` 는 제목 키워드 필터다.

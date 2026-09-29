@@ -46,7 +46,6 @@ export const postEditCommand = new Command("edit")
   .option("--id <postId>", "Dooray post ID (project/post-number 대신)")
   .option("--url <url>", "Dooray 업무 URL (project/post-number 대신)")
   .option("--title <title>", "제목 변경 (non-interactive)")
-  .option("--subject <subject>", "--title의 deprecated alias")
   .option("--body <text>", "본문 변경 (- 입력 시 stdin, non-interactive)")
   .option("--body-file <path>", "본문 파일 경로 (- 입력 시 stdin, non-interactive)")
   .option("--mention <name>", "멤버 멘션 (반복 가능, 이름 부분일치)", (v, prev: string[]) => [...prev, v], [] as string[])
@@ -98,12 +97,7 @@ export const postEditCommand = new Command("edit")
     const members = await ensureMembers(client, projectId);
     stopSpinner(true, "업무 조회 완료");
 
-    const title = opts.title ?? opts.subject;
-    if (opts.subject && !opts.title) {
-      process.stderr.write(
-        "⚠  --subject는 deprecated입니다. 대신 --title을 사용해주세요.\n",
-      );
-    }
+    const title = opts.title;
 
     const bodyMimeType = resolveBodyMimeType(post.body.mimeType, opts.mimeType);
 
