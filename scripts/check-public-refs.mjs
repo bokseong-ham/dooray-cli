@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // 공개 문서에 내부 추적 번호가 남았는지 검사한다.
 //
-// 이유는 CLAUDE.md "공개 문서(README · 공개 SKILL) — 내부 참조 번호 제외" 가 소유한다.
+// 이유는 .claude/rules/public-docs.md 가 소유한다.
 // 요약하면 사용자는 ADR 맥락을 모르고, 이 문서를 그대로 에이전트에 붙여 쓰기도 한다.
 //
 // 사용법: node scripts/check-public-refs.mjs   (cwd 는 저장소 루트)
