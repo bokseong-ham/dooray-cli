@@ -268,6 +268,42 @@ describe("post replace", () => {
     expect(mocks.getConfigOrThrow).not.toHaveBeenCalled();
   });
 
+  it("--new-file 경로가 비면 old 구간을 지우지 않고 설정 조회 전에 종료 코드 3", async () => {
+    const { error } = await run(["post", "replace", "--id", "post-1", "--old", "2. 배포", "--new-file", ""]);
+
+    expectParamError(error, /--new-file 경로가 비어 있습니다/);
+    expect(mocks.getConfigOrThrow).not.toHaveBeenCalled();
+    expect(mocks.client.updatePost).not.toHaveBeenCalled();
+  });
+
+  it("대상 해석이 실패하면 스피너를 띄우지 않는다", async () => {
+    mocks.resolvePostInput.mockRejectedValue(new Error("resolve failed"));
+
+    const { error } = await run(["post", "replace", "--id", "post-1", "--old", "배포", "--new", "x"]);
+
+    expect((error as Error).message).toBe("resolve failed");
+    expect(mocks.startSpinner).not.toHaveBeenCalled();
+  });
+
+  it("업무 조회가 실패하면 스피너를 실패로 멈춘다", async () => {
+    mocks.client.getPost.mockRejectedValue(new Error("get failed"));
+
+    const { error } = await run(["post", "replace", "--id", "post-1", "--old", "배포", "--new", "x"]);
+
+    expect((error as Error).message).toBe("get failed");
+    expect(mocks.stopSpinner).toHaveBeenCalledWith(false);
+    expect(mocks.client.updatePost).not.toHaveBeenCalled();
+  });
+
+  it("업무 수정이 실패하면 스피너를 실패로 멈춘다", async () => {
+    mocks.client.updatePost.mockRejectedValue(new Error("update failed"));
+
+    const { error } = await run(["post", "replace", "--id", "post-1", "--old", "배포", "--new", "x"]);
+
+    expect((error as Error).message).toBe("update failed");
+    expect(mocks.stopSpinner).toHaveBeenLastCalledWith(false);
+  });
+
   it("--json 은 replaced 를 담은 구조를 낸다", async () => {
     const { stdout } = await run([
       "--json", "post", "replace", "--id", "post-1", "--old", "배포", "--new", "카나리 배포",

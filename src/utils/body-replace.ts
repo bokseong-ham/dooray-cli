@@ -45,12 +45,21 @@ function requireOne(text: string | undefined, file: string | undefined, name: "o
       EXIT_PARAM_ERROR,
     );
   }
+  // 빈 경로는 readTextInput 에서 "파일 없음" 으로 취급돼 빈 문자열이 된다. new 라면 구간 삭제로 통과해
+  // old 구간이 지워진 채 저장되므로 읽기 전에 막는다. 인자로 준 빈 new(`--new ""`)는 삭제 용도라 허용한다.
+  if (file != null && file.trim() === "") {
+    throw new DoorayCliError(
+      `--${name}-file 경로가 비어 있습니다. 파일 경로나 stdin(-)을 지정해주세요.`,
+      EXIT_PARAM_ERROR,
+    );
+  }
 }
 
 /**
  * old 와 new 를 읽는다. 설정 조회·API 호출 전에 부른다.
  *
  * - 각각 인자와 파일 중 하나만 받는다
+ * - 파일 경로가 빈 문자열이면 거부한다. 빈 new 로 읽혀 old 구간이 지워지는 것을 막는다
  * - stdin 은 한 번만 읽을 수 있어 old 와 new 가 함께 `-` 를 쓰면 거부한다
  * - 옵션 조합 검사를 old·new 모두 끝낸 뒤에 읽는다. stdin 을 다 읽고 나서 조합 오류를 내면
  *   파이프로 보낸 입력이 버려진다
@@ -146,14 +155,18 @@ export function applyReplace(
 ): ReplaceResult {
   const occurrences = findOccurrences(content, oldText);
   if (occurrences.length === 0) {
-    // 일치 규칙은 정확 일치 그대로 두고, 줄바꿈 형식이 다를 가능성만 알린다.
+    // 일치 규칙은 정확 일치 그대로 두고, 줄바꿈 형식이나 유니코드 정규화 형식이 다를 가능성만 알린다.
     const crlfHint = content.includes("\r\n") && !oldText.includes("\r")
       ? "\n  본문의 줄바꿈이 CRLF(\\r\\n)입니다. old 의 줄바꿈이 LF(\\n)면 여러 줄 old 는 일치하지 않습니다."
+      : "";
+    const nfcHint = content.normalize("NFC").includes(oldText.normalize("NFC"))
+      ? "\n  old 와 본문의 유니코드 정규화 형식(NFC/NFD)이 다릅니다. 파일 이름 등에서 복사한 한글은 NFD 일 수 있습니다."
       : "";
     throw new DoorayCliError(
       "본문에서 old 를 찾지 못했습니다. 공백과 줄바꿈까지 정확히 일치해야 합니다.\n" +
         "  현재 본문은 `post get --json` / `wiki page get --json` 의 body.content 로 확인할 수 있습니다." +
-        crlfHint,
+        crlfHint +
+        nfcHint,
       EXIT_PARAM_ERROR,
     );
   }

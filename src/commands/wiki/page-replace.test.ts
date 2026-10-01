@@ -180,6 +180,33 @@ describe("wiki page replace", () => {
     expect(mocks.resolveWikiPageInput).not.toHaveBeenCalled();
   });
 
+  it("--new-file 경로가 비면 대상 해석 전에 거부하고 수정하지 않는다", async () => {
+    const { error } = await run(["wiki", "page", "replace", "--id", "page-1", "--old", "- 배포", "--new-file", ""]);
+
+    expectParamError(error, /--new-file 경로가 비어 있습니다/);
+    expect(mocks.resolveWikiPageInput).not.toHaveBeenCalled();
+    expect(mocks.client.updateWikiPageContent).not.toHaveBeenCalled();
+  });
+
+  it("페이지 조회가 실패하면 스피너를 실패로 멈춘다", async () => {
+    mocks.client.getWikiPage.mockRejectedValue(new Error("get failed"));
+
+    const { error } = await run(["wiki", "page", "replace", "--id", "page-1", "--old", "배포", "--new", "x"]);
+
+    expect((error as Error).message).toBe("get failed");
+    expect(mocks.stopSpinner).toHaveBeenCalledWith(false);
+    expect(mocks.client.updateWikiPageContent).not.toHaveBeenCalled();
+  });
+
+  it("본문 수정이 실패하면 스피너를 실패로 멈춘다", async () => {
+    mocks.client.updateWikiPageContent.mockRejectedValue(new Error("update failed"));
+
+    const { error } = await run(["wiki", "page", "replace", "--id", "page-1", "--old", "배포", "--new", "x"]);
+
+    expect((error as Error).message).toBe("update failed");
+    expect(mocks.stopSpinner).toHaveBeenLastCalledWith(false);
+  });
+
   it("--dry-run --quiet 은 바뀔 군데 수만 낸다", async () => {
     const { stdout } = await run([
       "--quiet", "wiki", "page", "replace", "--id", "page-1", "--old", "- ", "--new", "* ", "--all", "--dry-run",

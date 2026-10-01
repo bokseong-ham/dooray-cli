@@ -64,8 +64,14 @@ export const wikiPageReplaceCommand = new Command("replace")
     });
 
     startSpinner("위키 페이지 조회 중...");
-    const page = (await client.getWikiPage(wikiId, pageId)).result;
-    stopSpinner(true, "위키 페이지 조회 완료");
+    let page: WikiPageDetail;
+    try {
+      page = (await client.getWikiPage(wikiId, pageId)).result;
+      stopSpinner(true, "위키 페이지 조회 완료");
+    } catch (e) {
+      stopSpinner(false);
+      throw e;
+    }
 
     const current = page.body?.content ?? "";
     const result = applyReplace(current, oldText, newText, !!opts.all);
@@ -78,11 +84,17 @@ export const wikiPageReplaceCommand = new Command("replace")
 
     await checkAndGuardDropped(current, result.content, wikiAttachments(page), !opts.confirm);
 
+    // 첨부 누락 확인 프롬프트는 스피너가 없는 동안 끝난다. 수정 스피너는 그 뒤에 띄운다.
     startSpinner("위키 페이지 본문 수정 중...");
-    await client.updateWikiPageContent(wikiId, pageId, {
-      body: { mimeType: bodyMimeType, content: result.content },
-    });
-    stopSpinner(true, "위키 페이지 수정 완료");
+    try {
+      await client.updateWikiPageContent(wikiId, pageId, {
+        body: { mimeType: bodyMimeType, content: result.content },
+      });
+      stopSpinner(true, "위키 페이지 수정 완료");
+    } catch (e) {
+      stopSpinner(false);
+      throw e;
+    }
 
     if (globalOpts.json) {
       printJson({ wikiId, pageId, replaced: result.replaced });

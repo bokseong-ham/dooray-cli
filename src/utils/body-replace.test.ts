@@ -185,6 +185,24 @@ describe("readReplaceInputs", () => {
   it("old 와 new 가 같으면 거부한다", async () => {
     await expectParamError(readReplaceInputs({ old: "같음", new: "같음" }), /같아/);
   });
+
+  it("--new-file 경로가 빈 문자열이면 구간 삭제로 넘기지 않고 거부한다", async () => {
+    await expectParamError(readReplaceInputs({ old: "x", newFile: "" }), /--new-file 경로가 비어 있습니다/);
+  });
+
+  it("--new-file 경로가 공백뿐이어도 거부한다", async () => {
+    await expectParamError(readReplaceInputs({ old: "x", newFile: "  " }), /--new-file 경로가 비어 있습니다/);
+  });
+
+  it("--old-file 경로가 빈 문자열이면 경로가 비었다고 거부한다", async () => {
+    await expectParamError(readReplaceInputs({ oldFile: "", new: "y" }), /--old-file 경로가 비어 있습니다/);
+  });
+
+  it("빈 경로는 stdin 을 읽기 전에 거부한다", async () => {
+    const stdin = stubStdin("파이프 입력");
+    await expectParamError(readReplaceInputs({ old: "-", newFile: "" }), /--new-file 경로가 비어 있습니다/);
+    expect(stdin).not.toHaveBeenCalled();
+  });
 });
 
 describe("findOccurrences", () => {
@@ -286,6 +304,29 @@ describe("applyReplace 경계", () => {
   it("CRLF 본문이어도 old 에 CR 이 있으면 정확 일치로 바꾼다", () => {
     const result = applyReplace("첫째\r\n둘째", "첫째\r\n둘째", "x", false);
     expect(result.content).toBe("x");
+  });
+
+  it("정규화하면 일치하는 0건에는 NFC/NFD 안내를 덧붙인다", () => {
+    const nfc = "한글 문서";
+    const nfd = nfc.normalize("NFD");
+    expect(nfd).not.toBe(nfc);
+    expectThrowParam(() => applyReplace(`앞 ${nfc} 뒤`, nfd, "x", false), /NFC\/NFD/);
+  });
+
+  it("CRLF 안내와 NFC/NFD 안내는 함께 나올 수 있다", () => {
+    const old = "한글".normalize("NFD");
+    expectThrowParam(() => applyReplace("첫째\r\n한글 문서", old, "x", false), /CRLF[\s\S]*NFC\/NFD|NFC\/NFD[\s\S]*CRLF/);
+  });
+
+  it("그냥 없는 문자열의 0건에는 NFC/NFD 안내가 없다", () => {
+    let message = "";
+    try {
+      applyReplace("한글 문서", "없는 말", "x", false);
+    } catch (e) {
+      message = (e as Error).message;
+    }
+    expect(message).toContain("찾지 못했습니다");
+    expect(message).not.toContain("NFC");
   });
 
   it("LF 본문의 0건에는 CRLF 안내가 없다", () => {

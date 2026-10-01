@@ -9,7 +9,7 @@ import { Command } from "commander";
 import { getConfigOrThrow } from "../../config/store.js";
 import { DoorayApiClient } from "../../api/client.js";
 import { resolvePostInput } from "../../resolvers/post-input.js";
-import type { CreatePostUser, PostUser } from "../../api/types.js";
+import type { CreatePostUser, PostDetail, PostUser } from "../../api/types.js";
 import type { OutputOptions } from "../../formatters/table.js";
 import { printJson } from "../../formatters/table.js";
 import { startSpinner, stopSpinner } from "../../utils/spinner.js";
@@ -43,7 +43,7 @@ export const postReplaceCommand = new Command("replace")
     const client = new DoorayApiClient(config.apiKey, config.baseUrl);
     const globalOpts = postReplaceCommand.optsWithGlobals() as OutputOptions;
 
-    startSpinner("업무 조회 중...");
+    // 대상 해석은 스피너 전에 한다. 입력 오류 메시지가 스피너 문자와 섞이지 않게 한다.
     const { projectId, postId, postNumber } = await resolvePostInput(client, {
       projectArg: project,
       postNumberArg: postNumberStr,
@@ -51,8 +51,16 @@ export const postReplaceCommand = new Command("replace")
       urlOpt: opts.url,
       argv: process.argv.slice(2),
     });
-    const post = (await client.getPost(projectId, postId)).result;
-    stopSpinner(true, "업무 조회 완료");
+
+    startSpinner("업무 조회 중...");
+    let post: PostDetail;
+    try {
+      post = (await client.getPost(projectId, postId)).result;
+      stopSpinner(true, "업무 조회 완료");
+    } catch (e) {
+      stopSpinner(false);
+      throw e;
+    }
 
     const current = post.body?.content ?? "";
     const result = applyReplace(current, oldText, newText, !!opts.all);
@@ -66,16 +74,22 @@ export const postReplaceCommand = new Command("replace")
     const attachments = (post.files ?? []).map((f) => ({ id: f.id, name: f.name }));
     await checkAndGuardDropped(current, result.content, attachments, !opts.confirm);
 
+    // 첨부 누락 확인 프롬프트는 스피너가 없는 동안 끝난다. 수정 스피너는 그 뒤에 띄운다.
     startSpinner("업무 수정 중...");
-    await client.updatePost(projectId, postId, {
-      subject: post.subject,
-      body: { mimeType: bodyMimeType, content: result.content },
-      priority: post.priority,
-      dueDate: post.dueDate,
-      dueDateFlag: post.dueDateFlag,
-      users: { to: post.users.to.map(toRequestUser), cc: post.users.cc.map(toRequestUser) },
-    });
-    stopSpinner(true, "업무 수정 완료");
+    try {
+      await client.updatePost(projectId, postId, {
+        subject: post.subject,
+        body: { mimeType: bodyMimeType, content: result.content },
+        priority: post.priority,
+        dueDate: post.dueDate,
+        dueDateFlag: post.dueDateFlag,
+        users: { to: post.users.to.map(toRequestUser), cc: post.users.cc.map(toRequestUser) },
+      });
+      stopSpinner(true, "업무 수정 완료");
+    } catch (e) {
+      stopSpinner(false);
+      throw e;
+    }
 
     if (globalOpts.json) {
       printJson({ postId, number: postNumber, replaced: result.replaced });
