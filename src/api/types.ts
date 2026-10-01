@@ -655,11 +655,28 @@ export interface MessengerSendResult {
 
 export type MessengerSendResponse = DoorayApiResponse<MessengerSendResult>;
 
-// 채널 목록 매칭에 필요한 필드만 (title 매칭용). direct/me 방은 title 빈값.
+// 대화방 참여자. 실측상 `{ type: "member", member: { organizationMemberId } }` 이고 이름은 오지 않는다.
+export interface MessengerChannelUser {
+  type?: string;
+  member?: { organizationMemberId?: string };
+}
+
+// direct 방과 일부 private 방은 title 이 빈값이다 (ADR-066).
+// title 매칭(resolveMessengerChannel)은 id·title·type 만 쓰고, 나머지는 `messenger channels` 가 쓴다.
 export interface MessengerChannel {
   id: string;
   title: string;
+  /** 실측: `direct`(1:1) / `private`(그룹) */
   type: string;
+  /** 실측: `normal` / `system` */
+  status?: string;
+  displayed?: boolean;
+  capacity?: number;
+  createdAt?: string;
+  updatedAt?: string;
+  archivedAt?: string | null;
+  users?: { participants?: MessengerChannelUser[] };
+  me?: MessengerChannelUser & { role?: string };
 }
 
 export type MessengerChannelListResponse = DoorayApiResponse<MessengerChannel[]>;

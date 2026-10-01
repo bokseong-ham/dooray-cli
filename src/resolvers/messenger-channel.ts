@@ -22,7 +22,9 @@ export async function resolveMessengerChannel(
   const named = res.result.filter((ch) => !!ch.title);
   const adapter = named.map((ch) => ({ name: ch.title, id: ch.id }));
   const match = matchByName(adapter, input, "대화방", (ch) => `${ch.name} (${ch.id})`, {
-    helpHint: "channelId 직접 입력 (15+자리 numeric) 또는 Dooray 메신저에서 방 확인",
+    // matchByName 이 앞에 "전체 목록: " 을 붙인다. 1:1 방은 제목이 없어 이름으로 못 찾으므로 id 를 얻는 길을 알린다.
+    helpHint:
+      "dooray messenger channels — 여기서 찾은 channelId 직접 입력 (1:1 방은 제목이 없어 id 로만 넘길 수 있다)",
   });
   return match.id;
 }

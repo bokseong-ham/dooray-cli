@@ -1,0 +1,276 @@
+/**
+ * `dooray messenger channels` — 내가 속한 대화방 목록. `GET messenger/v1/channels`.
+ *
+ * `logs` 와 `channel-send --channel` 에 넘길 channelId 를 여기서 얻는다.
+ * API 가 `size` 를 비롯한 파라미터를 무시하고 전체를 주므로 필터·정렬은 모두 클라이언트에서 한다 (ADR-066).
+ * 제목이 빈 방(1:1 방 전부와 일부 그룹방)은 참여자 이름으로 표시명을 만든다.
+ * 이름 조회는 방마다 호출이 붙어 표 모드와 `--search` 가 있을 때만, 필요한 참여자만 한다.
+ */
+
+import { Command, Option } from "commander";
+import { getConfigOrThrow } from "../../config/store.js";
+import { DoorayApiClient } from "../../api/client.js";
+import { buildOrganizationMemberNameMap } from "../../resolvers/member.js";
+import { ensureMe } from "../../resolvers/me.js";
+import type { MessengerChannel } from "../../api/types.js";
+import type { OutputOptions } from "../../formatters/table.js";
+import { output, printJson } from "../../formatters/table.js";
+import { formatSentAt } from "../../formatters/datetime.js";
+import { sanitizeForTerminal } from "../../utils/sanitize.js";
+import { startSpinner, stopSpinner } from "../../utils/spinner.js";
+import { DoorayCliError } from "../../utils/errors.js";
+import { EXIT_PARAM_ERROR } from "../../utils/exit-codes.js";
+import {
+  DAY_START,
+  expandLocalDate,
+  isDateOnlyForm,
+  parseIsoInstant,
+  parseLocalDate,
+} from "../../utils/local-date.js";
+
+export const CHANNEL_TYPES = ["direct", "private"] as const;
+
+// 제목 없는 방 표시명에 이름을 몇 명까지 늘어놓을지. 표 모드는 이 수만큼만 이름을 조회한다.
+const MAX_NAMES_IN_LABEL = 3;
+
+interface ChannelsOptions {
+  type?: (typeof CHANNEL_TYPES)[number];
+  search?: string;
+  since?: string;
+  all?: boolean;
+}
+
+/**
+ * `--since` 를 비교 기준 시각 문자열로 확정한다.
+ * `YYYY-MM-DD` 는 그 날 로컬 00:00:00, offset 이 붙은 ISO8601 은 실재성을 본 뒤 그대로 쓴다.
+ */
+export function resolveSince(value: string): string {
+  if (isDateOnlyForm(value)) {
+    const date = parseLocalDate(value);
+    if (date != null) return expandLocalDate(date, DAY_START);
+  } else if (parseIsoInstant(value) != null) {
+    return value;
+  }
+  throw new DoorayCliError(
+    `--since 값을 읽을 수 없습니다: "${value}" ` +
+      `(YYYY-MM-DD 또는 2026-09-20T09:00:00+09:00 형태로 주세요)`,
+    EXIT_PARAM_ERROR,
+  );
+}
+
+/** 앞뒤 공백을 뗀 검색어. 비면 전체가 걸리므로(셸 변수가 빈 경우) 거부한다. */
+function resolveSearch(value: string | undefined): string | undefined {
+  if (value == null) return undefined;
+  const keyword = value.trim();
+  if (keyword === "") {
+    throw new DoorayCliError("--search 검색어가 비어 있습니다.", EXIT_PARAM_ERROR);
+  }
+  return keyword.toLowerCase();
+}
+
+/** 보관된 방과 `status` 가 `normal` 이 아닌 방(`system` 등)을 기본 목록에서 뺀다. status 가 없는 방은 남긴다. */
+function isActive(ch: MessengerChannel): boolean {
+  return !ch.archivedAt && (ch.status == null || ch.status === "normal");
+}
+
+function updatedAtMs(ch: MessengerChannel): number {
+  const ms = ch.updatedAt ? Date.parse(ch.updatedAt) : NaN;
+  return Number.isNaN(ms) ? -Infinity : ms;
+}
+
+/** 필터를 적용하고 최근 활동순으로 정렬한다. 이름이 필요 없는 조건만 다룬다(`--search` 는 따로). */
+export function filterAndSortChannels(
+  channels: MessengerChannel[],
+  opts: { type?: string; sinceMs?: number; all?: boolean },
+): MessengerChannel[] {
+  return channels
+    .filter((ch) => opts.all || isActive(ch))
+    .filter((ch) => opts.type == null || ch.type === opts.type)
+    // updatedAt 이 없거나 읽을 수 없는 방은 --since 를 만족한다고 볼 수 없어 뺀다.
+    .filter((ch) => opts.sinceMs == null || updatedAtMs(ch) >= opts.sinceMs)
+    .sort((a, b) => updatedAtMs(b) - updatedAtMs(a));
+}
+
+function participantIds(ch: MessengerChannel): string[] {
+  return (ch.users?.participants ?? [])
+    .map((p) => p.member?.organizationMemberId)
+    .filter((id): id is string => !!id);
+}
+
+function otherParticipantIds(ch: MessengerChannel, myId: string | undefined): string[] {
+  return participantIds(ch).filter((id) => id !== myId);
+}
+
+/**
+ * 제목이 빈 방의 표시명. 나를 뺀 참여자 이름으로 `DM: 홍길동` / `그룹: 가, 나, 다 외 N명`.
+ * 이름을 하나도 얻지 못하면 대체 문구를 쓴다. 나만 있는 방은 `(나)` 로 표시한다.
+ * 화면 표시용이다. `--search` 는 이 문자열이 아니라 참여자 이름 각각에서 찾는다.
+ */
+export function buildUntitledLabel(
+  ch: MessengerChannel,
+  myId: string | undefined,
+  nameMap: Map<string, string>,
+): string {
+  const prefix = ch.type === "direct" ? "DM" : "그룹";
+  const ids = participantIds(ch);
+  const others = ids.filter((id) => id !== myId);
+  if (ids.length > 0 && others.length === 0) return `${prefix}: (나)`;
+
+  const names = others
+    .slice(0, MAX_NAMES_IN_LABEL)
+    .map((id) => nameMap.get(id))
+    .filter((n): n is string => !!n);
+  if (names.length === 0) {
+    return `${prefix}: ${ch.type === "direct" ? "(상대 미확인)" : "(참여자 미확인)"}`;
+  }
+  // 이름을 얻지 못한 참여자도 "외 N명" 에 센다.
+  const rest = others.length - names.length;
+  return `${prefix}: ${names.join(", ")}${rest > 0 ? ` 외 ${rest}명` : ""}`;
+}
+
+/** 제목이 있으면 제목, 없으면 나를 뺀 참여자의 실제 이름 각각에서 찾는다. */
+function matchesSearch(
+  ch: MessengerChannel,
+  others: string[],
+  nameMap: Map<string, string>,
+  keyword: string,
+): boolean {
+  if (ch.title) return ch.title.toLowerCase().includes(keyword);
+  return others.some((id) => nameMap.get(id)?.toLowerCase().includes(keyword) ?? false);
+}
+
+function channelKind(type: string): string {
+  if (type === "direct") return "DM";
+  if (type === "private") return "그룹";
+  return type;
+}
+
+/**
+ * 목록 응답의 me 가 빠진 방에 쓸 내 id. 그런 방이 없으면 조회하지 않는다.
+ * 조회에 실패해도 목록은 살린다 — 그 방들은 나를 빼지 않은 채로 보인다.
+ */
+async function fallbackMyId(
+  client: DoorayApiClient,
+  untitled: MessengerChannel[],
+): Promise<string | undefined> {
+  if (!untitled.some((ch) => !ch.me?.member?.organizationMemberId)) return undefined;
+  try {
+    return (await ensureMe(client)).id;
+  } catch {
+    process.stderr.write(
+      "⚠  내 정보를 확인하지 못해 일부 대화방의 참여자 목록에서 나를 빼지 못했습니다.\n",
+    );
+    return undefined;
+  }
+}
+
+export const messengerChannelsCommand = new Command("channels")
+  .description("내가 속한 메신저 대화방 목록 (최근 활동순). logs·channel-send 에 넘길 id 를 찾는다")
+  .addOption(
+    new Option("--type <type>", "대화방 종류 (direct: 1:1, private: 그룹)").choices([...CHANNEL_TYPES]),
+  )
+  .option("--search <keyword>", "대화방 제목 부분일치 (대소문자 무시, 제목 없는 방은 참여자 이름으로)")
+  .option("--since <date>", "이 시각 이후 활동이 있는 방만 (YYYY-MM-DD 또는 offset 붙은 ISO8601)")
+  .option("--all", "보관된 방과 시스템 방도 포함")
+  .action(async (opts: ChannelsOptions) => {
+    const globalOpts = messengerChannelsCommand.optsWithGlobals() as OutputOptions;
+
+    // 검증은 설정 조회·API 호출 전에 둔다.
+    const sinceMs = opts.since != null ? Date.parse(resolveSince(opts.since)) : undefined;
+    const keyword = resolveSearch(opts.search);
+
+    const config = await getConfigOrThrow();
+    const client = new DoorayApiClient(config.apiKey, config.baseUrl);
+
+    startSpinner("대화방 조회 중...");
+    let channels: MessengerChannel[];
+    try {
+      const res = await client.getMessengerChannels();
+      channels = filterAndSortChannels(res.result ?? [], { type: opts.type, sinceMs, all: opts.all });
+    } catch (e) {
+      stopSpinner(false);
+      throw e;
+    }
+
+    // 표는 이름 열에, --search 는 제목 없는 방의 매칭에 이름이 필요하다.
+    // --json·--quiet 만 있으면 이름을 쓰지 않으므로 방마다 붙는 멤버 조회를 건너뛴다.
+    const tableMode = !globalOpts.json && !globalOpts.quiet;
+    const labels = new Map<string, string>();
+    if (keyword != null || tableMode) {
+      const untitled = channels.filter((ch) => !ch.title);
+      let nameMap: Map<string, string>;
+      const othersById = new Map<string, string[]>();
+      try {
+        const myFallback = await fallbackMyId(client, untitled);
+        for (const ch of untitled) {
+          othersById.set(ch.id, otherParticipantIds(ch, ch.me?.member?.organizationMemberId ?? myFallback));
+        }
+        // 나는 조회하지 않는다. 검색은 모든 참여자가 대상이고, 표만 그릴 때는 화면에 나올 앞 몇 명이면 된다.
+        const lookupIds = untitled.flatMap((ch) => {
+          const others = othersById.get(ch.id)!;
+          return keyword != null ? others : others.slice(0, MAX_NAMES_IN_LABEL);
+        });
+        nameMap = await buildOrganizationMemberNameMap(client, lookupIds);
+
+        if (tableMode) {
+          for (const ch of channels) {
+            const myId = ch.me?.member?.organizationMemberId ?? myFallback;
+            labels.set(ch.id, ch.title || buildUntitledLabel(ch, myId, nameMap));
+          }
+        }
+      } catch (e) {
+        stopSpinner(false);
+        throw e;
+      }
+
+      if (keyword != null) {
+        channels = channels.filter((ch) =>
+          matchesSearch(ch, othersById.get(ch.id) ?? [], nameMap, keyword),
+        );
+        // 이름을 못 얻은 참여자로는 찾을 수 없다. 조용히 빠지면 "그 사람과의 방이 없다" 로 읽히므로 알린다.
+        const unresolved = new Set(
+          untitled.flatMap((ch) => othersById.get(ch.id)!).filter((id) => !nameMap.has(id)),
+        );
+        if (unresolved.size > 0) {
+          process.stderr.write(
+            `⚠  참여자 ${unresolved.size}명의 이름을 확인하지 못해 그 이름으로는 찾지 못했습니다.\n`,
+          );
+        }
+      }
+    }
+
+    stopSpinner(true, channels.length > 0 ? "조회 완료" : "대화방 없음");
+
+    if (globalOpts.json) {
+      // 서버 응답 원형 (필터·정렬만 적용) — 만든 표시명을 끼워넣지 않는다.
+      printJson(channels);
+      return;
+    }
+
+    if (globalOpts.quiet) {
+      // 빈 배열에 printQuiet 를 부르면 빈 줄 하나가 나간다. 아무것도 내지 않는다.
+      if (channels.length > 0) {
+        output(globalOpts, { headers: [], rows: [], raw: channels, ids: channels.map((ch) => ch.id) });
+      }
+      return;
+    }
+
+    if (channels.length === 0) {
+      process.stdout.write("조건에 맞는 대화방이 없습니다.\n");
+      return;
+    }
+
+    const rows = channels.map((ch) => [
+      // 서버가 준 문자열은 외부 통제 값이라 출력 직전 control char 를 없앤다.
+      sanitizeForTerminal(labels.get(ch.id) ?? ""),
+      sanitizeForTerminal(channelKind(ch.type)),
+      formatSentAt(ch.updatedAt),
+      ch.id,
+    ]);
+    output(globalOpts, {
+      headers: ["이름", "종류", "최근 활동", "id"],
+      rows,
+      raw: channels,
+      ids: channels.map((ch) => ch.id),
+    });
+  });
