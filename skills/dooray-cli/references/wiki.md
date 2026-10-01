@@ -87,7 +87,7 @@ dooray wiki page replace --id <page-id> --old "TODO" --new "완료" --all
 
 - 대상은 `wiki page edit` 과 같게 `--id <page-id>`, `<project> <page-id>`, `--url` 로 준다
 - 본문만 바꾸고 제목은 건드리지 않는다. 본문 형식은 기존 값을 유지한다
-- 첨부 참조 누락 확인이 없어 `--no-confirm` 도 없다. 인라인 이미지 snippet 을 지우지 않도록 `--dry-run` 으로 먼저 본다
+- 치환으로 첨부나 인라인 이미지 참조(`/wikis/.../files/<id>`)가 사라지면 확인을 받는다. 의도한 것이면 `--no-confirm`
 - 성공하면 `--json` 은 `{ wikiId, pageId, replaced }`, `--quiet` 은 pageId 다
 
 ## 첨부 일괄 내려받기

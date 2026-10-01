@@ -112,11 +112,12 @@ printf '바뀐 문단\n' | dooray post replace --id "$POST_ID" --old-file old.md
 ```
 
 - **old 는 공백·줄바꿈·들여쓰기까지 정확히 같아야 한다.** `post get --json` 의 `body.content` 에서 그대로 잘라 쓴다. 화면 출력에서 옮기면 공백이 달라질 수 있다
-- 일치가 없으면 종료 코드 3 이다. 다시 조회해 old 를 고친다
+- 파일과 stdin 으로 준 old·new 는 UTF-8 BOM 과 **끝 줄바꿈 하나를 떼고** 쓴다. 에디터와 `echo` 가 붙이는 줄바꿈 때문이다. 끝 줄바꿈까지 일치시켜야 하면 인자로 준다(`--old $'마지막 줄\n'`). 인자로 준 값은 그대로 쓴다
+- 일치가 없으면 종료 코드 3 이다. 다시 조회해 old 를 고친다. 본문 줄바꿈이 CRLF 인데 old 에 CR 이 없으면 그 사실을 함께 알려준다
 - 두 군데 이상 일치하면 몇 군데인지 알리고 종료 코드 3 으로 멈춘다. 한 군데만 바꾸려면 앞뒤 문맥을 더 넣어 old 를 유일하게 만들고, 전부 바꾸려면 `--all` 을 붙인다
 - old 와 new 가 같으면 거부된다. new 를 빈 문자열(`--new ""`)로 주면 old 구간을 지운다
 - `--old`/`--old-file` 중 하나, `--new`/`--new-file` 중 하나를 준다. `-` 는 stdin 이고 old 와 new 가 함께 stdin 을 쓸 수는 없다
-- `--dry-run` 은 수정하지 않고 바뀌는 줄만 `-`/`+` 로 보여준다. 본문 전체는 내지 않는다. `--json` 과 함께 주면 `{ dryRun, postId, replaced, mimeType, hunks: [{ line, before, after }] }` 다
+- `--dry-run` 은 수정하지 않고 바뀌는 줄만 `-`/`+` 로 보여준다. 본문 전체는 내지 않는다. 탭은 그대로, CR 은 `<CR>` 로 보인다. `--json` 과 함께 주면 `{ dryRun, postId, replaced, mimeType, hunks: [{ line, before, after }] }`, `--quiet` 이면 바뀔 군데 수 한 줄이다
 - 성공하면 `--json` 은 `{ postId, number, replaced }`, `--quiet` 은 postId 다
 - 제목·우선순위·마감·담당자·참조자·태그·본문 형식은 그대로 둔다. `--mime-type` 은 없다
 - 치환으로 첨부 참조(`/files/<id>`)가 사라지면 `post edit` 과 같이 확인을 받는다. 의도한 것이면 `--no-confirm`

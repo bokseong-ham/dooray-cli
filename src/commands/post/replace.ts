@@ -15,7 +15,8 @@ import { printJson } from "../../formatters/table.js";
 import { startSpinner, stopSpinner } from "../../utils/spinner.js";
 import { resolveBodyMimeType } from "../../utils/body-input.js";
 import { checkAndGuardDropped } from "../../utils/attachment-check.js";
-import { applyReplace, formatHunks, readReplaceInputs } from "../../utils/body-replace.js";
+import { applyReplace, readReplaceInputs } from "../../utils/body-replace.js";
+import { printReplacePreview } from "../../formatters/body-replace.js";
 
 function toRequestUser(u: PostUser): CreatePostUser {
   return { type: u.type, member: u.member, emailUser: u.emailUser, group: u.group };
@@ -58,18 +59,7 @@ export const postReplaceCommand = new Command("replace")
     const bodyMimeType = resolveBodyMimeType(post.body?.mimeType);
 
     if (opts.dryRun) {
-      if (globalOpts.json) {
-        printJson({
-          dryRun: true,
-          postId,
-          replaced: result.replaced,
-          mimeType: bodyMimeType,
-          hunks: result.hunks,
-        });
-      } else {
-        process.stdout.write(formatHunks(result.hunks));
-        process.stdout.write(`${result.replaced}군데가 바뀝니다 (dry-run, 수정하지 않음).\n`);
-      }
+      printReplacePreview(globalOpts, { postId }, result, bodyMimeType);
       return;
     }
 

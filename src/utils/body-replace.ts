@@ -3,15 +3,13 @@
  *
  * - `--old`/`--old-file`, `--new`/`--new-file` 입력을 읽는다. `-` 는 stdin 이다
  * - 현재 본문에서 old 를 공백·줄바꿈까지 정확히 찾아 바꾼다
- * - `--dry-run` 미리보기용으로 바뀌는 줄만 담은 구간(hunk)을 만든다
+ * - `--dry-run` 미리보기용으로 바뀌는 줄만 담은 구간(hunk)을 만든다. 출력은 `formatters/body-replace.ts`
  *
  * 왜 별도 명령인지, 유일성 규칙과 왕복의 한계는 ADR-065 가 소유한다.
  */
-import { readFile } from "node:fs/promises";
-import { readStdin } from "./body-input.js";
+import { readTextInput, type TextInputBehavior } from "./body-input.js";
 import { DoorayCliError } from "./errors.js";
 import { EXIT_PARAM_ERROR } from "./exit-codes.js";
-import { sanitizeMultilineForTerminal } from "./sanitize.js";
 
 export interface ReplaceInputOptions {
   old?: string;
@@ -25,15 +23,16 @@ export interface ReplaceInputs {
   newText: string;
 }
 
+const REPLACE_INPUT_BEHAVIOR: TextInputBehavior = {
+  stripFileArtifacts: true,
+  missingFileAsParamError: true,
+};
+
 function usesStdin(text: string | undefined, file: string | undefined): boolean {
   return text === "-" || file === "-";
 }
 
-async function readOne(
-  text: string | undefined,
-  file: string | undefined,
-  name: "old" | "new",
-): Promise<string> {
+function requireOne(text: string | undefined, file: string | undefined, name: "old" | "new"): void {
   if (text != null && file != null) {
     throw new DoorayCliError(
       `--${name}와 --${name}-file은 함께 사용할 수 없습니다.`,
@@ -46,12 +45,6 @@ async function readOne(
       EXIT_PARAM_ERROR,
     );
   }
-  if (file != null) {
-    if (file === "-") return readStdin();
-    return readFile(file, "utf-8");
-  }
-  if (text === "-") return readStdin();
-  return text ?? "";
 }
 
 /**
@@ -59,18 +52,29 @@ async function readOne(
  *
  * - 각각 인자와 파일 중 하나만 받는다
  * - stdin 은 한 번만 읽을 수 있어 old 와 new 가 함께 `-` 를 쓰면 거부한다
+ * - 옵션 조합 검사를 old·new 모두 끝낸 뒤에 읽는다. stdin 을 다 읽고 나서 조합 오류를 내면
+ *   파이프로 보낸 입력이 버려진다
+ * - 파일과 stdin 으로 받은 값은 BOM 과 끝 줄바꿈 하나를 뗀다. 인자로 받은 값은 그대로다
  * - old 가 비었거나 old 와 new 가 같으면 바뀔 것이 없어 거부한다
  * - new 는 빈 문자열을 허용한다. old 구간을 지우는 용도다
  */
 export async function readReplaceInputs(opts: ReplaceInputOptions): Promise<ReplaceInputs> {
+  requireOne(opts.old, opts.oldFile, "old");
+  requireOne(opts.new, opts.newFile, "new");
   if (usesStdin(opts.old, opts.oldFile) && usesStdin(opts.new, opts.newFile)) {
     throw new DoorayCliError(
       "old 와 new 가 모두 stdin(-)을 읽을 수 없습니다. 하나는 --old-file/--new-file 에 파일 경로로 주세요.",
       EXIT_PARAM_ERROR,
     );
   }
-  const oldText = await readOne(opts.old, opts.oldFile, "old");
-  const newText = await readOne(opts.new, opts.newFile, "new");
+  const oldText = await readTextInput(
+    { text: opts.old, file: opts.oldFile, textFlag: "--old", fileFlag: "--old-file" },
+    REPLACE_INPUT_BEHAVIOR,
+  );
+  const newText = await readTextInput(
+    { text: opts.new, file: opts.newFile, textFlag: "--new", fileFlag: "--new-file" },
+    REPLACE_INPUT_BEHAVIOR,
+  );
   if (oldText.length === 0) {
     throw new DoorayCliError("찾을 문자열(old)이 비어 있습니다.", EXIT_PARAM_ERROR);
   }
@@ -114,6 +118,8 @@ export interface ReplaceResult {
 }
 
 function lineStart(text: string, index: number): number {
+  // lastIndexOf 는 음수 fromIndex 를 0 으로 바꿔 index 0 의 `\n` 을 찾는다. 위치 0 은 그 자체가 줄 머리다.
+  if (index === 0) return 0;
   return text.lastIndexOf("\n", index - 1) + 1;
 }
 
@@ -140,9 +146,14 @@ export function applyReplace(
 ): ReplaceResult {
   const occurrences = findOccurrences(content, oldText);
   if (occurrences.length === 0) {
+    // 일치 규칙은 정확 일치 그대로 두고, 줄바꿈 형식이 다를 가능성만 알린다.
+    const crlfHint = content.includes("\r\n") && !oldText.includes("\r")
+      ? "\n  본문의 줄바꿈이 CRLF(\\r\\n)입니다. old 의 줄바꿈이 LF(\\n)면 여러 줄 old 는 일치하지 않습니다."
+      : "";
     throw new DoorayCliError(
       "본문에서 old 를 찾지 못했습니다. 공백과 줄바꿈까지 정확히 일치해야 합니다.\n" +
-        "  현재 본문은 `post get --json` / `wiki page get --json` 의 body.content 로 확인할 수 있습니다.",
+        "  현재 본문은 `post get --json` / `wiki page get --json` 의 body.content 로 확인할 수 있습니다." +
+        crlfHint,
       EXIT_PARAM_ERROR,
     );
   }
@@ -186,6 +197,9 @@ function buildHunks(
 ): ReplaceHunk[] {
   const delta = newText.length - oldText.length;
   const hunks: ReplaceHunk[] = [];
+  // 줄 번호는 직전 구간 머리부터 이어서 센다. 구간마다 본문 앞부분을 다시 세면 본문 길이 × 구간 수가 된다.
+  let countedTo = 0;
+  let line = 1;
   let i = 0;
   while (i < targets.length) {
     const first = i;
@@ -197,8 +211,10 @@ function buildHunks(
     }
     const outStart = start + first * delta;
     const outEnd = end + (i + 1) * delta;
+    line += countNewlines(original, countedTo, start);
+    countedTo = start;
     hunks.push({
-      line: countNewlines(original.slice(0, start)) + 1,
+      line,
       before: original.slice(start, end),
       after: replaced.slice(outStart, outEnd),
     });
@@ -207,25 +223,8 @@ function buildHunks(
   return hunks;
 }
 
-function countNewlines(text: string): number {
+function countNewlines(text: string, from: number, to: number): number {
   let n = 0;
-  for (let i = 0; i < text.length; i++) if (text.charCodeAt(i) === 10) n++;
+  for (let i = from; i < to; i++) if (text.charCodeAt(i) === 10) n++;
   return n;
-}
-
-/**
- * `--dry-run` 의 사람용 출력. 바뀌는 줄만 diff 형식으로 보인다.
- *
- * 본문 전체를 찍지 않는다. 긴 본문의 일부만 고치려고 만든 명령이라
- * 미리보기가 본문 전체를 내면 그 목적이 무색해진다.
- * 서버에서 받은 본문 조각이라 제어문자를 치환한다.
- */
-export function formatHunks(hunks: ReplaceHunk[]): string {
-  const out: string[] = [];
-  hunks.forEach((h, i) => {
-    out.push(`@@ ${i + 1}/${hunks.length} — ${h.line}번째 줄 @@`);
-    for (const l of sanitizeMultilineForTerminal(h.before).split("\n")) out.push(`-${l}`);
-    for (const l of sanitizeMultilineForTerminal(h.after).split("\n")) out.push(`+${l}`);
-  });
-  return out.join("\n") + "\n";
 }

@@ -36,7 +36,10 @@ vi.mock("../../utils/spinner.js", () => ({
   stopSpinner: mocks.stopSpinner,
 }));
 
-function page(body?: { mimeType: string; content?: string }) {
+function page(
+  body?: { mimeType: string; content?: string },
+  extra: Record<string, unknown> = {},
+) {
   return {
     result: {
       id: "page-1",
@@ -46,6 +49,7 @@ function page(body?: { mimeType: string; content?: string }) {
       creator: { type: "member", member: { organizationMemberId: "member-1" } },
       subject: "기존 제목",
       ...(body != null && { body }),
+      ...extra,
     },
   };
 }
@@ -174,6 +178,67 @@ describe("wiki page replace", () => {
 
     expectParamError(error, /같아/);
     expect(mocks.resolveWikiPageInput).not.toHaveBeenCalled();
+  });
+
+  it("--dry-run --quiet 은 바뀔 군데 수만 낸다", async () => {
+    const { stdout } = await run([
+      "--quiet", "wiki", "page", "replace", "--id", "page-1", "--old", "- ", "--new", "* ", "--all", "--dry-run",
+    ]);
+
+    expect(mocks.client.updateWikiPageContent).not.toHaveBeenCalled();
+    expect(stdout).toBe("3\n");
+  });
+
+  describe("첨부 참조 누락", () => {
+    // 인라인 이미지는 본문 참조의 id 가 images[].attachFileId 다 (id 와 다르다)
+    const withImage = page(
+      { mimeType: "text/x-markdown", content: "앞\n![도식.png](/wikis/900/files/attach-1)\n뒤" },
+      { images: [{ id: "image-1", attachFileId: "attach-1", name: "도식.png", size: 10 }], files: [] },
+    );
+    const dropArgs = [
+      "wiki", "page", "replace", "--id", "page-1", "--old", "![도식.png](/wikis/900/files/attach-1)\n", "--new", "",
+    ];
+
+    beforeEach(() => {
+      mocks.client.getWikiPage.mockResolvedValue(withImage);
+    });
+
+    it("non-TTY 에서 --no-confirm 이 없으면 경고하고 수정하지 않는다", async () => {
+      const isTTY = process.stdin.isTTY;
+      Object.defineProperty(process.stdin, "isTTY", { value: false, configurable: true });
+      const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+      try {
+        const { error } = await run(dropArgs);
+
+        expectParamError(error, /--no-confirm/);
+        expect(stderr.mock.calls.map((c) => String(c[0])).join("")).toContain("도식.png");
+        expect(mocks.client.updateWikiPageContent).not.toHaveBeenCalled();
+      } finally {
+        stderr.mockRestore();
+        Object.defineProperty(process.stdin, "isTTY", { value: isTTY, configurable: true });
+      }
+    });
+
+    it("--no-confirm 이면 경고만 내고 진행한다", async () => {
+      const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+      try {
+        const { error } = await run([...dropArgs, "--no-confirm"]);
+
+        expect(error).toBeUndefined();
+        expect(mocks.client.updateWikiPageContent.mock.calls[0]?.[2].body.content).toBe("앞\n뒤");
+      } finally {
+        stderr.mockRestore();
+      }
+    });
+
+    it("참조가 남으면 확인하지 않는다", async () => {
+      const { error } = await run([
+        "wiki", "page", "replace", "--id", "page-1", "--old", "앞", "--new", "머리",
+      ]);
+
+      expect(error).toBeUndefined();
+      expect(mocks.client.updateWikiPageContent).toHaveBeenCalledOnce();
+    });
   });
 
   it("--quiet 은 pageId 만 낸다", async () => {

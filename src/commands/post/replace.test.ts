@@ -250,6 +250,24 @@ describe("post replace", () => {
     });
   });
 
+  it("--dry-run --quiet 은 바뀔 군데 수만 낸다", async () => {
+    const { stdout } = await run([
+      "--quiet", "post", "replace", "--id", "post-1", "--old", "서버", "--new", "노드", "--all", "--dry-run",
+    ]);
+
+    expect(mocks.client.updatePost).not.toHaveBeenCalled();
+    expect(stdout).toBe("2\n");
+  });
+
+  it("없는 --old-file 은 설정 조회 전에 종료 코드 3", async () => {
+    const { error } = await run([
+      "post", "replace", "--id", "post-1", "--old-file", "/nonexistent/dir/old.md", "--new", "x",
+    ]);
+
+    expectParamError(error, /파일을 찾을 수 없습니다/);
+    expect(mocks.getConfigOrThrow).not.toHaveBeenCalled();
+  });
+
   it("--json 은 replaced 를 담은 구조를 낸다", async () => {
     const { stdout } = await run([
       "--json", "post", "replace", "--id", "post-1", "--old", "배포", "--new", "카나리 배포",

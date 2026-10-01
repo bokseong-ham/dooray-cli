@@ -4,15 +4,17 @@
 
 ```
 dooray post replace <대상> (--old <text> | --old-file <path>) (--new <text> | --new-file <path>) [--all] [--dry-run] [--no-confirm]
-dooray wiki page replace <대상> (--old <text> | --old-file <path>) (--new <text> | --new-file <path>) [--all] [--dry-run]
+dooray wiki page replace <대상> (--old <text> | --old-file <path>) (--new <text> | --new-file <path>) [--all] [--dry-run] [--no-confirm]
 ```
 
 | 명령 | 읽기 | 쓰기 | 보존하는 것 |
 | --- | --- | --- | --- |
-| `post replace` | `GET project/v1/posts/{postId}` | `PUT project/v1/projects/{id}/posts/{postId}` | 제목·우선순위·마감·담당자·참조자·본문 형식. 태그는 `tagIds` 를 빼서 서버가 유지한다 |
+| `post replace` | `GET project/v1/projects/{id}/posts/{postId}` (`--id`·`--url` 이면 그 전에 `GET project/v1/posts/{postId}` 로 프로젝트를 해석한다) | `PUT project/v1/projects/{id}/posts/{postId}` | 제목·우선순위·마감·담당자·참조자·본문 형식. 태그는 `tagIds` 를 빼서 서버가 유지한다 |
 | `wiki page replace` | `GET wiki/v1/wikis/{wikiId}/pages/{pageId}` | `PUT .../pages/{pageId}/content` | 제목(요청에 싣지 않는다)·본문 형식 |
 
 old 는 공백과 줄바꿈까지 정확히 일치해야 한다. 0건이면 거부하고, 2건 이상이면 `--all` 이 있을 때만 모두 바꾼다.
+파일과 stdin 으로 받은 old·new 는 UTF-8 BOM 과 끝 줄바꿈 하나를 떼고 비교한다. 인자로 받은 값은 그대로 쓴다.
+치환으로 첨부 참조가 사라지면 두 명령 모두 확인을 받는다.
 
 **맥락**: 본문을 바꾸는 수단이 `post edit --body`/`--body-file` 과 `wiki page edit --body`/`--body-file` 뿐이었다.
 둘 다 본문 전체를 교체한다. 수천 줄짜리 런북에서 한두 줄을 고치려 해도 전문을 받아 고쳐 전부 다시 보내야 한다.
@@ -33,6 +35,13 @@ Dooray 를 다루는 다른 도구(MCP 서버)에는 `old_string` 을 찾아 `ne
   그 구간을 `post replace` 로 바꾼 뒤에도 태그가 남았다
 - **치환 후 나머지 필드가 그대로다.** `post replace` 전후로 상세 조회를 비교해 `body` 와 `updatedAt` 외에
   제목·우선순위·태그·담당자·참조자·마일스톤·워크플로우가 같았다. `mimeType` 도 `text/x-markdown` 그대로였다
+- **CRLF 본문은 표본에서 나오지 않았다.** 개인 프로젝트의 업무 11건(모두 `text/x-markdown`)과 위키 페이지 6건의 본문을
+  읽기 전용으로 훑어 `\r\n` 과 홀로 선 `\r` 이 모두 0건이었다. 표본이 작아 다른 프로젝트나 `text/html` 본문,
+  웹 편집기 밖에서 들어온 본문에는 있을 수 있다고 보고 0건 안내만 둔다 (설계 결정 참고)
+- **위키 인라인 이미지의 본문 참조는 `images[].id` 가 아니라 `images[].attachFileId` 를 쓴다.**
+  본문 `![...](/wikis/<n>/files/<x>)` 의 `<x>` 가 `images[]` 의 `attachFileId` 와 같았고 `id` 와는 달랐다.
+  앞 숫자 `<n>` 은 그 위키의 wikiId 와 달랐다. 검출에는 앞 숫자를 쓰지 않는다.
+  일반 첨부(`files[]`)가 본문에 어떤 형태로 들어가는지는 표본에 없어 확인하지 못했다
 - **확인하지 못한 것**
   - 웹 편집기로 칠한 형광펜이 GET 에서 다른 표현으로 내려온다는 이야기가 있으나 재현해 보지 못했다.
     그렇다면 그 구간을 지나는 치환은 웹에서 보이는 것과 다른 본문을 저장한다
@@ -49,25 +58,40 @@ Dooray 를 다루는 다른 도구(MCP 서버)에는 `old_string` 을 찾아 `ne
   사용자와 에이전트에게는 "본문 전체를 줄 때는 `edit`, 일부를 고칠 때는 `replace`" 라는 선택 기준이 생긴다
 - **인자와 파일을 둘 다 받는다.** 짧은 한 줄은 `--old`/`--new` 가 편하고, 여러 줄이나 따옴표·백틱이 섞인 구간은
   셸 이스케이프를 피하려 파일이 낫다. `-` 는 `--body`/`--body-file` 과 같게 stdin 이다.
-  stdin 은 한 번만 읽을 수 있으므로 old 와 new 가 함께 stdin 을 쓰면 읽기 전에 거부한다
+  stdin 은 한 번만 읽을 수 있으므로 old 와 new 가 함께 stdin 을 쓰면 읽기 전에 거부한다.
+  인자·파일·stdin 을 읽는 규칙은 `--body`/`--body-file` 과 같은 헬퍼(`readTextInput`)를 쓰고, 아래 두 동작만 옵션으로 켠다
+- **파일과 stdin 입력은 UTF-8 BOM 과 끝 줄바꿈 하나(`\n` 또는 `\r\n`)를 뗀다.** 에디터는 파일 끝에 줄바꿈을 붙이고
+  `echo` 도 그렇다. 정확 일치라 그 줄바꿈 하나 때문에 0건이 되거나, 줄 끝까지 포함해 뜻보다 넓게 일치한다.
+  BOM 은 본문에 들어갈 일이 없는 문자다. 끝 줄바꿈까지 일치시키려면 인자(`--old $'...\n'`)로 준다. 인자는 셸이 넘긴 그대로 쓴다.
+  `--body-file` 은 본문 전체를 그대로 보내는 입력이라 이 처리를 하지 않는다
+- **없는 파일은 `EXIT_PARAM_ERROR` 로 알린다.** raw ENOENT 를 내면 종료 코드가 API 오류와 구분되지 않는다.
+  `--body-file` 의 종전 동작은 바꾸지 않았다
+- **옵션 조합 검사를 old·new 모두 끝낸 뒤에 읽는다.** old 를 stdin 으로 다 읽은 뒤 new 누락을 알리면 파이프로 보낸 입력이 버려진다
 - **입력 검증을 설정 조회·API 호출보다 먼저 한다.** old 가 비었거나 old 와 new 가 같으면 바뀔 것이 없다.
   new 는 빈 문자열을 허용한다. 구간을 지우는 용도다
 - **유일성 규칙**: 일치가 0건이면 공백·줄바꿈까지 맞아야 한다고 안내하고, 2건 이상인데 `--all` 이 없으면 개수를 알려 거부한다.
   아무 곳이나 첫 번째를 바꾸면 사용자가 뜻한 곳이 아닐 수 있고, 긴 본문에서는 그것을 알아채기 어렵다.
+  0건인데 본문에 `\r\n` 이 있고 old 에 `\r` 이 없으면 줄바꿈 형식이 다를 수 있다고 덧붙인다.
+  일치 규칙을 줄바꿈 무시로 바꾸지 않은 것은 그러면 PUT 할 본문의 줄바꿈을 무엇으로 맞출지 새로 정해야 하고,
+  위 실측에서 CRLF 본문을 만나지 못해 그 규칙을 검증할 수 없었기 때문이다.
   일치 개수는 겹치는 위치까지 센다(`aaa` 에서 `aa` 는 2군데). 겹침을 빼면 한 군데로 보여 모호함을 놓친다.
   `--all` 은 앞에서부터 겹치지 않는 구간을 바꾸므로, 겹침이 있으면 거부 메시지의 개수보다 적게 바뀔 수 있다
 - **치환에 `String.prototype.replace` 를 쓰지 않는다.** 치환 문자열의 `$&`·`$1` 을 패턴으로 해석해, new 에 `$` 가 들어 있으면 결과가 달라진다
 - **`--dry-run` 은 바뀌는 줄만 보인다.** 일치 구간을 품은 줄 전체를 원본(`-`)과 결과(`+`)로 diff 처럼 낸다.
   같은 줄에 걸친 위치는 한 구간으로 합친다. 본문 전체를 내면 긴 본문의 일부만 보내려던 이 명령의 목적이 무색해진다.
-  `--json` 과 함께 주면 `{ dryRun, replaced, mimeType, hunks: [{ line, before, after }] }` 로 낸다.
-  서버 본문 조각을 터미널에 낼 때는 `sanitizeMultilineForTerminal` 을 거친다
+  `--json` 과 함께 주면 `{ dryRun, replaced, mimeType, hunks: [{ line, before, after }] }` 로, `--quiet` 이면 바뀔 군데 수 한 줄로 낸다.
+  서버 본문 조각을 터미널에 낼 때는 제어문자를 치환하되 **탭은 그대로 두고 CR 은 `<CR>` 로 보인다.** 유니코드 제어 그림 문자(U+240D)는 터미널 폰트에 따라 깨질 수 있어 ASCII 로 둔다.
+  사용자가 미리보기를 복사해 다음 `--old` 를 만들기 때문에, 탭을 `?` 로 바꾸면 복사본이 0건이 된다. 탭은 커서를 앞으로만 옮겨 터미널에 안전하다.
+  CR 은 커서를 줄 머리로 돌려 앞 글자를 덮어쓰므로 그대로 둘 수 없고, `?` 는 원문의 `?` 와, 글자 `\r` 은 코드 예시에 적힌 `\r` 과 헷갈린다.
+  공용 `sanitizeMultilineForTerminal` 의 기본 동작(탭과 CR 을 `?` 로, CRLF 를 LF 로)은 그대로 두고 옵션으로 켠다
 - **본문 형식은 `resolveBodyMimeType` 으로 기존 값을 보존한다** (ADR-053). `--mime-type` 은 두지 않는다.
   일부만 바꾸는 명령이 본문 전체의 형식을 바꾸면 나머지 부분이 깨진다
 - **업무는 `post edit` 의 첨부 누락 경고를 그대로 쓴다.** 치환으로 `/files/<id>` 참조가 사라지면 `checkAndGuardDropped` 가
   경고하고 확인을 받는다. `--no-confirm` 으로 넘긴다. `--dry-run` 에서는 확인하지 않는다 (`post edit` 과 같다)
-- **위키에는 첨부 경고가 없다.** `wiki page edit` 에도 없고, 위키 본문의 첨부 참조는 `/wikis/<wikiId>/files/<id>` 형태라
-  `/files/<id>` 를 찾는 지금의 검출식에 걸리지 않는다. 같은 보호를 위키에 넣는 것은 `wiki page edit` 과 함께 다룰 일이라 이 결정의 범위 밖이다.
-  그래서 `wiki page replace` 에는 `--no-confirm` 이 없다
+- **위키에도 같은 첨부 경고를 넣었다.** 위키 본문의 참조는 `/wikis/<n>/files/<id>` 형태라 `/files/<id>` 만 찾던 검출식을
+  앞 segment 를 선택으로 받게 넓혔다. 업무 본문에는 이 형태가 나오지 않아 `post edit`·`post replace` 의 동작은 같다.
+  비교할 첨부 목록은 `files[]` 와 `images[]` 의 `id` 에 `attachFileId` 를 더한 것이다 (실측 항목).
+  `wiki page edit` 에는 아직 넣지 않았다. `replace` 는 일부만 고친다고 여겨 확인 없이 쓰기 쉬워 먼저 넣었고, `edit` 은 후속으로 다룬다
 - **왕복의 한계를 그대로 둔다.** 부분 치환도 내부적으로는 현재 본문을 읽고 바꿔 전체를 다시 보낸다.
   읽고 보내는 사이에 누군가 본문을 고치면 그 수정을 덮어쓴다. 업무 PUT 에 조건부 갱신(`version`)이 있지만
   현재 값을 얻을 수 없어 쓸 수 없고, HTTP 조건부 헤더는 서버가 보지 않는다.

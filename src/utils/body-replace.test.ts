@@ -2,17 +2,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { Readable } from "node:stream";
 
-const mocks = vi.hoisted(() => ({ readStdin: vi.fn() }));
-
-vi.mock("./body-input.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("./body-input.js")>();
-  return { ...actual, readStdin: mocks.readStdin };
-});
-
-import { applyReplace, findOccurrences, formatHunks, readReplaceInputs } from "./body-replace.js";
+import { applyReplace, findOccurrences, readReplaceInputs } from "./body-replace.js";
 import { DoorayCliError } from "./errors.js";
 import { EXIT_PARAM_ERROR } from "./exit-codes.js";
+
+/** stdin 을 파이프 입력처럼 바꾼다. 돌려받은 spy 로 stdin 접근 여부를 확인한다. */
+function stubStdin(data: string) {
+  const stream = Readable.from([Buffer.from(data)]) as Readable & { isTTY?: boolean };
+  stream.isTTY = false;
+  return vi.spyOn(process, "stdin", "get").mockReturnValue(stream as unknown as typeof process.stdin);
+}
 
 async function expectParamError(promise: Promise<unknown>, message: RegExp): Promise<void> {
   const err = await promise.then(
@@ -40,11 +41,12 @@ describe("readReplaceInputs", () => {
   let dir: string;
 
   beforeEach(async () => {
-    vi.clearAllMocks();
+    vi.restoreAllMocks();
     dir = await mkdtemp(join(tmpdir(), "body-replace-"));
   });
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     await rm(dir, { recursive: true, force: true });
   });
 
@@ -58,13 +60,72 @@ describe("readReplaceInputs", () => {
   it("파일에서 여러 줄 old·new 를 읽는다", async () => {
     const oldPath = join(dir, "old.txt");
     const newPath = join(dir, "new.txt");
-    await writeFile(oldPath, "첫 줄\n둘째 줄\n");
-    await writeFile(newPath, "바뀐 첫 줄\n바뀐 둘째 줄\n");
+    await writeFile(oldPath, "첫 줄\n둘째 줄");
+    await writeFile(newPath, "바뀐 첫 줄\n바뀐 둘째 줄");
 
     await expect(readReplaceInputs({ oldFile: oldPath, newFile: newPath })).resolves.toEqual({
-      oldText: "첫 줄\n둘째 줄\n",
-      newText: "바뀐 첫 줄\n바뀐 둘째 줄\n",
+      oldText: "첫 줄\n둘째 줄",
+      newText: "바뀐 첫 줄\n바뀐 둘째 줄",
     });
+  });
+
+  it("파일 입력은 UTF-8 BOM 과 끝 줄바꿈 하나를 뗀다", async () => {
+    const oldPath = join(dir, "old.txt");
+    const newPath = join(dir, "new.txt");
+    await writeFile(oldPath, "\uFEFF첫 줄\n둘째 줄\n");
+    await writeFile(newPath, "바뀐 줄\r\n");
+
+    await expect(readReplaceInputs({ oldFile: oldPath, newFile: newPath })).resolves.toEqual({
+      oldText: "첫 줄\n둘째 줄",
+      newText: "바뀐 줄",
+    });
+  });
+
+  it("끝 줄바꿈은 하나만 뗀다", async () => {
+    const oldPath = join(dir, "old.txt");
+    await writeFile(oldPath, "문단\n\n");
+
+    await expect(readReplaceInputs({ oldFile: oldPath, new: "x" })).resolves.toEqual({
+      oldText: "문단\n",
+      newText: "x",
+    });
+  });
+
+  it("stdin 입력도 BOM 과 끝 줄바꿈을 뗀다", async () => {
+    stubStdin("\uFEFF파이프 값\n");
+    await expect(readReplaceInputs({ old: "가", new: "-" })).resolves.toEqual({
+      oldText: "가",
+      newText: "파이프 값",
+    });
+  });
+
+  it("인자로 준 값은 BOM·끝 줄바꿈을 그대로 둔다", async () => {
+    await expect(readReplaceInputs({ old: "\uFEFF줄\n", new: "바뀐 줄\n" })).resolves.toEqual({
+      oldText: "\uFEFF줄\n",
+      newText: "바뀐 줄\n",
+    });
+  });
+
+  it("없는 파일은 종료 코드 3", async () => {
+    await expectParamError(
+      readReplaceInputs({ oldFile: join(dir, "missing.txt"), new: "x" }),
+      /파일을 찾을 수 없습니다/,
+    );
+  });
+
+  it("new 가 빠졌으면 stdin 을 읽기 전에 거부한다", async () => {
+    const stdin = stubStdin("버려지면 안 되는 입력");
+    await expectParamError(readReplaceInputs({ old: "-" }), /--new 또는 --new-file/);
+    expect(stdin).not.toHaveBeenCalled();
+  });
+
+  it("new 가 상호배타를 어기면 stdin 을 읽기 전에 거부한다", async () => {
+    const stdin = stubStdin("버려지면 안 되는 입력");
+    await expectParamError(
+      readReplaceInputs({ oldFile: "-", new: "a", newFile: join(dir, "x") }),
+      /--new와 --new-file/,
+    );
+    expect(stdin).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -73,9 +134,8 @@ describe("readReplaceInputs", () => {
     ["--new -", { old: "가", new: "-" }, { oldText: "가", newText: "stdin 값" }],
     ["--new-file -", { old: "가", newFile: "-" }, { oldText: "가", newText: "stdin 값" }],
   ])("%s 는 stdin 에서 읽는다", async (_name, opts, expected) => {
-    mocks.readStdin.mockResolvedValue("stdin 값");
+    stubStdin("stdin 값");
     await expect(readReplaceInputs(opts)).resolves.toEqual(expected);
-    expect(mocks.readStdin).toHaveBeenCalledOnce();
   });
 
   it.each([
@@ -84,8 +144,9 @@ describe("readReplaceInputs", () => {
     [{ old: "-", newFile: "-" }],
     [{ oldFile: "-", new: "-" }],
   ])("old 와 new 가 함께 stdin 을 쓰면 읽기 전에 거부한다 (%o)", async (opts) => {
+    const stdin = stubStdin("x");
     await expectParamError(readReplaceInputs(opts), /stdin/);
-    expect(mocks.readStdin).not.toHaveBeenCalled();
+    expect(stdin).not.toHaveBeenCalled();
   });
 
   it("--old 와 --old-file 을 함께 주면 거부한다", async () => {
@@ -200,20 +261,40 @@ describe("applyReplace", () => {
   });
 });
 
-describe("formatHunks", () => {
-  it("바뀌는 줄만 diff 형식으로 낸다", () => {
-    const out = formatHunks([{ line: 2, before: "대상 줄", after: "바뀐 줄" }]);
-    expect(out).toBe("@@ 1/1 — 2번째 줄 @@\n-대상 줄\n+바뀐 줄\n");
+describe("applyReplace 경계", () => {
+  it("본문이 \\n 으로 시작하고 위치 0 에서 일치해도 구간이 실제 결과와 같다", () => {
+    const result = applyReplace("\nfoo\nbar", "\nfoo", "foo", false);
+    expect(result.content).toBe("foo\nbar");
+    expect(result.hunks).toEqual([{ line: 1, before: "\nfoo", after: "foo" }]);
   });
 
-  it("여러 줄 구간은 줄마다 표시를 붙인다", () => {
-    const out = formatHunks([{ line: 1, before: "a\nb", after: "c" }]);
-    expect(out).toBe("@@ 1/1 — 1번째 줄 @@\n-a\n-b\n+c\n");
+  it("위치 0 의 일반 문자 일치", () => {
+    const result = applyReplace("foo\nbar", "foo", "baz", false);
+    expect(result.hunks).toEqual([{ line: 1, before: "foo", after: "baz" }]);
   });
 
-  it("서버 본문의 제어문자를 치환한다", () => {
-    const out = formatHunks([{ line: 1, before: "\x1b[31m빨강", after: "평문" }]);
-    expect(out).not.toContain("\x1b");
-    expect(out).toContain("-?[31m빨강");
+  it("줄 번호를 구간마다 이어서 센다", () => {
+    const content = Array.from({ length: 10 }, (_, i) => `줄${i + 1} x`).join("\n");
+    const result = applyReplace(content, "x", "y", true);
+    expect(result.hunks.map((h) => h.line)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+  });
+
+  it("CRLF 본문에서 0건이고 old 에 CR 이 없으면 안내를 덧붙인다", () => {
+    expectThrowParam(() => applyReplace("첫째\r\n둘째", "첫째\n둘째", "x", false), /CRLF/);
+  });
+
+  it("CRLF 본문이어도 old 에 CR 이 있으면 정확 일치로 바꾼다", () => {
+    const result = applyReplace("첫째\r\n둘째", "첫째\r\n둘째", "x", false);
+    expect(result.content).toBe("x");
+  });
+
+  it("LF 본문의 0건에는 CRLF 안내가 없다", () => {
+    let message = "";
+    try {
+      applyReplace("첫째\n둘째", "없음", "x", false);
+    } catch (e) {
+      message = (e as Error).message;
+    }
+    expect(message).not.toContain("CRLF");
   });
 });

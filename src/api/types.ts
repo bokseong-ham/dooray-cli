@@ -527,6 +527,8 @@ export interface WikiPageFile {
   id: string;
   name: string;
   size: number;
+  /** 인라인 이미지(`images`)에 붙는다. 본문 참조 `/wikis/<n>/files/<id>` 의 id 는 `id` 가 아니라 이 값이다 (ADR-065 실측) */
+  attachFileId?: string;
 }
 
 export interface WikiPageDetail {
