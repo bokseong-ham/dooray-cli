@@ -1,17 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { EXIT_PARAM_ERROR } from "../../utils/exit-codes.js";
-import { MAX_RANGE_DAYS, expandDateOnly, localOffset, resolveTimeRange } from "./date-range.js";
+import { localOffset } from "../../utils/local-date.js";
+import { MAX_RANGE_DAYS, expandDateOnly, resolveTimeRange } from "./date-range.js";
 
 // 실행 장비의 타임존에 따라 offset 이 달라지므로 기대값을 박지 않고 그 장비의 값을 쓴다.
 function offsetOn(year: number, month: number, day: number, hour: number): string {
   return localOffset(new Date(year, month - 1, day, hour, 0, 0));
 }
-
-describe("localOffset", () => {
-  it("`+HH:MM` 형태로 낸다", () => {
-    expect(offsetOn(2026, 9, 20, 0)).toMatch(/^[+-]\d{2}:\d{2}$/);
-  });
-});
 
 describe("expandDateOnly", () => {
   it("from 은 그 날 00:00:00 으로 늘린다", () => {

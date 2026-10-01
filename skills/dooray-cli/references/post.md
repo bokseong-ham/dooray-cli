@@ -40,6 +40,47 @@ dooray post file upload   --url <url> --file ./report.pdf
 
 TTY 확인, non-TTY 실행, `-y`와 `--yes` 사용법은 [SKILL.md](../SKILL.md#삭제-명령의-확인-동작)를 따른다.
 
+## 업무 목록 거르기
+
+`post list` 의 필터는 함께 줄 수 있고 `--all` 이면 모든 페이지에 같은 조건이 걸린다.
+
+```bash
+dooray post list <project> --from me --created 2026-09-01~           # 9월 이후 내가 등록한 업무
+dooray post list <project> --to me --parent 42                       # 42번의 하위 업무 중 내 담당
+dooray post list <project> --cc me --updated prev-7d --order -postUpdatedAt
+dooray post list <project> --to user@example.com --all
+```
+
+| 옵션 | 동작 |
+| --- | --- |
+| `--from` / `--to` / `--cc` | 등록자·담당자·참조자. `me`, 멤버 id(15자리 이상), 이메일, 프로젝트 멤버 이름을 받는다. 옵션마다 한 명 |
+| `--parent` | 그 업무의 하위 업무만. 이 프로젝트의 업무 번호(`42`), `<project>/<number>`, postId(15자리 이상 숫자) |
+| `--created` / `--updated` | 등록·수정 기간. 형식은 아래 |
+| `--order` | `createdAt`·`postUpdatedAt`·`postDueAt` 중 하나. 앞에 `-` 를 붙이면 내림차순. 기본 `-createdAt` |
+
+같은 멤버 옵션을 두 번 주면 조회 전에 종료 코드 3 으로 끝난다. 여러 사람의 결합 규칙이 공식 문서에 없어 받지 않는다.
+"A 나 B 가 담당인 업무" 가 필요하면 `--to` 를 한 사람씩 따로 조회해 합친다.
+멤버 값의 앞뒤 공백은 지우고 해석한다. 빈 값이나 공백만 있는 값(`--from "$WHO"` 에서 변수가 빈 경우 등)은 조회 전에 종료 코드 3 으로 끝난다.
+
+`--parent` 의 짧은 숫자는 이 프로젝트의 업무 번호로 본다. `post create --parent` 와 달리 postId 를 쓰려면 15자리 이상 숫자여야 한다.
+숫자도 `<project>/<number>` 도 아닌 값은 조회 전에 종료 코드 3 으로 끝난다.
+
+기간은 네 가지 형태다.
+
+| 형태 | 뜻 |
+| --- | --- |
+| `A~B` | A 부터 B 까지 |
+| `A~` | A 이후 |
+| `~B` | B 이전 |
+| `prev-<N>d` | 최근 N일. N 은 1 이상 |
+
+`~B` 는 따옴표로 감싸 `--created "~2026-09-30"` 처럼 준다. 감싸지 않으면 zsh 는 `~` 를 홈 디렉터리로 해석하다 실패한다.
+
+A·B 는 `2026-09-01` 같은 날짜나 `2026-09-01T09:00:00+09:00` 같은 offset 이 붙은 일시다.
+날짜만 주면 A 는 그 날 `00:00:00`, B 는 그 날 `23:59:59` 로 본다. `2026-09-01~2026-09-01` 은 그 날 하루다.
+날짜 하나만 준 값(`--created 2026-09-01`), offset 없는 일시, 없는 날짜, 끝이 시작보다 앞서거나 같은 범위는
+조회 전에 종료 코드 3 으로 끝난다. `--order` 에 목록 밖의 값을 주어도 조회 전에 끝난다.
+
 ## 업무 생성
 
 ```bash
