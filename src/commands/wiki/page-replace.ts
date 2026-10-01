@@ -22,7 +22,8 @@ import { printReplacePreview } from "../../formatters/body-replace.js";
 import type { WikiPageDetail } from "../../api/types.js";
 
 /**
- * 첨부 누락 검사에 넘길 목록. 인라인 이미지는 본문 참조의 id 가 `attachFileId` 라 그 값도 함께 넣는다.
+ * 첨부 누락 검사에 넘길 목록. 인라인 이미지는 본문 참조의 id 가 `attachFileId` 였어서 그 값도 함께 넣는다.
+ * `attachFileId` 는 공식 문서 응답에 없는 필드라(실측으로만 확인) 없으면 `id` 만으로 확인한다.
  * 일반 첨부의 본문 참조 형태는 실측하지 못해 `id` 와 `attachFileId` 를 모두 후보로 둔다 (ADR-065).
  */
 function wikiAttachments(page: WikiPageDetail): { id: string; name: string }[] {

@@ -111,9 +111,9 @@ export function findOccurrences(haystack: string, needle: string): number[] {
 }
 
 export interface ReplaceHunk {
-  /** 바뀐 구간이 시작하는 줄 번호 (원본 기준, 1부터). */
+  /** 바뀐 글자가 시작하는 줄 번호 (원본 기준, 1부터). */
   line: number;
-  /** 원본에서 일치 구간을 포함한 줄 전체. */
+  /** 원본에서 바뀐 글자를 포함한 줄 전체. old 와 new 의 공통 앞뒤만 걸친 줄은 넣지 않는다. */
   before: string;
   /** 치환 후 같은 자리의 줄 전체. */
   after: string;
@@ -197,9 +197,34 @@ export function applyReplace(
 }
 
 /**
- * 바뀐 위치마다 그 위치를 품은 줄 전체를 원본과 결과에서 잘라 낸다.
- * 같은 줄에 걸치는 위치는 한 구간으로 합친다. 따로 두면 한 구간의 결과 줄에
- * 다른 위치의 치환이 빠져 미리보기와 실제 결과가 달라 보인다.
+ * old 와 new 의 공통 앞부분 길이와 공통 뒷부분 길이. 둘이 겹치지 않게 뒷부분은 짧은 쪽에서 앞부분을 뺀 만큼까지만 센다.
+ */
+function commonAffixes(oldText: string, newText: string): { prefix: number; suffix: number } {
+  const max = Math.min(oldText.length, newText.length);
+  let prefix = 0;
+  while (prefix < max && oldText.charCodeAt(prefix) === newText.charCodeAt(prefix)) prefix++;
+  let suffix = 0;
+  while (
+    suffix < max - prefix &&
+    oldText.charCodeAt(oldText.length - 1 - suffix) === newText.charCodeAt(newText.length - 1 - suffix)
+  ) {
+    suffix++;
+  }
+  return { prefix, suffix };
+}
+
+/**
+ * 바뀐 위치마다 실제로 바뀐 글자를 품은 줄 전체를 원본과 결과에서 잘라 낸다.
+ *
+ * - old 와 new 의 공통 앞뒤는 바뀌지 않으므로 빼고 줄을 찾는다. old·new 가 함께 `\n` 으로 끝나거나
+ *   시작할 때 바뀌지 않는 다음 줄·앞 줄이 미리보기에 끼지 않게 한다
+ * - 바뀐 글자에 줄바꿈이 들어 있으면 그 줄바꿈으로 이어지던 다음 줄도 담는다. 줄이 합쳐지거나 갈라진 것을 보이기 위해서다
+ * - 같은 줄에 걸치는 위치는 한 구간으로 합친다. 따로 두면 한 구간의 결과 줄에
+ *   다른 위치의 치환이 빠져 미리보기와 실제 결과가 달라 보인다
+ *
+ * 원본 위치 x 가 i 번째 위치의 바뀐 글자 끝(공통 뒷부분 포함)과 i+1 번째 위치의 바뀐 글자 머리
+ * (공통 앞부분 포함) 사이에 있으면 결과 위치는 x + (i+1)·delta 다. 구간 머리는 앞 구간의 줄 끝보다 뒤,
+ * 구간 끝은 마지막 위치의 바뀐 글자 끝 이후라 이 매핑이 성립한다.
  */
 function buildHunks(
   original: string,
@@ -209,6 +234,10 @@ function buildHunks(
   newText: string,
 ): ReplaceHunk[] {
   const delta = newText.length - oldText.length;
+  const { prefix, suffix } = commonAffixes(oldText, newText);
+  // 원본에서 바뀐 글자가 시작하는 곳과 끝나는 곳(끝은 제외 위치).
+  const changeStart = (t: number): number => t + prefix;
+  const changeEnd = (t: number): number => t + oldText.length - suffix;
   const hunks: ReplaceHunk[] = [];
   // 줄 번호는 직전 구간 머리부터 이어서 센다. 구간마다 본문 앞부분을 다시 세면 본문 길이 × 구간 수가 된다.
   let countedTo = 0;
@@ -216,11 +245,11 @@ function buildHunks(
   let i = 0;
   while (i < targets.length) {
     const first = i;
-    const start = lineStart(original, targets[i]);
-    let end = lineEnd(original, targets[i] + oldText.length);
-    while (i + 1 < targets.length && targets[i + 1] <= end) {
+    const start = lineStart(original, changeStart(targets[i]));
+    let end = lineEnd(original, changeEnd(targets[i]));
+    while (i + 1 < targets.length && changeStart(targets[i + 1]) <= end) {
       i++;
-      end = Math.max(end, lineEnd(original, targets[i] + oldText.length));
+      end = Math.max(end, lineEnd(original, changeEnd(targets[i])));
     }
     const outStart = start + first * delta;
     const outEnd = end + (i + 1) * delta;

@@ -173,6 +173,21 @@ describe("wiki page replace", () => {
     expect(stdout).toBe("@@ 1/1 — 5번째 줄 @@\n-- 확인\n+- 모니터링\n1군데가 바뀝니다 (dry-run, 수정하지 않음).\n");
   });
 
+  it("--json --dry-run 은 pageId 와 구간을 구조로 낸다", async () => {
+    const { stdout } = await run([
+      "--json", "wiki", "page", "replace", "--id", "page-1", "--old", "확인", "--new", "모니터링", "--dry-run",
+    ]);
+
+    expect(mocks.client.updateWikiPageContent).not.toHaveBeenCalled();
+    expect(JSON.parse(stdout)).toEqual({
+      dryRun: true,
+      pageId: "page-1",
+      replaced: 1,
+      mimeType: "text/x-markdown",
+      hunks: [{ line: 5, before: "- 확인", after: "- 모니터링" }],
+    });
+  });
+
   it("old 와 new 가 같으면 대상 해석 전에 거부한다", async () => {
     const { error } = await run(["wiki", "page", "replace", "--id", "page-1", "--old", "a", "--new", "a"]);
 
@@ -258,6 +273,23 @@ describe("wiki page replace", () => {
       }
     });
 
+    it("--dry-run 에서는 확인하지 않는다", async () => {
+      const isTTY = process.stdin.isTTY;
+      Object.defineProperty(process.stdin, "isTTY", { value: false, configurable: true });
+      const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+      try {
+        const { error, stdout } = await run([...dropArgs, "--dry-run"]);
+
+        expect(error).toBeUndefined();
+        expect(stdout).toContain("dry-run");
+        expect(stderr.mock.calls.map((c) => String(c[0])).join("")).not.toContain("도식.png");
+        expect(mocks.client.updateWikiPageContent).not.toHaveBeenCalled();
+      } finally {
+        stderr.mockRestore();
+        Object.defineProperty(process.stdin, "isTTY", { value: isTTY, configurable: true });
+      }
+    });
+
     it("참조가 남으면 확인하지 않는다", async () => {
       const { error } = await run([
         "wiki", "page", "replace", "--id", "page-1", "--old", "앞", "--new", "머리",
@@ -265,6 +297,43 @@ describe("wiki page replace", () => {
 
       expect(error).toBeUndefined();
       expect(mocks.client.updateWikiPageContent).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe("attachFileId 가 없는 응답 (공식 문서 응답 형태: id·name·size)", () => {
+    async function expectGuarded(content: string, extra: Record<string, unknown>, old: string, name: string) {
+      mocks.client.getWikiPage.mockResolvedValue(page({ mimeType: "text/x-markdown", content }, extra));
+      const isTTY = process.stdin.isTTY;
+      Object.defineProperty(process.stdin, "isTTY", { value: false, configurable: true });
+      const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+      try {
+        const { error } = await run(["wiki", "page", "replace", "--id", "page-1", "--old", old, "--new", ""]);
+
+        expectParamError(error, /--no-confirm/);
+        expect(stderr.mock.calls.map((c) => String(c[0])).join("")).toContain(name);
+        expect(mocks.client.updateWikiPageContent).not.toHaveBeenCalled();
+      } finally {
+        stderr.mockRestore();
+        Object.defineProperty(process.stdin, "isTTY", { value: isTTY, configurable: true });
+      }
+    }
+
+    it("일반 첨부(files[])의 참조가 사라지면 id 로 찾아 확인한다", async () => {
+      await expectGuarded(
+        "앞\n[설명서.pdf](/wikis/900/files/file-9)\n뒤",
+        { files: [{ id: "file-9", name: "설명서.pdf", size: 10 }], images: [] },
+        "[설명서.pdf](/wikis/900/files/file-9)\n",
+        "설명서.pdf",
+      );
+    });
+
+    it("인라인 이미지(images[])도 attachFileId 가 없으면 id 로 찾아 확인한다", async () => {
+      await expectGuarded(
+        "앞\n![도식.png](/wikis/900/files/image-1)\n뒤",
+        { images: [{ id: "image-1", name: "도식.png", size: 10 }] },
+        "![도식.png](/wikis/900/files/image-1)\n",
+        "도식.png",
+      );
     });
   });
 

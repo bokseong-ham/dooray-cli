@@ -339,3 +339,128 @@ describe("applyReplace 경계", () => {
     expect(message).not.toContain("CRLF");
   });
 });
+
+describe("applyReplace 미리보기 구간은 바뀐 줄만 담는다", () => {
+  const body = "a\n- 배포\n- 확인\nz";
+
+  it("old·new 가 함께 \\n 으로 끝나면 바뀌지 않는 다음 줄을 넣지 않는다", () => {
+    const result = applyReplace(body, "- 배포\n", "- 카나리\n", false);
+    expect(result.content).toBe("a\n- 카나리\n- 확인\nz");
+    expect(result.hunks).toEqual([{ line: 2, before: "- 배포", after: "- 카나리" }]);
+  });
+
+  it("old 만 \\n 으로 끝나 두 줄이 합쳐지면 합쳐진 다음 줄까지 넣는다", () => {
+    const result = applyReplace(body, "- 배포\n", "- 카나리", false);
+    expect(result.content).toBe("a\n- 카나리- 확인\nz");
+    expect(result.hunks).toEqual([{ line: 2, before: "- 배포\n- 확인", after: "- 카나리- 확인" }]);
+  });
+
+  it("new 만 \\n 으로 끝나 줄이 갈라지면 결과에 생긴 줄을 넣는다", () => {
+    const result = applyReplace(body, "- 배포", "- 카나리\n", false);
+    expect(result.content).toBe("a\n- 카나리\n\n- 확인\nz");
+    expect(result.hunks).toEqual([{ line: 2, before: "- 배포", after: "- 카나리\n" }]);
+  });
+
+  it("old·new 가 함께 \\n 으로 시작하면 바뀌지 않는 앞 줄을 넣지 않는다", () => {
+    const result = applyReplace(body, "\n- 배포", "\n- 카나리", false);
+    expect(result.hunks).toEqual([{ line: 2, before: "- 배포", after: "- 카나리" }]);
+  });
+
+  it("빈 줄 하나를 지우면 지운 빈 줄과 이어지던 줄만 보인다", () => {
+    const result = applyReplace("a\nb\n\nc", "\n\n", "\n", false);
+    expect(result.content).toBe("a\nb\nc");
+    expect(result.hunks).toEqual([{ line: 3, before: "\nc", after: "c" }]);
+  });
+
+  it("old 가 \\n 하나뿐이면 합쳐지는 두 줄을 보인다", () => {
+    const result = applyReplace("x\ny", "\n", "", false);
+    expect(result.content).toBe("xy");
+    expect(result.hunks).toEqual([{ line: 1, before: "x\ny", after: "xy" }]);
+  });
+
+  it("--all 로 \\n 을 모두 지우면 이어지는 줄을 한 구간으로 합친다", () => {
+    const result = applyReplace("a\nb\nc", "\n", "", true);
+    expect(result.content).toBe("abc");
+    expect(result.replaced).toBe(2);
+    expect(result.hunks).toEqual([{ line: 1, before: "a\nb\nc", after: "abc" }]);
+  });
+
+  it("--all 에서 줄 끝 \\n 까지 일치해도 인접 줄은 각자의 구간이다", () => {
+    const result = applyReplace("p\nq\n- k\n- k\nr", "- k\n", "- m\n", true);
+    expect(result.content).toBe("p\nq\n- m\n- m\nr");
+    expect(result.hunks).toEqual([
+      { line: 3, before: "- k", after: "- m" },
+      { line: 4, before: "- k", after: "- m" },
+    ]);
+  });
+
+  it("--all 에서 같은 줄의 여러 위치와 줄 끝 일치를 함께 합친다", () => {
+    const result = applyReplace("x x\nz", "x", "yy", true);
+    expect(result.hunks).toEqual([{ line: 1, before: "x x", after: "yy yy" }]);
+    const tail = applyReplace("a x\nx\nc", "x\n", "y\n", true);
+    expect(tail.content).toBe("a y\ny\nc");
+    expect(tail.hunks).toEqual([
+      { line: 1, before: "a x", after: "a y" },
+      { line: 2, before: "x", after: "y" },
+    ]);
+  });
+
+  it("본문 끝에서 old 가 끝나도 구간이 맞다", () => {
+    expect(applyReplace("a\n- 배포\n", "- 배포\n", "- 카나리\n", false).hunks).toEqual([
+      { line: 2, before: "- 배포", after: "- 카나리" },
+    ]);
+    expect(applyReplace("a\n- 배포", "\n- 배포", "\n- 카나리", false).hunks).toEqual([
+      { line: 2, before: "- 배포", after: "- 카나리" },
+    ]);
+    expect(applyReplace("a\n- 배포\n", "- 배포\n", "", false)).toEqual({
+      content: "a\n",
+      replaced: 1,
+      hunks: [{ line: 2, before: "- 배포\n", after: "" }],
+    });
+  });
+
+  it("공통 앞부분이 여러 줄이면 바뀐 줄의 번호를 낸다", () => {
+    const result = applyReplace("머리\n유지 줄\n바꿀 줄\n꼬리", "유지 줄\n바꿀 줄", "유지 줄\n바뀐 줄", false);
+    expect(result.hunks).toEqual([{ line: 3, before: "바꿀 줄", after: "바뀐 줄" }]);
+  });
+});
+
+describe("applyReplace 구간과 결과 본문의 일치", () => {
+  /** 구간의 before 를 원본의 그 줄 머리에서 after 로 바꿔 이어 붙인다. 결과 본문과 같아야 한다. */
+  function rebuild(original: string, hunks: { line: number; before: string; after: string }[]): string {
+    const lineStarts = [0];
+    for (let i = 0; i < original.length; i++) if (original[i] === "\n") lineStarts.push(i + 1);
+    let out = "";
+    let cursor = 0;
+    for (const h of hunks) {
+      const at = lineStarts[h.line - 1] as number;
+      expect(at).toBeGreaterThanOrEqual(cursor);
+      expect(original.startsWith(h.before, at)).toBe(true);
+      out += original.slice(cursor, at) + h.after;
+      cursor = at + h.before.length;
+    }
+    return out + original.slice(cursor);
+  }
+
+  it("작은 알파벳의 임의 조합에서 구간을 원본에 적용하면 결과 본문이 된다", () => {
+    // 재현 가능하도록 고정 시드 LCG 를 쓴다.
+    let seed = 42;
+    const rand = (n: number): number => {
+      seed = (seed * 1103515245 + 12345) % 2147483648;
+      return seed % n;
+    };
+    const pick = (len: number): string =>
+      Array.from({ length: len }, () => "ab\n"[rand(3)]).join("");
+    let checked = 0;
+    for (let k = 0; k < 3000; k++) {
+      const content = pick(1 + rand(12));
+      const oldText = pick(1 + rand(4));
+      const newText = pick(rand(5));
+      if (oldText === newText || !content.includes(oldText)) continue;
+      const result = applyReplace(content, oldText, newText, true);
+      expect(rebuild(content, result.hunks)).toBe(result.content);
+      checked++;
+    }
+    expect(checked).toBeGreaterThan(500);
+  });
+});
