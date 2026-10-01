@@ -46,7 +46,7 @@ TTY 확인, non-TTY 실행, `-y`와 `--yes` 사용법은 [SKILL.md](../SKILL.md#
 
 ```bash
 dooray post list <project> --from me --created 2026-09-01~           # 9월 이후 내가 등록한 업무
-dooray post list <project> --to me --parent <project>/42              # 42번의 하위 업무 중 내 담당
+dooray post list <project> --to me --parent 42                       # 42번의 하위 업무 중 내 담당
 dooray post list <project> --cc me --updated prev-7d --order -postUpdatedAt
 dooray post list <project> --to "김철수" --to user@example.com --all
 ```
@@ -54,12 +54,16 @@ dooray post list <project> --to "김철수" --to user@example.com --all
 | 옵션 | 동작 |
 | --- | --- |
 | `--from` / `--to` / `--cc` | 등록자·담당자·참조자. `me`, 멤버 id(15자리 이상), 이메일, 프로젝트 멤버 이름을 받는다. 반복 가능 |
-| `--parent` | 그 업무의 하위 업무만. `<project>/<number>` 또는 postId |
+| `--parent` | 그 업무의 하위 업무만. 이 프로젝트의 업무 번호(`42`), `<project>/<number>`, postId(15자리 이상 숫자) |
 | `--created` / `--updated` | 등록·수정 기간. 형식은 아래 |
 | `--order` | `createdAt`·`postUpdatedAt`·`postDueAt` 중 하나. 앞에 `-` 를 붙이면 내림차순. 기본 `-createdAt` |
 
-같은 멤버 옵션을 여러 번 주면 `--from` 은 그중 한 사람이라도 등록한 업무, `--to`·`--cc` 는 그 사람이 **모두** 들어 있는 업무가 온다.
-"A 나 B 가 담당인 업무" 를 원하면 `--to` 를 따로 두 번 조회해 합친다.
+같은 멤버 옵션을 여러 번 주면 `--from` 은 그중 한 사람이라도 등록한 업무, `--cc` 는 그 사람이 **모두** 참조자인 업무가 온다.
+`--to` 를 여러 번 줄 때의 동작은 확인하지 못했다. `--cc` 와 같을 것으로 보지만 확실하지 않다.
+"A 나 B 가 담당인 업무" 를 확실하게 얻으려면 `--to` 를 한 사람씩 따로 조회해 합친다.
+
+`--parent` 의 짧은 숫자는 이 프로젝트의 업무 번호로 본다. `post create --parent` 와 달리 postId 를 쓰려면 15자리 이상 숫자여야 한다.
+숫자도 `<project>/<number>` 도 아닌 값은 조회 전에 종료 코드 3 으로 끝난다.
 
 기간은 네 가지 형태다.
 

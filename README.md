@@ -160,14 +160,17 @@ dooray post list <project> --tag "<이름 A>" --tag "<이름 B>"
 ### 사람·상위 업무·기간으로 거르기
 
 ```bash
-dooray post list <project> --to me --parent <project>/42      # 42번의 하위 업무 중 내 담당
+dooray post list <project> --to me --parent 42               # 42번의 하위 업무 중 내 담당
 dooray post list <project> --from "김철수" --from user@example.com
 dooray post list <project> --cc me --updated prev-7d --order -postUpdatedAt
 dooray post list <project> --created 2026-09-01~2026-09-30
 ```
 
 `--from`·`--to`·`--cc` 는 등록자·담당자·참조자다. `me`, 멤버 id, 이메일, 프로젝트 멤버 이름을 받고 여러 번 줄 수 있다.
-여러 번 주면 `--from` 은 그중 한 사람이라도 등록한 업무가, `--to`·`--cc` 는 그 사람이 모두 들어 있는 업무가 온다.
+여러 번 주면 `--from` 은 그중 한 사람이라도 등록한 업무가, `--cc` 는 그 사람이 모두 참조자인 업무가 온다.
+`--to` 를 여러 번 줄 때의 동작은 확인하지 못했다. `--cc` 와 같을 것으로 보지만, 확실하게 하려면 한 사람씩 따로 조회해 합친다.
+
+`--parent` 는 이 프로젝트의 업무 번호(`42`), 다른 프로젝트의 `<project>/<number>`, postId 를 받는다.
 
 `--created`·`--updated` 는 `A~B`, `A~`(그 뒤로), `~B`(그 앞으로), `prev-<N>d`(최근 N일)를 받는다.
 A·B 는 `2026-09-01` 같은 날짜나 `2026-09-01T09:00:00+09:00` 같은 일시다.

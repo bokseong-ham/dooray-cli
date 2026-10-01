@@ -9,6 +9,12 @@ import {
   parseLocalDate,
 } from "./local-date.js";
 
+describe("localOffset", () => {
+  it("`+HH:MM` 형태로 낸다", () => {
+    expect(localOffset(new Date(2026, 8, 20, 0, 0, 0))).toMatch(/^[+-]\d{2}:\d{2}$/);
+  });
+});
+
 describe("parseLocalDate", () => {
   it("달력에 있는 날짜를 읽는다", () => {
     expect(parseLocalDate("2026-09-01")).toEqual({ year: 2026, month: 9, day: 1 });

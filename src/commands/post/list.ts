@@ -10,11 +10,13 @@ import { getConfigOrThrow } from "../../config/store.js";
 import { DoorayApiClient, type GetPostsParams } from "../../api/client.js";
 import { resolveProject } from "../../resolvers/project.js";
 import { lookupTagIds } from "../../resolvers/tag.js";
-import { resolveMember } from "../../resolvers/member.js";
+import { ensureMembers, needsMemberList, resolveMember } from "../../resolvers/member.js";
 import { ensureMe } from "../../resolvers/me.js";
+import { resolvePost } from "../../resolvers/post.js";
 import { resolvePostRef } from "../../resolvers/postRef.js";
 import { wrapLookupError } from "../../resolvers/post-users.js";
 import { resolveDateFilter } from "./date-filter.js";
+import { parseParentRef, type ParentRef } from "./parent-ref.js";
 import { formatPostList } from "../../formatters/post.js";
 import type { OutputOptions } from "../../formatters/table.js";
 import type { Post } from "../../api/types.js";
@@ -32,21 +34,34 @@ export const POST_LIST_ORDERS = [
 
 const collect = (v: string, prev: string[]) => [...prev, v];
 
+const MEMBER_FILTERS = [
+  ["from", "fromMemberIds"],
+  ["to", "toMemberIds"],
+  ["cc", "ccMemberIds"],
+] as const;
+
+/** `me` 는 대소문자를 가리지 않는다. `Me` 가 이름 부분 일치로 넘어가 다른 사람이 걸리지 않게 한다. */
+function isMe(input: string): boolean {
+  return input.toLowerCase() === "me";
+}
+
 /**
  * `--from`·`--to`·`--cc` 값을 organizationMemberId 로 바꾼다.
  * `me` 는 API 키 주인이고, 그 밖의 값은 `resolveMember` 가 id·이메일·프로젝트 멤버 이름 순으로 푼다.
  * 같은 사람을 두 번 주면 한 번만 보낸다.
+ * 호출자는 이름 입력이 있으면 멤버 목록 캐시를 먼저 데워 둔다. 그래야 병렬 해석이 목록을 한 번만 받는다.
  */
 async function resolveFilterMembers(
   client: DoorayApiClient,
   projectId: string,
   option: string,
   inputs: string[],
+  meId: () => Promise<string>,
 ): Promise<string[]> {
   const ids = await Promise.all(
     inputs.map(async (input) => {
       try {
-        if (input === "me") return (await ensureMe(client)).id;
+        if (isMe(input)) return await meId();
         return await resolveMember(client, projectId, input);
       } catch (err) {
         throw wrapLookupError(`--${option} 멤버 '${input}' 조회 실패`, err);
@@ -54,6 +69,21 @@ async function resolveFilterMembers(
     }),
   );
   return [...new Set(ids)];
+}
+
+async function resolveParent(
+  client: DoorayApiClient,
+  projectId: string,
+  parent: ParentRef,
+): Promise<string> {
+  switch (parent.kind) {
+    case "postId":
+      return parent.postId;
+    case "number":
+      return resolvePost(client, projectId, parent.number);
+    case "ref":
+      return resolvePostRef(client, parent.ref);
+  }
 }
 
 export const postListCommand = new Command("list")
@@ -72,7 +102,7 @@ export const postListCommand = new Command("list")
   .option("--from <member>", "등록자로 필터링 (반복 가능, me·id·이메일·이름)", collect, [] as string[])
   .option("--to <member>", "담당자로 필터링 (반복 가능, me·id·이메일·이름)", collect, [] as string[])
   .option("--cc <member>", "참조자로 필터링 (반복 가능, me·id·이메일·이름)", collect, [] as string[])
-  .option("--parent <ref>", "상위 업무의 하위 업무만 (project/번호 또는 postId)")
+  .option("--parent <ref>", "상위 업무의 하위 업무만 (이 프로젝트의 업무 번호, project/번호, postId)")
   .option("--created <range>", "등록 기간 (A~B, A~, ~B, prev-7d. A·B 는 YYYY-MM-DD 또는 ISO8601)")
   .option("--updated <range>", "수정 기간 (--created 와 같은 형식)")
   .addOption(
@@ -83,9 +113,10 @@ export const postListCommand = new Command("list")
   .action(async (project, opts) => {
     const globalOpts = postListCommand.optsWithGlobals() as OutputOptions;
 
-    // 기간은 설정·프로젝트 조회보다 먼저 검증한다. 잘못된 값으로 API 를 한 번도 부르지 않게 한다.
+    // 기간과 상위 업무 형식은 설정·프로젝트 조회보다 먼저 검증한다. 잘못된 값으로 API 를 한 번도 부르지 않게 한다.
     const createdAt = opts.created != null ? resolveDateFilter(opts.created, "created") : undefined;
     const updatedAt = opts.updated != null ? resolveDateFilter(opts.updated, "updated") : undefined;
+    const parent = opts.parent != null ? parseParentRef(opts.parent) : undefined;
 
     const config = await getConfigOrThrow();
     const client = new DoorayApiClient(config.apiKey, config.baseUrl);
@@ -103,26 +134,35 @@ export const postListCommand = new Command("list")
       if (createdAt) params.createdAt = createdAt;
       if (updatedAt) params.updatedAt = updatedAt;
 
-      // 멤버 필터도 태그처럼 주지 않았으면 키 자체를 넣지 않는다.
-      const memberFilters = [
-        ["from", "fromMemberIds"],
-        ["to", "toMemberIds"],
-        ["cc", "ccMemberIds"],
-      ] as const;
-      for (const [option, key] of memberFilters) {
-        const inputs: string[] = (opts[option] ?? []).filter((s: string) => s.length > 0);
-        if (inputs.length > 0) {
-          params[key] = await resolveFilterMembers(client, projectId, option, inputs);
-        }
-      }
-
-      if (opts.parent) params.parentPostId = await resolvePostRef(client, opts.parent);
-
-      // 태그를 주지 않았으면 `tagIds` 키 자체를 넣지 않는다. 빈 배열을 넣으면 의도가 흐려진다.
+      // 멤버·상위 업무·태그 필터는 주지 않았으면 키 자체를 넣지 않는다. 빈 배열을 넣으면 의도가 흐려진다.
+      const memberInputs = MEMBER_FILTERS.map(([option, key]) => ({
+        option,
+        key,
+        inputs: ((opts[option] ?? []) as string[]).filter((s) => s.length > 0),
+      })).filter((f) => f.inputs.length > 0);
       const tagNames: string[] = (opts.tag ?? []).filter((s: string) => s.length > 0);
-      if (tagNames.length > 0) {
-        params.tagIds = await lookupTagIds(client, projectId, tagNames);
+
+      // 이름 입력을 동시에 풀면 빈 캐시에서 이름마다 멤버 목록을 따로 받는다. 먼저 한 번 받아 둔다.
+      if (memberInputs.some((f) => f.inputs.some((i) => !isMe(i) && needsMemberList(i)))) {
+        await ensureMembers(client, projectId);
       }
+      let mePromise: Promise<string> | undefined;
+      const meId = () => (mePromise ??= ensureMe(client).then((me) => me.id));
+
+      // 서로 의존하지 않는 해석이라 함께 돌린다.
+      await Promise.all([
+        ...memberInputs.map(async ({ option, key, inputs }) => {
+          params[key] = await resolveFilterMembers(client, projectId, option, inputs, meId);
+        }),
+        parent &&
+          resolveParent(client, projectId, parent).then((id) => {
+            params.parentPostId = id;
+          }),
+        tagNames.length > 0 &&
+          lookupTagIds(client, projectId, tagNames).then((ids) => {
+            params.tagIds = ids;
+          }),
+      ]);
 
       if (opts.all) {
         posts = [];

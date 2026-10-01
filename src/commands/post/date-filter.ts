@@ -33,7 +33,7 @@ export const OPEN_START = "1970-01-01T00:00:00Z";
 function paramError(option: DateFilterOption, value: string, reason: string): DoorayCliError {
   return new DoorayCliError(
     `--${option} 값을 읽을 수 없습니다: "${value}" (${reason}. ` +
-      `예: 2026-09-01~2026-09-30, 2026-09-01~, ~2026-09-30, ` +
+      `예: 2026-09-01~2026-09-30, 2026-09-01~, "~2026-09-30", ` +
       `2026-09-01T09:00:00+09:00~, prev-7d)`,
     EXIT_PARAM_ERROR,
   );
@@ -79,11 +79,13 @@ export function resolveDateFilter(value: string, option: DateFilterOption): stri
   const start = rawStart === "" ? null : normalizeBound(rawStart, DAY_START, option, value);
   const end = rawEnd === "" ? null : normalizeBound(rawEnd, DAY_END, option, value);
 
-  if (start != null && end != null && Date.parse(start) >= Date.parse(end)) {
+  // 빈 시작을 채운 뒤에 견준다. `~1969-12-31` 도 서버에는 뒤집힌 범위로 나간다.
+  const from = start ?? OPEN_START;
+  if (end != null && Date.parse(from) >= Date.parse(end)) {
     throw new DoorayCliError(
-      `--${option} 의 시작이 끝과 같거나 뒤입니다: ${start} ~ ${end}`,
+      `--${option} 의 시작이 끝과 같거나 뒤입니다: ${from} ~ ${end}`,
       EXIT_PARAM_ERROR,
     );
   }
-  return `${start ?? OPEN_START}~${end ?? ""}`;
+  return `${from}~${end ?? ""}`;
 }

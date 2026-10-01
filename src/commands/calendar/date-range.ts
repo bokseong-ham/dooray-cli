@@ -20,8 +20,6 @@ import {
   parseLocalDate,
 } from "../../utils/local-date.js";
 
-export { localOffset } from "../../utils/local-date.js";
-
 /**
  * 한 번에 조회할 수 있는 최대 기간(일).
  *

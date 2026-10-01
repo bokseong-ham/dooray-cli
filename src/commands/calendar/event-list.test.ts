@@ -94,7 +94,7 @@ async function run(argv: string[]): Promise<string> {
 
 /** 실행 장비의 타임존에 따라 offset 이 달라지므로 기대값을 박지 않고 그 장비의 값을 쓴다. */
 async function offsetOn(year: number, month: number, day: number, hour: number): Promise<string> {
-  const { localOffset } = await import("./date-range.js");
+  const { localOffset } = await import("../../utils/local-date.js");
   return localOffset(new Date(year, month - 1, day, hour, 0, 0));
 }
 
