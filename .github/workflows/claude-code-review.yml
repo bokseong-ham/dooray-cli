@@ -150,7 +150,13 @@ jobs:
           # Agent 는 프롬프트의 「거르기는 검토한 쪽이 하지 않는다」가 쓴다 (Task 는 그 레거시 별칭).
           # allowedTools 는 허용 목록이라 여기 없으면 위임 절이 조용히 자가검토로 떨어진다.
           # 서브 에이전트는 부모 권한을 상속하므로 disallowedTools 의 read-only 도 함께 적용된다.
-          claude_args: '--model opus --allowedTools "Bash,Read,Grep,Glob,Agent,Task" --disallowedTools "Write,Edit"'
+          # Bash 는 프롬프트가 실제로 쓰는 명령만 연다. diff 는 남이 쓴 글이라 그 안의 지시문에 리뷰어가
+          # 속을 수 있고, 그때 curl 이나 env 로 토큰을 내보내지 못하게 하려는 것이다.
+          # 프롬프트가 새 명령을 쓰게 되면 여기에도 더한다. 없으면 그 명령이 거부되어 리뷰가 게시되지 않는다.
+          claude_args: >-
+            --model opus
+            --allowedTools "Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh api:*),Bash(jq:*),Bash(mktemp:*),Bash(cat:*),Bash(rm:*),Bash(ls:*),Bash(grep:*),Read,Grep,Glob,Agent,Task"
+            --disallowedTools "Write,Edit"
 
       # 실행 기록의 init 메시지에서 실제 모델 ID 를 읽어 notice 와 Job Summary 에 남긴다.
       # 리뷰가 실패해도 어떤 모델이었는지 남도록 always 로 돈다. 읽지 못해도 워크플로를 실패시키지 않는다.
