@@ -264,8 +264,9 @@ export const messengerChannelsCommand = new Command("channels")
       // 서버가 준 문자열은 외부 통제 값이라 출력 직전 control char 를 없앤다.
       sanitizeForTerminal(labels.get(ch.id) ?? ""),
       sanitizeForTerminal(channelKind(ch.type)),
-      formatSentAt(ch.updatedAt),
-      ch.id,
+      // formatSentAt 은 형식이 다르면 원문을 그대로 돌려주므로 시각도 거친다.
+      sanitizeForTerminal(formatSentAt(ch.updatedAt)),
+      sanitizeForTerminal(ch.id),
     ]);
     output(globalOpts, {
       headers: ["이름", "종류", "최근 활동", "id"],

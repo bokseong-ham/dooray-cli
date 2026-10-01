@@ -116,6 +116,27 @@ const BIG_GROUP = channel({
 
 const serverChannels = [DM_HONG, ARCHIVED, OLD_DM, TEAM, SYSTEM, GROUP_SMALL];
 
+/** 팩토리가 채운 키를 아예 없앤 사본. 값이 undefined 인 것과 키가 없는 것은 JSON 에서 다르다. */
+function withoutKey(ch: MessengerChannel, key: keyof MessengerChannel): MessengerChannel {
+  const copy = { ...ch };
+  delete copy[key];
+  return copy;
+}
+
+// updatedAt 이 없거나 읽을 수 없는 방, status 가 없는 방 (ADR-066 의 결정).
+const NO_UPDATED = withoutKey(channel({ id: "ch-no-updated", title: "시각 없는 방" }), "updatedAt");
+const BAD_UPDATED = channel({ id: "ch-bad-updated", title: "시각 깨진 방", updatedAt: "not-a-date" });
+const NO_STATUS = withoutKey(
+  channel({ id: "ch-no-status", title: "상태 없는 방", updatedAt: "2026-09-17T00:00:00.000+09:00" }),
+  "status",
+);
+// 1970 이전 시각은 epoch ms 가 음수다. 읽을 수 없는 시각을 0 으로 두면 이 방보다 앞에 선다.
+const PRE_EPOCH = channel({
+  id: "ch-pre-epoch",
+  title: "아주 오래된 방",
+  updatedAt: "1969-12-31T00:00:00.000+09:00",
+});
+
 function exitOverrideAll(cmd: Command): void {
   cmd.exitOverride();
   cmd.configureOutput({ writeErr: () => {} });
@@ -263,6 +284,54 @@ describe("messenger channels — --since", () => {
 
   it("resolveSince 는 날짜를 로컬 00:00:00 으로 늘린다", () => {
     expect(resolveSince("2026-09-16")).toMatch(/^2026-09-16T00:00:00[+-]\d{2}:\d{2}$/);
+  });
+});
+
+describe("messenger channels — updatedAt·status 가 빠진 방", () => {
+  it("updatedAt 이 없거나 읽을 수 없는 방은 정렬에서 맨 뒤로 간다", async () => {
+    setServerChannels([NO_UPDATED, OLD_DM, BAD_UPDATED, PRE_EPOCH, TEAM]);
+    const result = await runJson(["messenger", "channels"]);
+    const ids = result.map((c) => c.id);
+    expect(ids.slice(0, 3)).toEqual([TEAM.id, OLD_DM.id, PRE_EPOCH.id]);
+    expect(ids.slice(3).sort()).toEqual([NO_UPDATED.id, BAD_UPDATED.id].sort());
+  });
+
+  it("--since 를 주면 updatedAt 이 없거나 읽을 수 없는 방은 뺀다", async () => {
+    setServerChannels([NO_UPDATED, BAD_UPDATED, TEAM]);
+    const result = await runJson(["messenger", "channels", "--since", "2026-09-01"]);
+    expect(result.map((c) => c.id)).toEqual([TEAM.id]);
+  });
+
+  it("--since 가 1970 이전이어도 updatedAt 을 읽을 수 없는 방은 뺀다", async () => {
+    setServerChannels([NO_UPDATED, BAD_UPDATED, PRE_EPOCH]);
+    const result = await runJson([
+      "messenger",
+      "channels",
+      "--since",
+      "1969-01-01T00:00:00+09:00",
+    ]);
+    expect(result.map((c) => c.id)).toEqual([PRE_EPOCH.id]);
+  });
+
+  it("status 키가 없는 방은 기본 목록에 남고 status 가 system 인 방은 빠진다", async () => {
+    setServerChannels([NO_STATUS, SYSTEM, TEAM]);
+    const result = await runJson(["messenger", "channels"]);
+    expect(result.map((c) => c.id)).toEqual([TEAM.id, NO_STATUS.id]);
+    expect("status" in result[1]).toBe(false);
+  });
+
+  it("--all 이면 status 가 system 인 방도 남는다", async () => {
+    setServerChannels([NO_STATUS, SYSTEM, TEAM]);
+    const result = await runJson(["messenger", "channels", "--all"]);
+    expect(result.map((c) => c.id)).toEqual([SYSTEM.id, TEAM.id, NO_STATUS.id]);
+  });
+
+  it("표에서 updatedAt 이 없는 방의 최근 활동 칸은 비운다", async () => {
+    setServerChannels([NO_UPDATED]);
+    const out = await run(["messenger", "channels"]);
+    expect(out).toContain("시각 없는 방");
+    expect(out).toContain(NO_UPDATED.id);
+    expect(out).not.toContain("undefined");
   });
 });
 
@@ -423,6 +492,26 @@ describe("messenger channels — 표 출력", () => {
     const out = await run(["messenger", "channels"]);
     expect(out).not.toContain(`악성${ESC}`);
     expect(out).toContain("악성?[31m방");
+  });
+
+  it("최근 활동과 id 열의 control char 도 지운다", async () => {
+    // +09:00 형태가 아니면 formatSentAt 이 원문을 그대로 돌려주므로 시각 열도 거쳐야 한다.
+    setServerChannels([
+      channel({ id: `ch-${ESC}[31mevil`, title: "방", updatedAt: `2026-09-18${ESC}[31m` }),
+    ]);
+    const out = await run(["messenger", "channels"]);
+    // 표 테두리·머리글의 색 코드가 ESC 를 쓰므로 값 주변만 본다.
+    expect(out).not.toContain(`2026-09-18${ESC}`);
+    expect(out).not.toContain(`ch-${ESC}`);
+    expect(out).toContain("2026-09-18?[31m");
+    expect(out).toContain("ch-?[31mevil");
+  });
+
+  it("--quiet·--json 은 id 와 updatedAt 을 raw 로 낸다", async () => {
+    const evil = channel({ id: `ch-${ESC}[31mevil`, title: "방", updatedAt: `2026-09-18${ESC}[31m` });
+    setServerChannels([evil]);
+    expect(await run(["--quiet", "messenger", "channels"])).toBe(`${evil.id}\n`);
+    expect(await runJson(["messenger", "channels"])).toEqual([evil]);
   });
 });
 

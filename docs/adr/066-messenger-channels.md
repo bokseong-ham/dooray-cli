@@ -73,7 +73,8 @@ endpoint 는 `resolveMessengerChannel` 이 이름 해석에 이미 쓰고 있었
   (버스트 20, 초당 5건)에서 나온다. 줄이려면 멤버 이름 캐시가 필요하고, 그것은 이번 범위 밖이다.
 - **`--json` 은 필터·정렬만 적용한 서버 응답이고 표시명을 넣지 않는다.** raw 유지 규약(ADR-031, ADR-056)을 따른다.
 - **시각은 `logs` 의 `formatSentAt` 으로 보인다.** `Date` 로 파싱하지 않고 `+09:00` 일 때만 offset 과 초·밀리초를 뗀다(ADR-061).
-- 제목과 이름은 서버가 준 문자열이라 표에 넣기 전에 `sanitizeForTerminal` 을 거친다.
+- 표의 모든 열(이름·종류·최근 활동·id)은 서버가 준 문자열에서 나오므로 표에 넣기 전에 `sanitizeForTerminal` 을 거친다.
+  `formatSentAt` 은 형식이 다르면 원문을 그대로 돌려주므로 시각 열도 예외가 아니다. `--json`·`--quiet` 은 raw 그대로 낸다(ADR-031).
 
 **대안 기각**:
 
