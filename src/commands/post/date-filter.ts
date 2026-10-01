@@ -1,7 +1,7 @@
 /**
  * `post list` 의 `--created`·`--updated` 값을 업무 목록 API 의 `createdAt`·`updatedAt` 값으로 확정하는 순수 함수.
  *
- * `A~B`, `A~`, `~B`, `prev-<N>d` 를 받는다. A·B 는 `YYYY-MM-DD` 또는 offset 이 붙은 ISO8601 이다.
+ * `A~B`, `A~`, `~B`, `prev-<N>d`(N 은 1 이상)를 받는다. A·B 는 `YYYY-MM-DD` 또는 offset 이 붙은 ISO8601 이다.
  * 날짜만 주면 그 날짜의 지역 offset 으로 A 는 00:00:00, B 는 23:59:59 로 늘린다.
  * 서버가 거절하는 형태는 API 를 부르기 전에 `EXIT_PARAM_ERROR` 로 거른다 (ADR-064).
  */
@@ -20,7 +20,8 @@ import {
 
 export type DateFilterOption = "created" | "updated";
 
-const PREV_DAYS = /^prev-\d+d$/;
+/** `prev-0d` 는 서버가 오류 없이 0건을 준다(실측). 빈 결과가 실수를 숨기지 않게 N 은 1 이상만 받는다. */
+const PREV_DAYS = /^prev-[1-9]\d*d$/;
 
 /**
  * `~B` 의 빈 시작을 채울 값.
@@ -69,7 +70,7 @@ export function resolveDateFilter(value: string, option: DateFilterOption): stri
 
   const parts = value.split("~");
   if (parts.length !== 2) {
-    throw paramError(option, value, "A~B, A~, ~B, prev-<N>d 중 하나로 주세요");
+    throw paramError(option, value, "A~B, A~, ~B, prev-<N>d(N 은 1 이상) 중 하나로 주세요");
   }
   const [rawStart, rawEnd] = parts as [string, string];
   if (rawStart === "" && rawEnd === "") {

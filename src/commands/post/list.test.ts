@@ -259,6 +259,31 @@ describe("post list --from / --to / --cc", () => {
     expect(listParams().ccMemberIds).toEqual([MY_ID]);
   });
 
+  it.each(["from", "to", "cc"])("--%s 의 빈 값·공백만 있는 값은 설정·스피너·API 전에 거부한다", async (option) => {
+    for (const value of ["", " ", "\t  "]) {
+      await expect(run(["my-project", `--${option}`, value])).rejects.toMatchObject({
+        exitCode: EXIT_PARAM_ERROR,
+        message: expect.stringContaining(`--${option} 값이 비어 있습니다`),
+      });
+    }
+    expect(mocks.getConfigOrThrow).not.toHaveBeenCalled();
+    expect(mocks.startSpinner).not.toHaveBeenCalled();
+    expect(mocks.client.getPosts).not.toHaveBeenCalled();
+    expect(mocks.client.getProjectMembers).not.toHaveBeenCalled();
+  });
+
+  it("다른 값과 섞여 있어도 빈 값이 하나라도 있으면 거부한다", async () => {
+    await expectParamError(["my-project", "--to", "me", "--to", ""]);
+  });
+
+  it("앞뒤 공백은 지우고 해석한다", async () => {
+    await run(["my-project", "--from", "  me ", "--to", " 이영희  "]);
+
+    const args = listParams();
+    expect(args.fromMemberIds).toEqual([MY_ID]);
+    expect(args.toMemberIds).toEqual([NAME_ID]);
+  });
+
   it("찾을 수 없는 멤버면 어느 옵션의 어느 값인지 알리고 목록을 조회하지 않는다", async () => {
     await expect(run(["my-project", "--to", "nobody@example.com"])).rejects.toMatchObject({
       exitCode: EXIT_PARAM_ERROR,
@@ -283,7 +308,7 @@ describe("post list --parent", () => {
     expect(listParams().parentPostId).toBe("parent-post-id");
   });
 
-  it("슬래시가 없으면 postId 로 보고 그대로 넣는다", async () => {
+  it("15자리 이상 숫자는 postId 로 보고 그대로 넣는다", async () => {
     await run(["my-project", "--parent", "1234567890123456789"]);
 
     expect(listParams().parentPostId).toBe("1234567890123456789");
@@ -358,10 +383,10 @@ describe("post list --created / --updated", () => {
     expect(listParams().updatedAt).toBe(`1970-01-01T00:00:00Z~2026-09-30T23:59:59${endOffset}`);
   });
 
-  it("prev-<N>d 는 그대로 보낸다", async () => {
-    await run(["my-project", "--created", "prev-7d"]);
+  it.each(["prev-1d", "prev-7d", "prev-30d"])("%s 는 그대로 보낸다", async (value) => {
+    await run(["my-project", "--created", value]);
 
-    expect(listParams().createdAt).toBe("prev-7d");
+    expect(listParams().createdAt).toBe(value);
   });
 
   it("주지 않으면 createdAt·updatedAt 키가 없다", async () => {
@@ -380,6 +405,10 @@ describe("post list --created / --updated", () => {
     ["offset 없는 ISO", "2026-09-01T00:00:00~"],
     ["실재하지 않는 시각", "2026-09-01T25:00:00+09:00~"],
     ["주 단위 prev", "prev-1w"],
+    // 서버는 prev-0d 를 오류 없이 0건으로 돌려준다. 빈 결과가 실수를 숨기지 않게 막는다.
+    ["0일 prev", "prev-0d"],
+    ["0 이 둘인 prev", "prev-00d"],
+    ["앞자리가 0 인 prev", "prev-007d"],
     ["뒤집힌 범위", "2026-09-30~2026-09-01"],
     ["시작과 끝이 같은 시각", "2026-09-01T00:00:00+09:00~2026-09-01T00:00:00+09:00"],
     // 날짜만 준 1969-12-31 의 끝(23:59:59)은 UTC 서쪽 시간대에서 1970-01-01 이후가 된다. 시간대와 무관한 값으로 본다.

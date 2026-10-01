@@ -21,6 +21,8 @@ import { formatPostList } from "../../formatters/post.js";
 import type { OutputOptions } from "../../formatters/table.js";
 import type { Post } from "../../api/types.js";
 import { startSpinner, stopSpinner } from "../../utils/spinner.js";
+import { DoorayCliError } from "../../utils/errors.js";
+import { EXIT_PARAM_ERROR } from "../../utils/exit-codes.js";
 
 /** 서버가 받는 정렬 값. 목록 밖의 값은 서버가 오류 없이 무시하고 기본 정렬로 돌려준다(실측). */
 export const POST_LIST_ORDERS = [
@@ -71,6 +73,23 @@ async function resolveFilterMembers(
   return [...new Set(ids)];
 }
 
+/**
+ * `--from`·`--to`·`--cc` 값을 trim 하고 빈 값을 거부한다.
+ * 빈 값을 빼고 넘어가면 필터 없이 전체 목록이 오고, 공백만 있는 값은 이름 부분 일치로 엉뚱한 멤버가 걸린다 (ADR-064).
+ */
+function normalizeMemberInputs(option: string, raw: string[]): string[] {
+  return raw.map((value) => {
+    const trimmed = value.trim();
+    if (trimmed === "") {
+      throw new DoorayCliError(
+        `--${option} 값이 비어 있습니다: "${value}" (me, 멤버 id, 이메일, 프로젝트 멤버 이름 중 하나로 주세요)`,
+        EXIT_PARAM_ERROR,
+      );
+    }
+    return trimmed;
+  });
+}
+
 async function resolveParent(
   client: DoorayApiClient,
   projectId: string,
@@ -113,10 +132,16 @@ export const postListCommand = new Command("list")
   .action(async (project, opts) => {
     const globalOpts = postListCommand.optsWithGlobals() as OutputOptions;
 
-    // 기간과 상위 업무 형식은 설정·프로젝트 조회보다 먼저 검증한다. 잘못된 값으로 API 를 한 번도 부르지 않게 한다.
+    // 기간·상위 업무 형식과 멤버 값은 설정·프로젝트 조회보다 먼저 검증한다. 잘못된 값으로 API 를 한 번도 부르지 않게 한다.
     const createdAt = opts.created != null ? resolveDateFilter(opts.created, "created") : undefined;
     const updatedAt = opts.updated != null ? resolveDateFilter(opts.updated, "updated") : undefined;
     const parent = opts.parent != null ? parseParentRef(opts.parent) : undefined;
+    // 멤버 필터는 주지 않았으면 키 자체를 넣지 않는다. 빈 배열을 넣으면 의도가 흐려진다.
+    const memberInputs = MEMBER_FILTERS.map(([option, key]) => ({
+      option,
+      key,
+      inputs: normalizeMemberInputs(option, (opts[option] ?? []) as string[]),
+    })).filter((f) => f.inputs.length > 0);
 
     const config = await getConfigOrThrow();
     const client = new DoorayApiClient(config.apiKey, config.baseUrl);
@@ -134,12 +159,7 @@ export const postListCommand = new Command("list")
       if (createdAt) params.createdAt = createdAt;
       if (updatedAt) params.updatedAt = updatedAt;
 
-      // 멤버·상위 업무·태그 필터는 주지 않았으면 키 자체를 넣지 않는다. 빈 배열을 넣으면 의도가 흐려진다.
-      const memberInputs = MEMBER_FILTERS.map(([option, key]) => ({
-        option,
-        key,
-        inputs: ((opts[option] ?? []) as string[]).filter((s) => s.length > 0),
-      })).filter((f) => f.inputs.length > 0);
+      // 상위 업무·태그 필터도 주지 않았으면 키 자체를 넣지 않는다.
       const tagNames: string[] = (opts.tag ?? []).filter((s: string) => s.length > 0);
 
       // 이름 입력을 동시에 풀면 빈 캐시에서 이름마다 멤버 목록을 따로 받는다. 먼저 한 번 받아 둔다.
