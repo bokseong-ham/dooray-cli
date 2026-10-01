@@ -18,7 +18,7 @@ NHN Dooray REST API 를 래핑한 CLI 다. 이 파일은 라우터이므로, 작
 | 그룹 멘션·cc 판단, 멘션·링크 자동 삽입, Dooray 마크다운 링크 | [mention-link.md](references/mention-link.md) |
 | 워크플로우 판단 기준, 정형 task 자동화, 명령 체이닝 | [workflow.md](references/workflow.md) |
 | 메일 원본 선택, 답장 전 확인 | [mail.md](references/mail.md) |
-| 메신저 메시지 읽기, 스레드 보고 | [messenger.md](references/messenger.md) |
+| 메신저 대화방 찾기, 메시지 읽기, 스레드 보고 | [messenger.md](references/messenger.md) |
 | 캘린더 기간 조회, 일정 상세, 참석자 | [calendar.md](references/calendar.md) |
 
 ## 대상 지정 방법
@@ -268,9 +268,10 @@ dooray post get <project> <number> --json --with-tag-names
 | 1:1 다이렉트 메시지 | `dooray messenger send --to "<id\|email>" --body "..."` — `--to` 는 ID 나 이메일만 받고 이름은 지원하지 않는다 |
 | 대화방 메시지 | `dooray messenger channel-send --channel "<channelId\|이름>" --body "..."` — 이름으로는 자신이 속한 방만 찾는다 |
 | 대화방 스레드 열기 | `dooray messenger thread-send --channel "<channelId\|이름>" --body "..."` — `--thread-body` 나 `--thread-body-file` 로 첫 메시지를 함께 보내고, `--log <log-id>` 로 이미 올라간 메시지에 연다 |
+| 대화방 목록 | `dooray messenger channels [--type direct\|private\|me\|bot] [--search <이름>] [--since <날짜>] [--all]` — 수정 시각(updatedAt) 최신순, 보관·숨긴·시스템 방은 `--all` 로 포함. `logs`·`channel-send` 에 넘길 channelId 를 여기서 찾는다 |
 | 대화방 메시지 읽기 | `dooray messenger logs "<channelId\|이름>" [-n\|--count <개수>]` — 최근 N건(기본 20, 최대 1000). 표는 오래된 것이 위, 최신이 아래 |
 
-`logs` 로 메시지를 읽거나 진행 상황을 스레드에 보고할 때는 [messenger.md](references/messenger.md) 를 먼저 읽는다.
+대화방을 찾거나 `logs` 로 메시지를 읽거나 진행 상황을 스레드에 보고할 때는 [messenger.md](references/messenger.md) 를 먼저 읽는다.
 
 ## 캘린더
 
