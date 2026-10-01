@@ -198,6 +198,30 @@ describe("readReplaceInputs", () => {
     await expectParamError(readReplaceInputs({ oldFile: "", new: "y" }), /--old-file 경로가 비어 있습니다/);
   });
 
+  it.each([
+    ["0바이트 파일", ""],
+    ["줄바꿈 하나만 든 파일", "\n"],
+    ["CRLF 하나만 든 파일", "\r\n"],
+    ["BOM 만 든 파일", "\uFEFF"],
+  ])("--new-file 로 읽은 new 가 비면 구간 삭제로 넘기지 않고 거부한다 (%s)", async (_name, content) => {
+    const path = join(dir, "empty-new.md");
+    await writeFile(path, content);
+    await expectParamError(readReplaceInputs({ old: "x", newFile: path }), /--new-file 로 읽은 new 가 비어 있습니다.*--new ""/);
+  });
+
+  it.each([
+    ["--new -", { old: "x", new: "-" }],
+    ["--new-file -", { old: "x", newFile: "-" }],
+  ])("%s 로 읽은 stdin 이 비면 거부한다", async (_name, opts) => {
+    stubStdin("");
+    await expectParamError(readReplaceInputs(opts), /stdin 으로 읽은 new 가 비어 있습니다.*--new ""/);
+  });
+
+  it("stdin 이 줄바꿈 하나뿐이어도 비었다고 보고 거부한다", async () => {
+    stubStdin("\n");
+    await expectParamError(readReplaceInputs({ old: "x", new: "-" }), /stdin 으로 읽은 new 가 비어 있습니다/);
+  });
+
   it("빈 경로는 stdin 을 읽기 전에 거부한다", async () => {
     const stdin = stubStdin("파이프 입력");
     await expectParamError(readReplaceInputs({ old: "-", newFile: "" }), /--new-file 경로가 비어 있습니다/);

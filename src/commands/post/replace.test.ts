@@ -1,4 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { Command } from "commander";
 import type { PostDetail } from "../../api/types.js";
 import { DoorayCliError } from "../../utils/errors.js";
@@ -272,6 +275,18 @@ describe("post replace", () => {
     const { error } = await run(["post", "replace", "--id", "post-1", "--old", "2. 배포", "--new-file", ""]);
 
     expectParamError(error, /--new-file 경로가 비어 있습니다/);
+    expect(mocks.getConfigOrThrow).not.toHaveBeenCalled();
+    expect(mocks.client.updatePost).not.toHaveBeenCalled();
+  });
+
+  it("--new-file 로 읽은 내용이 비면 old 구간을 지우지 않고 설정 조회 전에 종료 코드 3", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "post-replace-"));
+    const empty = join(dir, "new.md");
+    await writeFile(empty, "\n");
+
+    const { error } = await run(["post", "replace", "--id", "post-1", "--old", "2. 배포", "--new-file", empty]);
+
+    expectParamError(error, /--new-file 로 읽은 new 가 비어 있습니다/);
     expect(mocks.getConfigOrThrow).not.toHaveBeenCalled();
     expect(mocks.client.updatePost).not.toHaveBeenCalled();
   });

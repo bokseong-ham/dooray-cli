@@ -65,7 +65,8 @@ function requireOne(text: string | undefined, file: string | undefined, name: "o
  *   파이프로 보낸 입력이 버려진다
  * - 파일과 stdin 으로 받은 값은 BOM 과 끝 줄바꿈 하나를 뗀다. 인자로 받은 값은 그대로다
  * - old 가 비었거나 old 와 new 가 같으면 바뀔 것이 없어 거부한다
- * - new 는 빈 문자열을 허용한다. old 구간을 지우는 용도다
+ * - new 의 빈 문자열은 인자(`--new ""`)로 줄 때만 구간 삭제로 받는다. 파일이나 stdin 으로 읽은 new 가
+ *   비면 거부한다. 앞 명령이 실패해 파이프가 비거나 빈 파일을 잘못 준 것과 의도한 삭제를 구분할 수 없다
  */
 export async function readReplaceInputs(opts: ReplaceInputOptions): Promise<ReplaceInputs> {
   requireOne(opts.old, opts.oldFile, "old");
@@ -86,6 +87,18 @@ export async function readReplaceInputs(opts: ReplaceInputOptions): Promise<Repl
   );
   if (oldText.length === 0) {
     throw new DoorayCliError("찾을 문자열(old)이 비어 있습니다.", EXIT_PARAM_ERROR);
+  }
+  if (newText.length === 0 && usesStdin(opts.new, opts.newFile)) {
+    throw new DoorayCliError(
+      'stdin 으로 읽은 new 가 비어 있습니다. 구간을 지우려면 --new "" 로 주세요.',
+      EXIT_PARAM_ERROR,
+    );
+  }
+  if (newText.length === 0 && opts.newFile != null) {
+    throw new DoorayCliError(
+      `--new-file 로 읽은 new 가 비어 있습니다: ${opts.newFile}. 구간을 지우려면 --new "" 로 주세요.`,
+      EXIT_PARAM_ERROR,
+    );
   }
   if (oldText === newText) {
     throw new DoorayCliError("old 와 new 가 같아 바뀌는 것이 없습니다.", EXIT_PARAM_ERROR);
