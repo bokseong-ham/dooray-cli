@@ -666,10 +666,11 @@ export interface MessengerChannelUser {
 export interface MessengerChannel {
   id: string;
   title: string;
-  /** 실측: `direct`(1:1) / `private`(그룹) */
+  /** 공식 문서: `direct`(1:1) / `private`(일반 채널) / `me`(나와의 대화) / `bot`(봇이 만든 채널) */
   type: string;
-  /** 실측: `normal` / `system` */
+  /** 공식 문서: `system` / `normal` / `archived` / `deleted` */
   status?: string;
+  /** 공식 문서의 응답 예시 주석: 숨기기 여부. `false` 면 숨긴 방이다. */
   displayed?: boolean;
   capacity?: number;
   createdAt?: string;

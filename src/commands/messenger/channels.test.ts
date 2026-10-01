@@ -4,6 +4,8 @@ import type { MessengerChannel } from "../../api/types.js";
 import { buildUntitledLabel, resolveSince } from "./channels.js";
 
 const mocks = vi.hoisted(() => ({
+  // 이름 조회 구간이 예외를 던지는 경로를 만들 때만 채운다. 비어 있으면 실제 구현을 쓴다.
+  nameMapError: { current: null as Error | null },
   getConfigOrThrow: vi.fn(),
   ensureMe: vi.fn(),
   startSpinner: vi.fn(),
@@ -24,6 +26,17 @@ vi.mock("../../api/client.js", () => ({
   }),
 }));
 
+vi.mock("../../resolvers/member.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../resolvers/member.js")>();
+  return {
+    ...actual,
+    buildOrganizationMemberNameMap: async (...args: Parameters<typeof actual.buildOrganizationMemberNameMap>) => {
+      if (mocks.nameMapError.current) throw mocks.nameMapError.current;
+      return actual.buildOrganizationMemberNameMap(...args);
+    },
+  };
+});
+
 vi.mock("../../resolvers/me.js", () => ({
   ensureMe: mocks.ensureMe,
 }));
@@ -42,6 +55,11 @@ const KIM_ID = "3333444455556666777";
 const LEE_ID = "4444555566667777888";
 const PARK_ID = "9999888877776666555";
 const UNKNOWN_ID = "9999999999999999999";
+const ENG_ID = "member-eng";
+// 걸러지는 방에만 있는 참여자. 이름을 조회하면 안 된다.
+const ARCHIVED_ONLY_ID = "member-archived-only";
+const HIDDEN_ONLY_ID = "member-hidden-only";
+const OLD_ONLY_ID = "member-old-only";
 
 const NAMES: Record<string, string> = {
   [ME_ID]: "나본인",
@@ -49,6 +67,7 @@ const NAMES: Record<string, string> = {
   [KIM_ID]: "김철수",
   [LEE_ID]: "이영희",
   [PARK_ID]: "박민수",
+  [ENG_ID]: "John Doe",
 };
 
 function participant(id: string) {
@@ -137,6 +156,38 @@ const PRE_EPOCH = channel({
   updatedAt: "1969-12-31T00:00:00.000+09:00",
 });
 
+// 숨긴 방(displayed: false). 기본 목록에서 빠지고 --all 로 나온다.
+const HIDDEN = channel({
+  id: "ch-hidden",
+  title: "숨긴 방",
+  displayed: false,
+  updatedAt: "2026-09-23T00:00:00.000+09:00",
+});
+const NO_DISPLAYED = withoutKey(
+  channel({ id: "ch-no-displayed", title: "표시 여부 없는 방", updatedAt: "2026-09-16T00:00:00.000+09:00" }),
+  "displayed",
+);
+
+// 공식 문서의 type: me(나와의 대화), bot(봇이 만든 채널).
+const ME_ROOM = channel({ id: "ch-me", type: "me", updatedAt: "2026-09-14T00:00:00.000+09:00" });
+const BOT_ROOM = channel({
+  id: "ch-bot",
+  type: "bot",
+  updatedAt: "2026-09-13T00:00:00.000+09:00",
+  users: { participants: [ME_ID, HONG_ID, KIM_ID, LEE_ID, PARK_ID].map(participant) },
+});
+
+/** ANSI 색 코드를 떼고, 셀 값 중 하나가 id 인 표 행의 셀들을 돌려준다. */
+function tableRow(out: string, id: string): string[] {
+  // eslint-disable-next-line no-control-regex
+  const plain = out.replace(/\u001b\[[0-9;]*m/g, "");
+  for (const line of plain.split("\n")) {
+    const cells = line.split("│").slice(1, -1).map((c) => c.trim());
+    if (cells.includes(id)) return cells;
+  }
+  throw new Error(`표에서 ${id} 행을 찾지 못했다:\n${plain}`);
+}
+
 function exitOverrideAll(cmd: Command): void {
   cmd.exitOverride();
   cmd.configureOutput({ writeErr: () => {} });
@@ -195,6 +246,7 @@ function setServerChannels(list: MessengerChannel[]): void {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.nameMapError.current = null;
   mocks.getConfigOrThrow.mockResolvedValue({
     apiKey: "test-api-key",
     baseUrl: "https://example.dooray.com",
@@ -238,6 +290,15 @@ describe("messenger channels — 정렬과 필터", () => {
     expect(result.map((c) => c.id)).toEqual([TEAM.id, GROUP_SMALL.id]);
   });
 
+  it.each([
+    ["me", ME_ROOM.id],
+    ["bot", BOT_ROOM.id],
+  ])("--type %s 는 그 종류의 방만 남긴다", async (type, id) => {
+    setServerChannels([DM_HONG, TEAM, ME_ROOM, BOT_ROOM]);
+    const result = await runJson(["messenger", "channels", "--type", type]);
+    expect(result.map((c) => c.id)).toEqual([id]);
+  });
+
   it("--type 에 정해진 값 밖을 주면 commander 가 거부한다", async () => {
     await expect(run(["messenger", "channels", "--type", "public"])).rejects.toThrow(
       /Allowed choices/,
@@ -246,8 +307,23 @@ describe("messenger channels — 정렬과 필터", () => {
   });
 });
 
+describe("messenger channels — 숨긴 방(displayed)", () => {
+  it("displayed 가 false 인 방은 기본으로 빼고 키가 없는 방은 남긴다", async () => {
+    setServerChannels([HIDDEN, NO_DISPLAYED, TEAM]);
+    const result = await runJson(["messenger", "channels"]);
+    expect(result.map((c) => c.id)).toEqual([TEAM.id, NO_DISPLAYED.id]);
+    expect("displayed" in result[1]).toBe(false);
+  });
+
+  it("--all 이면 숨긴 방도 포함한다", async () => {
+    setServerChannels([HIDDEN, NO_DISPLAYED, TEAM]);
+    const result = await runJson(["messenger", "channels", "--all"]);
+    expect(result.map((c) => c.id)).toEqual([HIDDEN.id, TEAM.id, NO_DISPLAYED.id]);
+  });
+});
+
 describe("messenger channels — --since", () => {
-  it("YYYY-MM-DD 는 그 날 00:00 이후 활동한 방만 남긴다", async () => {
+  it("YYYY-MM-DD 는 updatedAt 이 그 날 00:00 이후인 방만 남긴다", async () => {
     const result = await runJson(["messenger", "channels", "--since", "2026-09-16"]);
     expect(result.map((c) => c.id)).toEqual([TEAM.id, DM_HONG.id]);
   });
@@ -326,7 +402,7 @@ describe("messenger channels — updatedAt·status 가 빠진 방", () => {
     expect(result.map((c) => c.id)).toEqual([SYSTEM.id, TEAM.id, NO_STATUS.id]);
   });
 
-  it("표에서 updatedAt 이 없는 방의 최근 활동 칸은 비운다", async () => {
+  it("표에서 updatedAt 이 없는 방의 수정 시각 칸은 비운다", async () => {
     setServerChannels([NO_UPDATED]);
     const out = await run(["messenger", "channels"]);
     expect(out).toContain("시각 없는 방");
@@ -361,6 +437,26 @@ describe("messenger channels — --search", () => {
     const looked = mocks.client.getMemberDetail.mock.calls.map((c) => c[0]).sort();
     // TEAM 은 제목이 있어 조회 대상이 아니다. 나는 조회하지 않고, 같은 id 는 한 번만 부른다.
     expect(looked).toEqual([HONG_ID, KIM_ID, LEE_ID, PARK_ID].sort());
+  });
+
+  it("영문 이름도 대소문자를 무시하고 찾는다", async () => {
+    const engDm = channel({
+      id: "ch-dm-eng",
+      type: "direct",
+      users: { participants: [ME_ID, ENG_ID].map(participant) },
+    });
+    setServerChannels([engDm, DM_HONG]);
+    expect((await runJson(["messenger", "channels", "--search", "jOHN"])).map((c) => c.id)).toEqual([
+      engDm.id,
+    ]);
+    expect((await runJson(["messenger", "channels", "--search", "doe"])).map((c) => c.id)).toEqual([
+      engDm.id,
+    ]);
+  });
+
+  it("제목 검색도 검색어의 대소문자를 무시한다", async () => {
+    const result = await runJson(["messenger", "channels", "--search", "DEV TEAM"]);
+    expect(result.map((c) => c.id)).toEqual([TEAM.id]);
   });
 
   it("--json 출력에는 표시명을 끼워넣지 않는다", async () => {
@@ -465,6 +561,22 @@ describe("messenger channels — 이름 조회 시점", () => {
     expect(lastStderr).toMatch(/내 정보를 확인하지 못해/);
   });
 
+  it("me 가 빠진 방은 ensureMe 로 얻은 내 id 로 나를 빼서 내 이름으로 검색되지 않는다", async () => {
+    const selfOnly = channel({ id: "ch-self", type: "direct", me: undefined });
+    setServerChannels([{ ...DM_HONG, me: undefined }, selfOnly]);
+    const result = await runJson(["messenger", "channels", "--search", "나본인"]);
+    expect(mocks.ensureMe).toHaveBeenCalledTimes(1);
+    expect(result).toEqual([]);
+    expect(mocks.client.getMemberDetail.mock.calls.map((c) => c[0])).not.toContain(ME_ID);
+  });
+
+  it("me 가 빠진 나만 있는 방은 DM: (나) 로 보인다", async () => {
+    setServerChannels([channel({ id: "ch-self", type: "direct", me: undefined })]);
+    const out = await run(["messenger", "channels"]);
+    expect(mocks.ensureMe).toHaveBeenCalledTimes(1);
+    expect(tableRow(out, "ch-self")[0]).toBe("DM: (나)");
+  });
+
   it("me 가 빠진 제목 없는 방이 있으면 ensureMe 로 나를 가린다", async () => {
     setServerChannels([{ ...DM_HONG, me: undefined }]);
     const out = await run(["messenger", "channels"]);
@@ -473,11 +585,71 @@ describe("messenger channels — 이름 조회 시점", () => {
   });
 });
 
+describe("messenger channels — 걸러진 방의 이름 조회", () => {
+  const archivedUntitled = channel({
+    id: "ch-archived-untitled",
+    archivedAt: "2026-08-01T00:00:00.000+09:00",
+    users: { participants: [ME_ID, ARCHIVED_ONLY_ID].map(participant) },
+  });
+  const hiddenUntitled = channel({
+    id: "ch-hidden-untitled",
+    displayed: false,
+    users: { participants: [ME_ID, HIDDEN_ONLY_ID].map(participant) },
+  });
+  const oldUntitledDm = channel({
+    id: "ch-old-untitled",
+    type: "direct",
+    updatedAt: "2026-08-01T00:00:00.000+09:00",
+    users: { participants: [ME_ID, OLD_ONLY_ID].map(participant) },
+  });
+
+  function looked(): string[] {
+    return mocks.client.getMemberDetail.mock.calls.map((c) => c[0] as string);
+  }
+
+  it("기본 제외(보관·숨김)로 빠진 방의 참여자는 조회하지 않는다", async () => {
+    setServerChannels([archivedUntitled, hiddenUntitled, DM_HONG]);
+    await run(["messenger", "channels", "--search", "홍"]);
+    expect(looked()).toEqual([HONG_ID]);
+  });
+
+  it("--type 으로 빠진 방의 참여자는 조회하지 않는다", async () => {
+    setServerChannels([oldUntitledDm, GROUP_SMALL]);
+    await run(["messenger", "channels", "--type", "private"]);
+    expect(looked().sort()).toEqual([KIM_ID, LEE_ID].sort());
+  });
+
+  it("--since 로 빠진 방의 참여자는 조회하지 않는다", async () => {
+    setServerChannels([oldUntitledDm, DM_HONG]);
+    await run(["messenger", "channels", "--since", "2026-09-01"]);
+    expect(looked()).toEqual([HONG_ID]);
+  });
+});
+
+describe("messenger channels — 스피너", () => {
+  it("대화방 목록 조회가 실패하면 spinner 를 닫고 오류를 그대로 던진다", async () => {
+    const err = new Error("list failed");
+    mocks.client.getMessengerChannels.mockRejectedValue(err);
+    await expect(run(["messenger", "channels"])).rejects.toBe(err);
+    expect(mocks.stopSpinner).toHaveBeenCalledTimes(1);
+    expect(mocks.stopSpinner).toHaveBeenCalledWith(false);
+  });
+
+  it("이름 조회 구간이 실패하면 spinner 를 닫고 오류를 그대로 던진다", async () => {
+    const err = new Error("name lookup failed");
+    mocks.nameMapError.current = err;
+    await expect(run(["messenger", "channels"])).rejects.toBe(err);
+    expect(mocks.stopSpinner).toHaveBeenCalledTimes(1);
+    expect(mocks.stopSpinner).toHaveBeenCalledWith(false);
+  });
+});
+
 describe("messenger channels — 표 출력", () => {
-  it("이름·종류·최근 활동·id 열을 낸다", async () => {
+  it("이름·종류·수정 시각·id 열을 낸다", async () => {
     const out = await run(["messenger", "channels"]);
     expect(out).toContain("이름");
-    expect(out).toContain("최근 활동");
+    expect(out).toContain("수정 시각");
+    expect(out).not.toContain("최근 활동");
     expect(out).toContain("Dev Team 공지");
     expect(out).toContain("DM: 홍길동");
     expect(out).toContain("그룹: 김철수, 이영희");
@@ -494,7 +666,37 @@ describe("messenger channels — 표 출력", () => {
     expect(out).toContain("악성?[31m방");
   });
 
-  it("최근 활동과 id 열의 control char 도 지운다", async () => {
+  it("종류 열은 direct·private·me·bot 을 DM·그룹·나와의 대화·봇 으로 보인다", async () => {
+    setServerChannels([DM_HONG, TEAM, ME_ROOM, BOT_ROOM]);
+    const out = await run(["messenger", "channels"]);
+    expect(tableRow(out, DM_HONG.id)[1]).toBe("DM");
+    expect(tableRow(out, TEAM.id)[1]).toBe("그룹");
+    expect(tableRow(out, ME_ROOM.id)[1]).toBe("나와의 대화");
+    expect(tableRow(out, BOT_ROOM.id)[1]).toBe("봇");
+  });
+
+  it("제목 없는 me·bot 방은 나와의 대화·봇 표시명으로 보인다", async () => {
+    setServerChannels([ME_ROOM, BOT_ROOM]);
+    const out = await run(["messenger", "channels"]);
+    expect(tableRow(out, ME_ROOM.id)[0]).toBe("나와의 대화");
+    expect(tableRow(out, BOT_ROOM.id)[0]).toBe("봇: 홍길동, 김철수, 이영희 외 1명");
+  });
+
+  it("문서에 없는 type 은 그룹으로 뭉개지 않고 원문을 sanitize 해서 보인다", async () => {
+    const odd = channel({
+      id: "ch-odd",
+      type: `public${ESC}[31m`,
+      users: { participants: [ME_ID, HONG_ID].map(participant) },
+    });
+    setServerChannels([odd]);
+    const out = await run(["messenger", "channels"]);
+    expect(out).not.toContain(`public${ESC}`);
+    const row = tableRow(out, odd.id);
+    expect(row[1]).toBe("public?[31m");
+    expect(row[0]).toBe("public?[31m: 홍길동");
+  });
+
+  it("수정 시각과 id 열의 control char 도 지운다", async () => {
     // +09:00 형태가 아니면 formatSentAt 이 원문을 그대로 돌려주므로 시각 열도 거쳐야 한다.
     setServerChannels([
       channel({ id: `ch-${ESC}[31mevil`, title: "방", updatedAt: `2026-09-18${ESC}[31m` }),
@@ -573,6 +775,36 @@ describe("buildUntitledLabel", () => {
   it("나만 있는 방은 (나)", () => {
     const ch = channel({ id: "x", type: "direct" });
     expect(buildUntitledLabel(ch, ME_ID, names)).toBe("DM: (나)");
+  });
+
+  it("me 방은 참여자와 상관없이 나와의 대화", () => {
+    expect(buildUntitledLabel(ME_ROOM, ME_ID, names)).toBe("나와의 대화");
+    const withOthers = channel({
+      id: "x",
+      type: "me",
+      users: { participants: [ME_ID, HONG_ID].map(participant) },
+    });
+    expect(buildUntitledLabel(withOthers, ME_ID, names)).toBe("나와의 대화");
+  });
+
+  it("bot 방은 그룹과 같은 규칙에 접두만 봇", () => {
+    expect(buildUntitledLabel(BOT_ROOM, ME_ID, names)).toBe("봇: 홍길동, 김철수, 이영희 외 1명");
+    const unknownOnly = channel({
+      id: "x",
+      type: "bot",
+      users: { participants: [ME_ID, UNKNOWN_ID].map(participant) },
+    });
+    expect(buildUntitledLabel(unknownOnly, ME_ID, names)).toBe("봇: (참여자 미확인)");
+    expect(buildUntitledLabel(channel({ id: "x", type: "bot" }), ME_ID, names)).toBe("봇: (나)");
+  });
+
+  it("문서에 없는 type 은 그룹 규칙에 원문 type 을 접두로 쓴다", () => {
+    const ch = channel({
+      id: "x",
+      type: "public",
+      users: { participants: [ME_ID, UNKNOWN_ID].map(participant) },
+    });
+    expect(buildUntitledLabel(ch, ME_ID, names)).toBe("public: (참여자 미확인)");
   });
 
   it("실제 조회 실패도 표에서 미확인으로 보인다", async () => {

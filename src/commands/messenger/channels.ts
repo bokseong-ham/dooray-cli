@@ -4,6 +4,7 @@
  * `logs` 와 `channel-send --channel` 에 넘길 channelId 를 여기서 얻는다.
  * API 가 `size` 를 비롯한 파라미터를 무시하고 전체를 주므로 필터·정렬은 모두 클라이언트에서 한다 (ADR-066).
  * 제목이 빈 방(1:1 방 전부와 일부 그룹방)은 참여자 이름으로 표시명을 만든다.
+ * 정렬과 `--since` 는 `updatedAt` 을 쓴다. 공식 문서가 갱신 조건을 정하지 않아 「수정 시각」 으로만 부른다.
  * 이름 조회는 방마다 호출이 붙어 표 모드와 `--search` 가 있을 때만, 필요한 참여자만 한다.
  */
 
@@ -28,7 +29,16 @@ import {
   parseLocalDate,
 } from "../../utils/local-date.js";
 
-export const CHANNEL_TYPES = ["direct", "private"] as const;
+// 공식 문서의 type 네 값: direct(1:1), private(일반 채널), me(나와의 대화), bot(봇이 만든 채널).
+export const CHANNEL_TYPES = ["direct", "private", "me", "bot"] as const;
+
+// 표의 종류 열. 문서에 없는 값은 이 표에 없어 원문을 그대로 보인다.
+const CHANNEL_KIND_LABELS = new Map<string, string>([
+  ["direct", "DM"],
+  ["private", "그룹"],
+  ["me", "나와의 대화"],
+  ["bot", "봇"],
+]);
 
 // 제목 없는 방 표시명에 이름을 몇 명까지 늘어놓을지. 표 모드는 이 수만큼만 이름을 조회한다.
 const MAX_NAMES_IN_LABEL = 3;
@@ -68,9 +78,16 @@ function resolveSearch(value: string | undefined): string | undefined {
   return keyword.toLowerCase();
 }
 
-/** 보관된 방과 `status` 가 `normal` 이 아닌 방(`system` 등)을 기본 목록에서 뺀다. status 가 없는 방은 남긴다. */
+/**
+ * 보관된 방, 숨긴 방(`displayed: false`), `status` 가 `normal` 이 아닌 방(`system`·`archived`·`deleted`)을
+ * 기본 목록에서 뺀다. `status`·`displayed` 키가 없는 방은 남긴다.
+ */
 function isActive(ch: MessengerChannel): boolean {
-  return !ch.archivedAt && (ch.status == null || ch.status === "normal");
+  return (
+    !ch.archivedAt &&
+    ch.displayed !== false &&
+    (ch.status == null || ch.status === "normal")
+  );
 }
 
 function updatedAtMs(ch: MessengerChannel): number {
@@ -78,7 +95,7 @@ function updatedAtMs(ch: MessengerChannel): number {
   return Number.isNaN(ms) ? -Infinity : ms;
 }
 
-/** 필터를 적용하고 최근 활동순으로 정렬한다. 이름이 필요 없는 조건만 다룬다(`--search` 는 따로). */
+/** 필터를 적용하고 수정 시각(updatedAt) 최신순으로 정렬한다. 이름이 필요 없는 조건만 다룬다(`--search` 는 따로). */
 export function filterAndSortChannels(
   channels: MessengerChannel[],
   opts: { type?: string; sinceMs?: number; all?: boolean },
@@ -102,7 +119,8 @@ function otherParticipantIds(ch: MessengerChannel, myId: string | undefined): st
 }
 
 /**
- * 제목이 빈 방의 표시명. 나를 뺀 참여자 이름으로 `DM: 홍길동` / `그룹: 가, 나, 다 외 N명`.
+ * 제목이 빈 방의 표시명. 나를 뺀 참여자 이름으로 `DM: 홍길동` / `그룹: 가, 나, 다 외 N명` / `봇: 가 외 N명`.
+ * `me`(나와의 대화) 방은 참여자와 상관없이 `나와의 대화` 다. 문서에 없는 type 은 그룹 규칙에 원문 type 을 접두로 쓴다.
  * 이름을 하나도 얻지 못하면 대체 문구를 쓴다. 나만 있는 방은 `(나)` 로 표시한다.
  * 화면 표시용이다. `--search` 는 이 문자열이 아니라 참여자 이름 각각에서 찾는다.
  */
@@ -111,21 +129,24 @@ export function buildUntitledLabel(
   myId: string | undefined,
   nameMap: Map<string, string>,
 ): string {
-  const prefix = ch.type === "direct" ? "DM" : "그룹";
+  if (ch.type === "me") return "나와의 대화";
+  // 문서에 없는 type 은 channelKind 가 원문을 돌려준다.
+  const prefix = channelKind(ch.type);
+  const withPrefix = (body: string) => (prefix ? `${prefix}: ${body}` : body);
   const ids = participantIds(ch);
   const others = ids.filter((id) => id !== myId);
-  if (ids.length > 0 && others.length === 0) return `${prefix}: (나)`;
+  if (ids.length > 0 && others.length === 0) return withPrefix("(나)");
 
   const names = others
     .slice(0, MAX_NAMES_IN_LABEL)
     .map((id) => nameMap.get(id))
     .filter((n): n is string => !!n);
   if (names.length === 0) {
-    return `${prefix}: ${ch.type === "direct" ? "(상대 미확인)" : "(참여자 미확인)"}`;
+    return withPrefix(ch.type === "direct" ? "(상대 미확인)" : "(참여자 미확인)");
   }
   // 이름을 얻지 못한 참여자도 "외 N명" 에 센다.
   const rest = others.length - names.length;
-  return `${prefix}: ${names.join(", ")}${rest > 0 ? ` 외 ${rest}명` : ""}`;
+  return withPrefix(`${names.join(", ")}${rest > 0 ? ` 외 ${rest}명` : ""}`);
 }
 
 /** 제목이 있으면 제목, 없으면 나를 뺀 참여자의 실제 이름 각각에서 찾는다. */
@@ -140,9 +161,7 @@ function matchesSearch(
 }
 
 function channelKind(type: string): string {
-  if (type === "direct") return "DM";
-  if (type === "private") return "그룹";
-  return type;
+  return CHANNEL_KIND_LABELS.get(type) ?? type;
 }
 
 /**
@@ -165,13 +184,21 @@ async function fallbackMyId(
 }
 
 export const messengerChannelsCommand = new Command("channels")
-  .description("내가 속한 메신저 대화방 목록 (최근 활동순). logs·channel-send 에 넘길 id 를 찾는다")
+  .description(
+    "내가 속한 메신저 대화방 목록 (updatedAt(수정 시각) 최신순). logs·channel-send 에 넘길 id 를 찾는다",
+  )
   .addOption(
-    new Option("--type <type>", "대화방 종류 (direct: 1:1, private: 그룹)").choices([...CHANNEL_TYPES]),
+    new Option(
+      "--type <type>",
+      "대화방 종류 (direct: 1:1, private: 그룹, me: 나와의 대화, bot: 봇이 만든 방)",
+    ).choices([...CHANNEL_TYPES]),
   )
   .option("--search <keyword>", "대화방 제목 부분일치 (대소문자 무시, 제목 없는 방은 참여자 이름으로)")
-  .option("--since <date>", "이 시각 이후 활동이 있는 방만 (YYYY-MM-DD 또는 offset 붙은 ISO8601)")
-  .option("--all", "보관된 방과 시스템 방도 포함")
+  .option(
+    "--since <date>",
+    "updatedAt(수정 시각)이 이 시각 이후인 방만 (YYYY-MM-DD 또는 offset 붙은 ISO8601)",
+  )
+  .option("--all", "보관된 방, 숨긴 방, 시스템 방도 포함")
   .action(async (opts: ChannelsOptions) => {
     const globalOpts = messengerChannelsCommand.optsWithGlobals() as OutputOptions;
 
@@ -269,7 +296,7 @@ export const messengerChannelsCommand = new Command("channels")
       sanitizeForTerminal(ch.id),
     ]);
     output(globalOpts, {
-      headers: ["이름", "종류", "최근 활동", "id"],
+      headers: ["이름", "종류", "수정 시각", "id"],
       rows,
       raw: channels,
       ids: channels.map((ch) => ch.id),

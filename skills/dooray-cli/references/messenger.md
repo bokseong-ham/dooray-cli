@@ -7,14 +7,16 @@
 
 ```bash
 dooray messenger channels --search "홍길동"               # 그 사람과의 1:1 방, 그 사람이 낀 제목 없는 그룹방
-dooray messenger channels --since 2026-09-20              # 그 날 이후 활동이 있었던 방
+dooray messenger channels --since 2026-09-20              # 그 날 이후 수정 시각(updatedAt)이 찍힌 방
 dooray messenger channels --type private --search "배포"  # 제목에 "배포" 가 든 그룹방
 CH=$(dooray messenger channels --search "홍길동" --type direct --quiet)
 [ -n "$CH" ] && dooray messenger logs "$CH"   # 0건이면 아무것도 나오지 않는다
 ```
 
-목록은 최근 활동순이다. 보관된 방과 시스템 방은 기본으로 빠지고 `--all` 로 포함한다.
-제목이 빈 방은 나를 뺀 참여자 이름으로 `DM: 홍길동`, `그룹: 가, 나, 다 외 N명` 처럼 표시한다.
+목록은 수정 시각(`updatedAt`) 최신순이다. 보관된 방, 숨긴 방, 시스템 방은 기본으로 빠지고 `--all` 로 포함한다.
+`--type` 은 `direct`(1:1), `private`(그룹), `me`(나와의 대화), `bot`(봇이 만든 방) 을 받는다.
+제목이 빈 방은 나를 뺀 참여자 이름으로 `DM: 홍길동`, `그룹: 가, 나, 다 외 N명`, `봇: 가 외 N명` 처럼 표시하고,
+제목 없는 나와의 대화방은 `나와의 대화` 로 표시한다.
 `--search` 는 이 표시 문구가 아니라 제목, 제목이 없으면 나를 뺀 참여자 전원의 이름에서 찾는다.
 `DM:`·`외 N명` 같은 문구로는 걸리지 않으니 1:1 방만 보려면 `--type direct` 를 쓴다.
 이름 조회에 실패한 참여자가 있으면 몇 명인지 stderr 로 알린다. 그 사람의 방이 없다는 뜻이 아니다.
