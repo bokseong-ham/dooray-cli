@@ -3,6 +3,7 @@
  *
  * `A~B`, `A~`, `~B`, `prev-<N>d`(N 은 1 이상)를 받는다. A·B 는 `YYYY-MM-DD` 또는 offset 이 붙은 ISO8601 이다.
  * 날짜만 주면 그 날짜의 지역 offset 으로 A 는 00:00:00, B 는 23:59:59 로 늘린다.
+ * 비운 쪽은 `OPEN_START`·`OPEN_END` 로 채워 공식 문서의 `A~B` 형태로 보낸다.
  * 서버가 거절하는 형태는 API 를 부르기 전에 `EXIT_PARAM_ERROR` 로 거른다 (ADR-064).
  */
 
@@ -30,6 +31,15 @@ const PREV_DAYS = /^prev-[1-9]\d*d$/;
  * 업무가 이보다 앞서 만들어졌을 리 없으므로 "처음부터" 와 같다.
  */
 export const OPEN_START = "1970-01-01T00:00:00Z";
+
+/**
+ * `A~` 의 빈 끝을 채울 값.
+ *
+ * 공식 문서의 기간 형태는 `today`·`thisweek`·`prev-{N}d`·`next-{N}d`·`A~B` 다섯 가지이고 `A~` 는 없다.
+ * 끝을 채워 문서에 있는 `A~B` 로 보낸다. 서버는 `A~` 와 같은 결과를 준다(실측).
+ * `9999-12-31T23:59:59Z` 는 HTTP 500 이라 상한 근처를 피한다.
+ */
+export const OPEN_END = "2999-12-31T23:59:59Z";
 
 function paramError(option: DateFilterOption, value: string, reason: string): DoorayCliError {
   return new DoorayCliError(
@@ -63,7 +73,7 @@ function normalizeBound(
  *
  * 서버는 날짜만 준 범위(`2026-09-01~2026-09-30`)와 끝만 준 범위(`~B`)와
  * 시작과 끝이 같은 범위를 400 으로 거절한다(실측). 앞의 둘은 받는 형태로 바꿔 보내고,
- * 시작이 끝과 같거나 뒤인 범위는 여기서 거부한다.
+ * 시작이 끝과 같거나 뒤인 범위는 여기서 거부한다. 시작만 준 `A~` 는 문서에 없는 형태라 끝을 채운다.
  */
 export function resolveDateFilter(value: string, option: DateFilterOption): string {
   if (PREV_DAYS.test(value)) return value;
@@ -80,13 +90,14 @@ export function resolveDateFilter(value: string, option: DateFilterOption): stri
   const start = rawStart === "" ? null : normalizeBound(rawStart, DAY_START, option, value);
   const end = rawEnd === "" ? null : normalizeBound(rawEnd, DAY_END, option, value);
 
-  // 빈 시작을 채운 뒤에 견준다. `~1969-12-31` 도 서버에는 뒤집힌 범위로 나간다.
+  // 빈 쪽을 채운 뒤에 견준다. `~1969-12-31` 과 `3000-01-01T00:00:00Z~` 도 서버에는 뒤집힌 범위로 나간다.
   const from = start ?? OPEN_START;
-  if (end != null && Date.parse(from) >= Date.parse(end)) {
+  const to = end ?? OPEN_END;
+  if (Date.parse(from) >= Date.parse(to)) {
     throw new DoorayCliError(
-      `--${option} 의 시작이 끝과 같거나 뒤입니다: ${from} ~ ${end}`,
+      `--${option} 의 시작이 끝과 같거나 뒤입니다: ${from} ~ ${to}`,
       EXIT_PARAM_ERROR,
     );
   }
-  return `${from}~${end ?? ""}`;
+  return `${from}~${to}`;
 }
