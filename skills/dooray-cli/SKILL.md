@@ -12,13 +12,13 @@ NHN Dooray REST API 를 래핑한 CLI 다. 이 파일은 라우터이므로, 작
 | 하려는 일 | reference |
 | --- | --- |
 | 설치·초기 설정, 출력 모드, API 제약, 에러 처리, 캐시, 피드백 등록 | [common.md](references/common.md) |
-| 업무 식별·생성·수정·삭제, 본문 일부 치환, 참조자·담당자 변경, 첨부 보호, 부모 지정, 태그 | [post.md](references/post.md) |
+| 업무 식별·생성·수정·삭제, 목록 거르기, 본문 일부 치환, 참조자·담당자 변경, 첨부 보호, 부모 지정, 태그 | [post.md](references/post.md) |
 | 업무 댓글 추가·필터·조회 | [comment.md](references/comment.md) |
 | 위키 페이지 조회·트리·삭제, 본문 일부 치환, 첨부와 인라인 이미지, 위키 댓글 | [wiki.md](references/wiki.md) |
 | 그룹 멘션·cc 판단, 멘션·링크 자동 삽입, Dooray 마크다운 링크 | [mention-link.md](references/mention-link.md) |
 | 워크플로우 판단 기준, 정형 task 자동화, 명령 체이닝 | [workflow.md](references/workflow.md) |
 | 메일 원본 선택, 답장 전 확인 | [mail.md](references/mail.md) |
-| 메신저 메시지 읽기, 스레드 보고 | [messenger.md](references/messenger.md) |
+| 메신저 대화방 찾기, 메시지 읽기, 스레드 보고 | [messenger.md](references/messenger.md) |
 | 캘린더 기간 조회, 일정 상세, 참석자 | [calendar.md](references/calendar.md) |
 
 ## 대상 지정 방법
@@ -115,6 +115,10 @@ NHN Dooray REST API 를 래핑한 CLI 다. 이 파일은 라우터이므로, 작
 | --- | --- |
 | 업무 목록 | `dooray post list <project>` — `--all` 로 모든 페이지를 이어 받는다 |
 | 태그로 거르기 | `dooray post list <project> --tag "<이름>"` — 반복 가능하고, 여러 번 주면 그 태그를 모두 가진 업무만 온다 |
+| 사람으로 거르기 | `dooray post list <project> --from me` — 등록자 `--from`, 담당자 `--to`, 참조자 `--cc`. 옵션마다 한 명이고 `me`·id·이메일·이름을 받는다 |
+| 하위 업무만 | `dooray post list <project> --parent <number>` — 이 프로젝트의 업무 번호다. `<project>/<number>` 와 postId 도 받는다 |
+| 기간으로 거르기 | `dooray post list <project> --created 2026-09-01~2026-09-30` — 수정 기간은 `--updated`. `A~`, `"~B"`(따옴표 필수), `prev-7d` 도 받는다 |
+| 정렬 바꾸기 | `dooray post list <project> --order -postUpdatedAt` — `createdAt`·`postUpdatedAt`·`postDueAt`, `-` 는 내림차순. 기본 `-createdAt` |
 | 업무 검색 | `dooray post search <project> "<keyword>"` — projectId(15자리 이상 numeric) 를 넣으면 캐시를 우회한다 |
 | 업무 상세 | `dooray post get <project> <number>` 또는 `dooray post get --id <postId>` — 일반 출력에는 태그가 이름으로 나온다 |
 | 태그 이름까지 받기 | `dooray post get <project> <number> --json --with-tag-names` — `--json` 의 `tags[]` 에 `name` 을 채운다. 하나라도 못 채우면 멈춘다 |
@@ -267,9 +271,10 @@ dooray post get <project> <number> --json --with-tag-names
 | 1:1 다이렉트 메시지 | `dooray messenger send --to "<id\|email>" --body "..."` — `--to` 는 ID 나 이메일만 받고 이름은 지원하지 않는다 |
 | 대화방 메시지 | `dooray messenger channel-send --channel "<channelId\|이름>" --body "..."` — 이름으로는 자신이 속한 방만 찾는다 |
 | 대화방 스레드 열기 | `dooray messenger thread-send --channel "<channelId\|이름>" --body "..."` — `--thread-body` 나 `--thread-body-file` 로 첫 메시지를 함께 보내고, `--log <log-id>` 로 이미 올라간 메시지에 연다 |
+| 대화방 목록 | `dooray messenger channels [--type direct\|private\|me\|bot] [--search <이름>] [--since <날짜>] [--all]` — 수정 시각(updatedAt) 최신순, 보관·숨긴·시스템 방은 `--all` 로 포함. `logs`·`channel-send` 에 넘길 channelId 를 여기서 찾는다 |
 | 대화방 메시지 읽기 | `dooray messenger logs "<channelId\|이름>" [-n\|--count <개수>]` — 최근 N건(기본 20, 최대 1000). 표는 오래된 것이 위, 최신이 아래 |
 
-`logs` 로 메시지를 읽거나 진행 상황을 스레드에 보고할 때는 [messenger.md](references/messenger.md) 를 먼저 읽는다.
+대화방을 찾거나 `logs` 로 메시지를 읽거나 진행 상황을 스레드에 보고할 때는 [messenger.md](references/messenger.md) 를 먼저 읽는다.
 
 ## 캘린더
 
@@ -287,3 +292,7 @@ dooray post get <project> <number> --json --with-tag-names
 `post` 와 `wiki page` 모두 제목은 `--title` 이다.
 `post create` 와 `post edit` 는 `--subject` 를 받지 않는다. 제목은 `--title` 로 준다.
 `post list` 의 `--subject` 는 제목 키워드 필터다.
+
+`--from`·`--to` 는 명령마다 뜻이 다르다.
+`post list` 에서는 등록자·담당자 **멤버** 필터이고, `calendar event list` 에서는 조회 기간의 시작·끝 **날짜**다.
+업무를 기간으로 거르려면 `post list` 의 `--created`(등록)·`--updated`(수정)를 쓴다.

@@ -1,0 +1,55 @@
+name: PR 위험 경로 표시
+
+# fork 에서 온 PR 이 빌드·배포·에이전트 지침에 닿는 경로를 건드리면 라벨로 알린다.
+# 관리자가 `/review` 댓글로 봇 리뷰를 돌리기 전에 먼저 볼 곳을 정해 준다.
+#
+# pull_request_target 은 main 의 워크플로로 돌고 쓰기 권한 토큰을 받는다.
+# 그래서 이 워크플로는 PR 의 코드를 체크아웃하지도 실행하지도 않는다. 변경 파일 이름만 API 로 읽는다.
+# 체크아웃이나 PR 코드 실행을 여기에 더하지 않는다.
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  pull-requests: write
+  issues: write
+
+jobs:
+  risk-paths:
+    name: 위험 경로 확인
+    if: github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: 변경 파일을 읽어 라벨을 붙이거나 뗀다
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+
+          LABEL="risk-paths"
+          # 워크플로, 검사·릴리스 스크립트, 의존성과 빌드 설정, 사용자 에이전트에 설치되는 스킬,
+          # 이 저장소에서 에이전트가 읽는 지침이다.
+          PATTERN='^(\.github/|scripts/|skills/|\.claude/|CLAUDE\.md$|AGENTS\.md$|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|\.npmrc$|tsup\.config\.ts$)'
+
+          # 이름을 바꾼 파일은 옛 경로도 본다. 위험 경로에서 밖으로 옮긴 것도 변경이다.
+          files=$(gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/files?per_page=100" \
+            --jq '.[] | .filename, (.previous_filename // empty)')
+          hits=$(printf '%s\n' "$files" | grep -E "$PATTERN" | sort -u || true)
+
+          if [ -z "$hits" ]; then
+            echo "위험 경로 변경 없음" >> "$GITHUB_STEP_SUMMARY"
+            gh api "repos/$REPO/issues/$PR_NUMBER/labels/$LABEL" --method DELETE >/dev/null 2>&1 || true
+            exit 0
+          fi
+
+          {
+            echo "위험 경로 변경이 있다. \`/review\` 를 달기 전에 아래 파일을 직접 확인한다."
+            echo
+            printf '%s\n' "$hits" | sed 's/^/    /'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          gh label create "$LABEL" --repo "$REPO" --color B60205 --force \
+            --description "fork PR 이 워크플로·스크립트·의존성·스킬 경로를 건드린다"
+          gh api "repos/$REPO/issues/$PR_NUMBER/labels" --method POST -f "labels[]=$LABEL" >/dev/null

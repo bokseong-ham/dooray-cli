@@ -6,6 +6,7 @@ import { buildOrganizationMemberNameMap } from "../../resolvers/member.js";
 import type { MessengerLog } from "../../api/types.js";
 import type { OutputOptions } from "../../formatters/table.js";
 import { output, printJson, truncate } from "../../formatters/table.js";
+import { formatSentAt } from "../../formatters/datetime.js";
 import { sanitizeForTerminal } from "../../utils/sanitize.js";
 import { startSpinner, stopSpinner } from "../../utils/spinner.js";
 import { DoorayCliError } from "../../utils/errors.js";
@@ -15,20 +16,6 @@ import { EXIT_PARAM_ERROR } from "../../utils/exit-codes.js";
 export const MAX_LOG_COUNT = 1000;
 const DEFAULT_LOG_COUNT = 20;
 const TEXT_MAX_LEN = 60;
-
-/**
- * `2026-09-18T11:38:11+09:00` → `2026-09-18 11:38`.
- *
- * `Date` 로 파싱하지 않는다 — 파싱하면 서버가 준 offset 기준 시각이
- * 실행 장비의 타임존으로 밀려 보인다.
- * 다만 offset 을 떼는 것은 `+09:00` 일 때뿐이다. 다른 offset 이나 `Z` 를
- * 떼면 그 시각을 KST 로 오독하므로 원형을 그대로 보여준다.
- */
-export function formatSentAt(sentAt?: string): string {
-  if (!sentAt) return "";
-  const m = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}):\d{2}(?:\.\d+)?\+09:00$/.exec(sentAt);
-  return m ? `${m[1]} ${m[2]}` : sentAt;
-}
 
 function senderId(log: MessengerLog): string | undefined {
   // sender.type 이 member 가 아닌 경우(봇 등)엔 organizationMemberId 가 없을 수 있다.

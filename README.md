@@ -119,6 +119,7 @@ Claude 데스크톱 앱은 사용자 컴퓨터의 파일과 명령을 기본 상
 dooray project list                          # 내 프로젝트
 dooray post list <project>                   # 업무 목록
 dooray post list <project> --tag "<태그 이름>"  # 태그로 거르기
+dooray post list <project> --from me --created 2026-09-01~  # 내가 9월 이후 등록한 업무
 dooray post get <project> 42                 # 업무 상세
 dooray post create <project> --title "제목"  # 업무 생성
 dooray post comment add <project> 42 --body "댓글"
@@ -156,6 +157,29 @@ dooray post list <project> --tag "<이름 A>" --tag "<이름 B>"
 옵션을 주지 않으면 출력이 서버 응답 그대로다.
 
 `--tag` 를 여러 번 주면 그 태그를 모두 가진 업무만 온다.
+
+### 사람·상위 업무·기간으로 거르기
+
+```bash
+dooray post list <project> --to me --parent 42               # 42번의 하위 업무 중 내 담당
+dooray post list <project> --from "김철수"
+dooray post list <project> --cc me --updated prev-7d --order -postUpdatedAt
+dooray post list <project> --created 2026-09-01~2026-09-30
+```
+
+`--from`·`--to`·`--cc` 는 등록자·담당자·참조자다. 옵션마다 한 명을 받고 `me`, 멤버 id, 이메일, 프로젝트 멤버 이름으로 준다.
+같은 옵션을 두 번 주면 조회하기 전에 오류로 끝난다. 여러 사람을 보려면 한 사람씩 따로 조회해 합친다.
+값의 앞뒤 공백은 지우고 해석한다. 빈 값이나 공백만 있는 값은 조회하기 전에 오류로 끝난다.
+
+`--parent` 는 이 프로젝트의 업무 번호(`42`), 다른 프로젝트의 `<project>/<number>`, postId 를 받는다.
+
+`--created`·`--updated` 는 `A~B`, `A~`(그 뒤로), `~B`(그 앞으로), `prev-<N>d`(최근 N일, N 은 1 이상)를 받는다.
+A·B 는 `2026-09-01` 같은 날짜나 `2026-09-01T09:00:00+09:00` 같은 일시다.
+날짜만 주면 A 는 그 날 0시, B 는 그 날 23시 59분 59초로 본다.
+없는 날짜나 끝이 시작보다 앞선 범위는 조회하기 전에 오류로 끝난다.
+`~` 로 시작하는 값은 셸이 홈 디렉터리로 바꾸려 하므로 `--created "~2026-09-30"` 처럼 따옴표로 감싼다.
+
+`--order` 는 `createdAt`·`postUpdatedAt`·`postDueAt` 중 하나이고 앞에 `-` 를 붙이면 내림차순이다. 기본은 `-createdAt` 이다.
 
 ### 본문 일부만 고치기
 
@@ -342,6 +366,25 @@ dooray messenger channel-send --channel "$THREAD" --body "테스트 통과"
 ```bash
 dooray messenger thread-send --channel "배포알림" --log <logId> --body "빌드 로그"
 ```
+
+내가 속한 대화방은 `channels` 로 본다. 수정 시각(`updatedAt`)이 최신인 방이 위에 오고,
+`logs` 나 `channel-send` 에 넘길 channelId 를 여기서 찾는다.
+
+```bash
+dooray messenger channels                         # 전체 (수정 시각 최신순)
+dooray messenger channels --search "홍길동"       # 이름 부분 일치 (대소문자 무시)
+dooray messenger channels --since 2026-09-20      # 그 날 이후 수정 시각(updatedAt)이 찍힌 방
+dooray messenger channels --type direct --quiet   # 1:1 방 id 만
+```
+
+1:1 방과 일부 그룹방은 제목이 비어 있다. 표에는 나를 뺀 참여자 이름으로 `DM: 홍길동`,
+`그룹: 가, 나, 다 외 N명`, `봇: 가, 나 외 N명` 처럼 보여주고, 제목 없는 나와의 대화방은 `나와의 대화` 로 보여준다. `--search` 는 제목에서 찾고, 제목이 없으면
+나를 뺀 참여자 모두의 이름에서 찾는다. 이름을 확인하지 못한 참여자가 있으면 그 수를 stderr 로 알린다.
+`--type` 은 `direct`(1:1), `private`(그룹), `me`(나와의 대화), `bot`(봇이 만든 방) 을 받는다. 빈 검색어는 거부한다. `--since` 는 `YYYY-MM-DD` 나 offset 이 붙은 시각을 받는다.
+보관된 방, 숨긴 방, 시스템 방은 기본으로 빠지고 `--all` 을 주면 함께 나온다.
+`--json` 은 거르고 정렬만 한 서버 응답 그대로라 만든 이름이 들어가지 않는다.
+참여자 이름을 얻으려면 멤버를 하나씩 조회해야 해서 1:1 방이 많으면 표 출력이 수십 초 걸린다.
+`--json` 이나 `--quiet` 에 `--search` 를 주지 않으면 이 조회를 건너뛴다.
 
 대화방에 올라온 메시지는 `logs` 로 읽는다. 대화방 인자는 `channel-send` 와 같게 channelId 나 이름을 받는다.
 

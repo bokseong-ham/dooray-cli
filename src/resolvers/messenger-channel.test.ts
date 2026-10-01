@@ -65,5 +65,8 @@ describe("resolveMessengerChannel", () => {
     await expect(resolveMessengerChannel(client, "없는방")).rejects.toThrow(
       /channelId 직접 입력/,
     );
+    await expect(resolveMessengerChannel(client, "없는방")).rejects.toThrow(
+      /dooray messenger channels/,
+    );
   });
 });
