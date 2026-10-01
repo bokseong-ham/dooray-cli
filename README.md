@@ -127,6 +127,7 @@ dooray wiki page get --id <page-id>          # 페이지 ID 하나로 조회 (pr
 dooray wiki list --search 설계               # 위키 이름으로 찾기 (대소문자 무시)
 dooray wiki page get --url "https://<tenant>.dooray.com/wiki/<wikiId>/<pageId>"
 dooray wiki page edit --id <page-id> --body-file notes.md   # 페이지 ID 하나로 본문 수정
+dooray post replace <project> 42 --old "초안" --new "확정"   # 본문 일부만 치환
 dooray wiki page move --id <page-id> --parent <parent-page-id>
 dooray wiki page move --id <page-id> --parent <parent-page-id> --no-children
 dooray mail list --unread                    # 안 읽은 메일
@@ -155,6 +156,23 @@ dooray post list <project> --tag "<이름 A>" --tag "<이름 B>"
 옵션을 주지 않으면 출력이 서버 응답 그대로다.
 
 `--tag` 를 여러 번 주면 그 태그를 모두 가진 업무만 온다.
+
+### 본문 일부만 고치기
+
+`post edit --body` 와 `wiki page edit --body` 는 본문 전체를 바꾼다.
+긴 본문에서 한두 군데만 고칠 때는 `replace` 로 바꿀 구간만 준다.
+
+```bash
+dooray post replace <project> 42 --old "2. 배포" --new "2. 카나리 배포"
+dooray wiki page replace --id <page-id> --old-file old.md --new-file new.md
+dooray post replace <project> 42 --old "v1.2" --new "v1.3" --all --dry-run
+```
+
+- `--old` 는 공백과 줄바꿈까지 정확히 일치해야 한다. 여러 줄이거나 따옴표가 섞이면 `--old-file`/`--new-file` 로 준다. `-` 는 stdin 이며, old 와 new 가 함께 stdin 을 쓸 수는 없다
+- 일치하는 곳이 없으면 종료 코드 3 으로 멈춘다. 두 군데 이상이면 몇 군데인지 알리고 멈추므로, 앞뒤 문맥을 더 넣어 한 군데로 좁히거나 `--all` 로 모두 바꾼다
+- `--dry-run` 은 수정하지 않고 바뀌는 줄만 diff 형식으로 보여준다
+- 제목·담당자·태그·본문 형식은 그대로 둔다. 업무는 치환으로 첨부 참조가 사라지면 `post edit` 과 같이 확인을 받는다
+- 내부적으로는 현재 본문을 읽어 바꾼 뒤 전체를 다시 보낸다. 그 사이에 다른 사람이 같은 본문을 고치면 그 수정을 덮어쓴다
 
 ### 본문 형식
 

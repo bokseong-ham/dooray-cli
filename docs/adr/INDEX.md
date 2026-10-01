@@ -72,3 +72,4 @@ ADR-NNN 내용은 `docs/adr/NNN-*.md` (번호 glob) 또는 아래 목록 링크�
 - [ADR-061](061-messenger-logs-read.md) — 메신저 대화방 읽기를 `messenger logs` 로 두고 최근 N건(상한 1000)까지만 지원한다 (페이징·날짜 필터 부재 실측)
 - [ADR-062](062-undocumented-endpoint-policy.md) — 공식 문서에 없는 endpoint 는 조건 넷을 채운 읽기 전용에만 쓴다
 - [ADR-063](063-calendar-read-commands.md) — 캘린더는 읽기 세 명령만 두고 기간은 항상 양끝을 보낸다 (기간 상한 50일·종일 `endedAt` exclusive·목록 `me` 로 참여 판정 실측)
+- [ADR-065](065-body-partial-replace.md) — 본문 부분 치환을 `post replace` 와 `wiki page replace` 로 둔다 (정확 일치·유일성 규칙, 업무 `version` 조건부 갱신은 현재 값을 얻을 수 없어 미사용 실측)

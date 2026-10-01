@@ -1,0 +1,186 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { Command } from "commander";
+import { DoorayCliError } from "../../utils/errors.js";
+import { EXIT_PARAM_ERROR } from "../../utils/exit-codes.js";
+
+const mocks = vi.hoisted(() => ({
+  getConfigOrThrow: vi.fn(),
+  resolveWikiPageInput: vi.fn(),
+  startSpinner: vi.fn(),
+  stopSpinner: vi.fn(),
+  client: {
+    getWikiPage: vi.fn(),
+    updateWikiPage: vi.fn(),
+    updateWikiPageTitle: vi.fn(),
+    updateWikiPageContent: vi.fn(),
+  },
+}));
+
+vi.mock("../../config/store.js", () => ({
+  getConfigOrThrow: mocks.getConfigOrThrow,
+}));
+
+vi.mock("../../api/client.js", () => ({
+  DoorayApiClient: vi.fn(function MockDoorayApiClient() {
+    return mocks.client;
+  }),
+}));
+
+vi.mock("../../resolvers/wiki-page-input.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../resolvers/wiki-page-input.js")>();
+  return { ...actual, resolveWikiPageInput: mocks.resolveWikiPageInput };
+});
+
+vi.mock("../../utils/spinner.js", () => ({
+  startSpinner: mocks.startSpinner,
+  stopSpinner: mocks.stopSpinner,
+}));
+
+function page(body?: { mimeType: string; content?: string }) {
+  return {
+    result: {
+      id: "page-1",
+      wikiId: "wiki-1",
+      version: 3,
+      root: false,
+      creator: { type: "member", member: { organizationMemberId: "member-1" } },
+      subject: "기존 제목",
+      ...(body != null && { body }),
+    },
+  };
+}
+
+function exitOverrideAll(cmd: Command): void {
+  cmd.exitOverride();
+  cmd.configureOutput({ writeErr: () => {} });
+  cmd.commands.forEach(exitOverrideAll);
+}
+
+async function run(args: string[]): Promise<{ stdout: string; error?: unknown }> {
+  vi.resetModules();
+  const { wikiPageReplaceCommand } = await import("./page-replace.js");
+  const program = new Command()
+    .name("dooray")
+    .option("--json", "JSON 형식으로 출력")
+    .option("--quiet", "ID만 출력");
+  const wikiCommand = new Command("wiki");
+  const pageCommand = new Command("page");
+  pageCommand.addCommand(wikiPageReplaceCommand);
+  wikiCommand.addCommand(pageCommand);
+  program.addCommand(wikiCommand);
+  exitOverrideAll(program);
+
+  let stdout = "";
+  const out = vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+    stdout += String(chunk);
+    return true;
+  });
+  try {
+    await program.parseAsync(["node", "dooray", ...args]);
+    return { stdout };
+  } catch (error) {
+    return { stdout, error };
+  } finally {
+    out.mockRestore();
+  }
+}
+
+function expectParamError(error: unknown, message: RegExp): void {
+  // run 이 모듈을 다시 불러 클래스 동일성이 깨지므로 이름으로 판정한다
+  expect((error as Error).name).toBe(DoorayCliError.name);
+  expect((error as DoorayCliError).exitCode).toBe(EXIT_PARAM_ERROR);
+  expect((error as Error).message).toMatch(message);
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  mocks.getConfigOrThrow.mockResolvedValue({
+    apiKey: "test-api-key",
+    baseUrl: "https://example.dooray.com",
+  });
+  mocks.resolveWikiPageInput.mockResolvedValue({ wikiId: "wiki-1", pageId: "page-1" });
+  mocks.client.getWikiPage.mockResolvedValue(
+    page({ mimeType: "text/x-markdown", content: "## 절차\n\n- 백업\n- 배포\n- 확인\n" }),
+  );
+  mocks.client.updateWikiPageContent.mockResolvedValue({});
+});
+
+describe("wiki page replace", () => {
+  it("본문만 PUT .../content 로 보내고 제목은 건드리지 않는다", async () => {
+    const { stdout, error } = await run([
+      "wiki", "page", "replace", "--id", "page-1", "--old", "- 배포\n", "--new", "- 카나리 배포\n- 전체 배포\n",
+    ]);
+
+    expect(error).toBeUndefined();
+    expect(mocks.resolveWikiPageInput).toHaveBeenCalledWith(mocks.client, expect.objectContaining({ idOpt: "page-1" }));
+    expect(mocks.client.updateWikiPageContent).toHaveBeenCalledWith("wiki-1", "page-1", {
+      body: {
+        mimeType: "text/x-markdown",
+        content: "## 절차\n\n- 백업\n- 카나리 배포\n- 전체 배포\n- 확인\n",
+      },
+    });
+    expect(mocks.client.updateWikiPage).not.toHaveBeenCalled();
+    expect(mocks.client.updateWikiPageTitle).not.toHaveBeenCalled();
+    expect(stdout).toBe("위키 페이지 본문에서 1군데를 치환했습니다: page-1\n");
+  });
+
+  it("text/html 본문의 mimeType 을 보존한다", async () => {
+    mocks.client.getWikiPage.mockResolvedValue(
+      page({ mimeType: "text/html", content: "<p>앞 <mark>형광펜</mark> 뒤</p>" }),
+    );
+
+    await run(["wiki", "page", "replace", "--id", "page-1", "--old", "형광펜", "--new", "강조"]);
+
+    expect(mocks.client.updateWikiPageContent.mock.calls[0]?.[2]).toEqual({
+      body: { mimeType: "text/html", content: "<p>앞 <mark>강조</mark> 뒤</p>" },
+    });
+  });
+
+  it("본문이 없는 페이지는 일치 없음으로 거부한다", async () => {
+    mocks.client.getWikiPage.mockResolvedValue(page());
+
+    const { error } = await run(["wiki", "page", "replace", "--id", "page-1", "--old", "x", "--new", "y"]);
+
+    expectParamError(error, /찾지 못했습니다/);
+    expect(mocks.client.updateWikiPageContent).not.toHaveBeenCalled();
+  });
+
+  it("2건 이상인데 --all 이 없으면 거부하고, --all 이면 전부 바꾼다", async () => {
+    const rejected = await run(["wiki", "page", "replace", "--id", "page-1", "--old", "- ", "--new", "* "]);
+    expectParamError(rejected.error, /3군데/);
+    expect(mocks.client.updateWikiPageContent).not.toHaveBeenCalled();
+
+    const { stdout } = await run([
+      "--json", "wiki", "page", "replace", "--id", "page-1", "--old", "- ", "--new", "* ", "--all",
+    ]);
+    expect(mocks.client.updateWikiPageContent.mock.calls[0]?.[2].body.content).toBe(
+      "## 절차\n\n* 백업\n* 배포\n* 확인\n",
+    );
+    expect(JSON.parse(stdout)).toEqual({ wikiId: "wiki-1", pageId: "page-1", replaced: 3 });
+  });
+
+  it("--dry-run 은 수정 API 를 부르지 않는다", async () => {
+    const { stdout } = await run([
+      "wiki", "page", "replace", "--id", "page-1", "--old", "확인", "--new", "모니터링", "--dry-run",
+    ]);
+
+    expect(mocks.client.updateWikiPageContent).not.toHaveBeenCalled();
+    expect(mocks.client.updateWikiPage).not.toHaveBeenCalled();
+    expect(stdout).toBe("@@ 1/1 — 5번째 줄 @@\n-- 확인\n+- 모니터링\n1군데가 바뀝니다 (dry-run, 수정하지 않음).\n");
+  });
+
+  it("old 와 new 가 같으면 대상 해석 전에 거부한다", async () => {
+    const { error } = await run(["wiki", "page", "replace", "--id", "page-1", "--old", "a", "--new", "a"]);
+
+    expectParamError(error, /같아/);
+    expect(mocks.resolveWikiPageInput).not.toHaveBeenCalled();
+  });
+
+  it("--quiet 은 pageId 만 낸다", async () => {
+    const { stdout } = await run([
+      "--quiet", "wiki", "page", "replace", "--id", "page-1", "--old", "확인", "--new", "모니터링",
+    ]);
+
+    expect(stdout).toBe("page-1\n");
+  });
+});
