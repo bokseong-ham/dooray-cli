@@ -34,7 +34,8 @@ export const POST_LIST_ORDERS = [
   "postDueAt",
 ] as const;
 
-const collect = (v: string, prev: string[]) => [...prev, v];
+// 기본값을 주지 않아 --help 에 "(default: [])" 가 붙지 않게 한다. 한 명만 받는 옵션에 빈 배열 기본값은 오해를 부른다.
+const collect = (v: string, prev: string[] = []) => [...prev, v];
 
 const MEMBER_FILTERS = [
   ["from", "fromMemberIds"],
@@ -50,44 +51,48 @@ function isMe(input: string): boolean {
 /**
  * `--from`·`--to`·`--cc` 값을 organizationMemberId 로 바꾼다.
  * `me` 는 API 키 주인이고, 그 밖의 값은 `resolveMember` 가 id·이메일·프로젝트 멤버 이름 순으로 푼다.
- * 같은 사람을 두 번 주면 한 번만 보낸다.
  * 호출자는 이름 입력이 있으면 멤버 목록 캐시를 먼저 데워 둔다. 그래야 병렬 해석이 목록을 한 번만 받는다.
  */
-async function resolveFilterMembers(
+async function resolveFilterMember(
   client: DoorayApiClient,
   projectId: string,
   option: string,
-  inputs: string[],
+  input: string,
   meId: () => Promise<string>,
-): Promise<string[]> {
-  const ids = await Promise.all(
-    inputs.map(async (input) => {
-      try {
-        if (isMe(input)) return await meId();
-        return await resolveMember(client, projectId, input);
-      } catch (err) {
-        throw wrapLookupError(`--${option} 멤버 '${input}' 조회 실패`, err);
-      }
-    }),
-  );
-  return [...new Set(ids)];
+): Promise<string> {
+  try {
+    if (isMe(input)) return await meId();
+    return await resolveMember(client, projectId, input);
+  } catch (err) {
+    throw wrapLookupError(`--${option} 멤버 '${input}' 조회 실패`, err);
+  }
 }
 
 /**
- * `--from`·`--to`·`--cc` 값을 trim 하고 빈 값을 거부한다.
- * 빈 값을 빼고 넘어가면 필터 없이 전체 목록이 오고, 공백만 있는 값은 이름 부분 일치로 엉뚱한 멤버가 걸린다 (ADR-064).
+ * `--from`·`--to`·`--cc` 값을 한 명으로 확정한다. 주지 않았으면 `undefined`.
+ *
+ * 공식 문서는 이 파라미터에 id 하나만 적고 여러 id 의 결합 규칙을 적지 않는다. 그래서 옵션마다 한 명만 받는다.
+ * 두 번 준 값을 조용히 마지막 값으로 쓰면 사용자는 둘 다 걸렸다고 오해하므로 거부한다.
+ * 값은 trim 하고 빈 값을 거부한다. 빈 값을 빼고 넘어가면 필터 없이 전체 목록이 오고,
+ * 공백만 있는 값은 이름 부분 일치로 엉뚱한 멤버가 걸린다 (ADR-064).
  */
-function normalizeMemberInputs(option: string, raw: string[]): string[] {
-  return raw.map((value) => {
-    const trimmed = value.trim();
-    if (trimmed === "") {
-      throw new DoorayCliError(
-        `--${option} 값이 비어 있습니다: "${value}" (me, 멤버 id, 이메일, 프로젝트 멤버 이름 중 하나로 주세요)`,
-        EXIT_PARAM_ERROR,
-      );
-    }
-    return trimmed;
-  });
+function normalizeMemberInput(option: string, raw: string[]): string | undefined {
+  if (raw.length > 1) {
+    throw new DoorayCliError(
+      `--${option} 는 한 명만 받습니다. 여러 명의 결합 규칙이 공식 문서에 없어 지원하지 않습니다`,
+      EXIT_PARAM_ERROR,
+    );
+  }
+  const [value] = raw;
+  if (value == null) return undefined;
+  const trimmed = value.trim();
+  if (trimmed === "") {
+    throw new DoorayCliError(
+      `--${option} 값이 비어 있습니다: "${value}" (me, 멤버 id, 이메일, 프로젝트 멤버 이름 중 하나로 주세요)`,
+      EXIT_PARAM_ERROR,
+    );
+  }
+  return trimmed;
 }
 
 async function resolveParent(
@@ -118,9 +123,9 @@ export const postListCommand = new Command("list")
     (v, prev: string[]) => [...prev, v],
     [] as string[],
   )
-  .option("--from <member>", "등록자로 필터링 (반복 가능, me·id·이메일·이름)", collect, [] as string[])
-  .option("--to <member>", "담당자로 필터링 (반복 가능, me·id·이메일·이름)", collect, [] as string[])
-  .option("--cc <member>", "참조자로 필터링 (반복 가능, me·id·이메일·이름)", collect, [] as string[])
+  .option("--from <member>", "등록자로 필터링 (한 명, me·id·이메일·이름)", collect)
+  .option("--to <member>", "담당자로 필터링 (한 명, me·id·이메일·이름)", collect)
+  .option("--cc <member>", "참조자로 필터링 (한 명, me·id·이메일·이름)", collect)
   .option("--parent <ref>", "상위 업무의 하위 업무만 (이 프로젝트의 업무 번호, project/번호, postId)")
   .option("--created <range>", "등록 기간 (A~B, A~, ~B, prev-7d. A·B 는 YYYY-MM-DD 또는 ISO8601)")
   .option("--updated <range>", "수정 기간 (--created 와 같은 형식)")
@@ -137,11 +142,10 @@ export const postListCommand = new Command("list")
     const updatedAt = opts.updated != null ? resolveDateFilter(opts.updated, "updated") : undefined;
     const parent = opts.parent != null ? parseParentRef(opts.parent) : undefined;
     // 멤버 필터는 주지 않았으면 키 자체를 넣지 않는다. 빈 배열을 넣으면 의도가 흐려진다.
-    const memberInputs = MEMBER_FILTERS.map(([option, key]) => ({
-      option,
-      key,
-      inputs: normalizeMemberInputs(option, (opts[option] ?? []) as string[]),
-    })).filter((f) => f.inputs.length > 0);
+    const memberInputs = MEMBER_FILTERS.flatMap(([option, key]) => {
+      const input = normalizeMemberInput(option, (opts[option] ?? []) as string[]);
+      return input == null ? [] : [{ option, key, input }];
+    });
 
     const config = await getConfigOrThrow();
     const client = new DoorayApiClient(config.apiKey, config.baseUrl);
@@ -163,7 +167,7 @@ export const postListCommand = new Command("list")
       const tagNames: string[] = (opts.tag ?? []).filter((s: string) => s.length > 0);
 
       // 이름 입력을 동시에 풀면 빈 캐시에서 이름마다 멤버 목록을 따로 받는다. 먼저 한 번 받아 둔다.
-      if (memberInputs.some((f) => f.inputs.some((i) => !isMe(i) && needsMemberList(i)))) {
+      if (memberInputs.some(({ input }) => !isMe(input) && needsMemberList(input))) {
         await ensureMembers(client, projectId);
       }
       let mePromise: Promise<string> | undefined;
@@ -171,8 +175,8 @@ export const postListCommand = new Command("list")
 
       // 서로 의존하지 않는 해석이라 함께 돌린다.
       await Promise.all([
-        ...memberInputs.map(async ({ option, key, inputs }) => {
-          params[key] = await resolveFilterMembers(client, projectId, option, inputs, meId);
+        ...memberInputs.map(async ({ option, key, input }) => {
+          params[key] = [await resolveFilterMember(client, projectId, option, input, meId)];
         }),
         parent &&
           resolveParent(client, projectId, parent).then((id) => {

@@ -161,14 +161,13 @@ dooray post list <project> --tag "<이름 A>" --tag "<이름 B>"
 
 ```bash
 dooray post list <project> --to me --parent 42               # 42번의 하위 업무 중 내 담당
-dooray post list <project> --from "김철수" --from user@example.com
+dooray post list <project> --from "김철수"
 dooray post list <project> --cc me --updated prev-7d --order -postUpdatedAt
 dooray post list <project> --created 2026-09-01~2026-09-30
 ```
 
-`--from`·`--to`·`--cc` 는 등록자·담당자·참조자다. `me`, 멤버 id, 이메일, 프로젝트 멤버 이름을 받고 여러 번 줄 수 있다.
-여러 번 주면 `--from` 은 그중 한 사람이라도 등록한 업무가, `--cc` 는 그 사람이 모두 참조자인 업무가 온다.
-`--to` 를 여러 번 줄 때의 동작은 확인하지 못했다. `--cc` 와 같을 것으로 보지만, 확실하게 하려면 한 사람씩 따로 조회해 합친다.
+`--from`·`--to`·`--cc` 는 등록자·담당자·참조자다. 옵션마다 한 명을 받고 `me`, 멤버 id, 이메일, 프로젝트 멤버 이름으로 준다.
+같은 옵션을 두 번 주면 조회하기 전에 오류로 끝난다. 여러 사람을 보려면 한 사람씩 따로 조회해 합친다.
 값의 앞뒤 공백은 지우고 해석한다. 빈 값이나 공백만 있는 값은 조회하기 전에 오류로 끝난다.
 
 `--parent` 는 이 프로젝트의 업무 번호(`42`), 다른 프로젝트의 `<project>/<number>`, postId 를 받는다.

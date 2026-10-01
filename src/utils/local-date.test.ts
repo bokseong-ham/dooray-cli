@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import {
   DAY_END,
   DAY_START,
@@ -58,6 +58,27 @@ describe("expandLocalDate", () => {
     );
     expect(expandLocalDate(date, DAY_END)).toBe(
       `2026-09-01T23:59:59${localOffset(new Date(2026, 8, 1, 23, 59, 59))}`,
+    );
+  });
+});
+
+describe("서머타임이 있는 시간대", () => {
+  const originalTz = process.env.TZ;
+  afterEach(() => {
+    // Node 는 TZ 를 바꾸면 곧바로 반영한다. 다른 테스트에 새지 않게 되돌린다.
+    if (originalTz == null) delete process.env.TZ;
+    else process.env.TZ = originalTz;
+  });
+
+  it("날짜마다 그 날의 offset 을 붙인다", () => {
+    process.env.TZ = "America/New_York";
+
+    // 지금 시각의 offset 을 빌려 쓰면 둘 중 한쪽이 한 시간 어긋난다.
+    expect(expandLocalDate({ year: 2026, month: 1, day: 15 }, DAY_START)).toBe(
+      "2026-01-15T00:00:00-05:00",
+    );
+    expect(expandLocalDate({ year: 2026, month: 7, day: 15 }, DAY_END)).toBe(
+      "2026-07-15T23:59:59-04:00",
     );
   });
 });

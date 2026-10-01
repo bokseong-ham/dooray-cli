@@ -114,7 +114,7 @@ NHN Dooray REST API 를 래핑한 CLI 다. 이 파일은 라우터이므로, 작
 | --- | --- |
 | 업무 목록 | `dooray post list <project>` — `--all` 로 모든 페이지를 이어 받는다 |
 | 태그로 거르기 | `dooray post list <project> --tag "<이름>"` — 반복 가능하고, 여러 번 주면 그 태그를 모두 가진 업무만 온다 |
-| 사람으로 거르기 | `dooray post list <project> --from me` — 등록자 `--from`, 담당자 `--to`, 참조자 `--cc`. `me`·id·이메일·이름을 받고 반복 가능 |
+| 사람으로 거르기 | `dooray post list <project> --from me` — 등록자 `--from`, 담당자 `--to`, 참조자 `--cc`. 옵션마다 한 명이고 `me`·id·이메일·이름을 받는다 |
 | 하위 업무만 | `dooray post list <project> --parent <number>` — 이 프로젝트의 업무 번호다. `<project>/<number>` 와 postId 도 받는다 |
 | 기간으로 거르기 | `dooray post list <project> --created 2026-09-01~2026-09-30` — 수정 기간은 `--updated`. `A~`, `"~B"`(따옴표 필수), `prev-7d` 도 받는다 |
 | 정렬 바꾸기 | `dooray post list <project> --order -postUpdatedAt` — `createdAt`·`postUpdatedAt`·`postDueAt`, `-` 는 내림차순. 기본 `-createdAt` |

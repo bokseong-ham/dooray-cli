@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Command } from "commander";
 import type { Post } from "../../api/types.js";
 import { EXIT_PARAM_ERROR } from "../../utils/exit-codes.js";
@@ -205,10 +205,14 @@ describe("post list --from / --to / --cc", () => {
     expect(mocks.client.getMe).toHaveBeenCalledOnce();
   });
 
-  it("id·이메일·이름을 각각 organizationMemberId 로 바꾼다", async () => {
-    await run(["my-project", "--to", MY_ID, "--to", "user@example.com", "--to", "이영희"]);
+  it.each([
+    ["id", MY_ID, MY_ID],
+    ["이메일", "user@example.com", EMAIL_ID],
+    ["이름", "이영희", NAME_ID],
+  ])("%s 를 organizationMemberId 로 바꾼다", async (_label, value, expected) => {
+    await run(["my-project", "--to", value]);
 
-    expect(listParams().toMemberIds).toEqual([MY_ID, EMAIL_ID, NAME_ID]);
+    expect(listParams().toMemberIds).toEqual([expected]);
   });
 
   it("세 옵션을 함께 주면 각 키에 따로 들어간다", async () => {
@@ -253,10 +257,21 @@ describe("post list --from / --to / --cc", () => {
     expect(mocks.client.getProjectMembers).not.toHaveBeenCalled();
   });
 
-  it("같은 사람을 두 번 주면 한 번만 보낸다", async () => {
-    await run(["my-project", "--cc", "me", "--cc", "홍길동"]);
-
-    expect(listParams().ccMemberIds).toEqual([MY_ID]);
+  // 공식 문서에 여러 id 의 결합 규칙이 없다. 조용히 마지막 값을 쓰면 둘 다 걸렸다고 오해한다.
+  it.each(["from", "to", "cc"])("--%s 를 두 번 주면 설정·스피너·API 전에 거부한다", async (option) => {
+    for (const values of [["me", "이영희"], ["me", "me"]]) {
+      await expect(
+        run(["my-project", ...values.flatMap((v) => [`--${option}`, v])]),
+      ).rejects.toMatchObject({
+        exitCode: EXIT_PARAM_ERROR,
+        message: expect.stringContaining(`--${option} 는 한 명만 받습니다`),
+      });
+    }
+    expect(mocks.getConfigOrThrow).not.toHaveBeenCalled();
+    expect(mocks.startSpinner).not.toHaveBeenCalled();
+    expect(mocks.client.getPosts).not.toHaveBeenCalled();
+    expect(mocks.client.getMe).not.toHaveBeenCalled();
+    expect(mocks.client.getProjectMembers).not.toHaveBeenCalled();
   });
 
   it.each(["from", "to", "cc"])("--%s 의 빈 값·공백만 있는 값은 설정·스피너·API 전에 거부한다", async (option) => {
@@ -270,10 +285,6 @@ describe("post list --from / --to / --cc", () => {
     expect(mocks.startSpinner).not.toHaveBeenCalled();
     expect(mocks.client.getPosts).not.toHaveBeenCalled();
     expect(mocks.client.getProjectMembers).not.toHaveBeenCalled();
-  });
-
-  it("다른 값과 섞여 있어도 빈 값이 하나라도 있으면 거부한다", async () => {
-    await expectParamError(["my-project", "--to", "me", "--to", ""]);
   });
 
   it("앞뒤 공백은 지우고 해석한다", async () => {
@@ -308,10 +319,25 @@ describe("post list --parent", () => {
     expect(listParams().parentPostId).toBe("parent-post-id");
   });
 
-  it("15자리 이상 숫자는 postId 로 보고 그대로 넣는다", async () => {
-    await run(["my-project", "--parent", "1234567890123456789"]);
+  it.each(["123456789012345", "1234567890123456789"])("15자리 이상 숫자(%s)는 postId 로 보고 그대로 넣는다", async (value) => {
+    await run(["my-project", "--parent", value]);
 
-    expect(listParams().parentPostId).toBe("1234567890123456789");
+    // 업무 번호로 찾는 호출 없이 목록 조회 한 번만 한다.
+    expect(mocks.client.getPosts).toHaveBeenCalledOnce();
+    expect(listParams().parentPostId).toBe(value);
+  });
+
+  it("14자리 숫자는 업무 번호로 보고 postId 를 찾는다", async () => {
+    mocks.client.getPosts.mockImplementation(async (_projectId, params) =>
+      params?.postNumber === "12345678901234"
+        ? { result: [{ id: "parent-post-id" }], totalCount: 1 }
+        : { result: [makePost(1)], totalCount: 1 },
+    );
+
+    await run(["my-project", "--parent", "12345678901234"]);
+
+    expect(mocks.client.getPosts).toHaveBeenCalledWith("project-1", { postNumber: "12345678901234" });
+    expect(listParams().parentPostId).toBe("parent-post-id");
   });
 
   it("짧은 숫자는 이 프로젝트의 업무 번호로 보고 postId 를 찾는다", async () => {
@@ -371,10 +397,17 @@ describe("post list --created / --updated", () => {
     expect(listParams().updatedAt).toBe("2026-09-01T09:00:00+09:00~2026-09-01T18:00:00Z");
   });
 
-  it("시작만 준 범위는 끝을 비워 둔다", async () => {
+  // 공식 문서에 A~ 형태는 없다. 끝을 채워 문서에 있는 A~B 로 보낸다.
+  it("날짜만 준 시작만 있으면 시작은 넓히고 끝은 2999-12-31T23:59:59Z 로 채운다", async () => {
     await run(["my-project", "--created", "2026-09-01~"]);
 
-    expect(listParams().createdAt).toBe(`2026-09-01T00:00:00${startOffset}~`);
+    expect(listParams().createdAt).toBe(`2026-09-01T00:00:00${startOffset}~2999-12-31T23:59:59Z`);
+  });
+
+  it("ISO 시작만 있으면 시작은 그대로 두고 끝을 채운다", async () => {
+    await run(["my-project", "--updated", "2026-09-01T09:00:00+09:00~"]);
+
+    expect(listParams().updatedAt).toBe("2026-09-01T09:00:00+09:00~2999-12-31T23:59:59Z");
   });
 
   it("끝만 준 범위는 서버가 받도록 시작을 1970-01-01 로 채운다", async () => {
@@ -415,6 +448,13 @@ describe("post list --created / --updated", () => {
     ["채운 시작보다 앞선 날짜", "~1969-12-30"],
     ["채운 시작보다 앞선 일시", "~1969-12-31T23:59:59Z"],
     ["채운 시작과 같은 끝", "~1970-01-01T00:00:00Z"],
+    ["채운 끝과 같은 시작", "2999-12-31T23:59:59Z~"],
+    ["채운 끝보다 뒤인 시작", "3000-01-01T00:00:00Z~"],
+    // prev-<N>d 는 앞뒤에 다른 글자가 붙으면 받지 않는다.
+    ["앞에 글자가 붙은 prev", "xprev-1d"],
+    ["뒤에 글자가 붙은 prev", "prev-1dx"],
+    ["앞에 공백이 붙은 prev", " prev-1d"],
+    ["뒤에 공백이 붙은 prev", "prev-1d "],
   ])("%s(%s)는 API 를 부르기 전에 거부한다", async (_label, value) => {
     await expectParamError(["my-project", "--created", value]);
   });
@@ -422,6 +462,30 @@ describe("post list --created / --updated", () => {
   it("--updated 도 같은 검증을 거치고 오류에 옵션 이름을 적는다", async () => {
     await expect(run(["my-project", "--updated", "abc"])).rejects.toThrow(/--updated 값을 읽을 수 없습니다/);
     expect(mocks.client.getPosts).not.toHaveBeenCalled();
+  });
+
+  it("--updated 의 시작이 끝보다 뒤면 오류에 --updated 를 적는다", async () => {
+    await expect(run(["my-project", "--updated", "2026-09-30~2026-09-01"])).rejects.toMatchObject({
+      exitCode: EXIT_PARAM_ERROR,
+      message: expect.stringContaining("--updated 의 시작이 끝과 같거나 뒤입니다"),
+    });
+    expect(mocks.client.getPosts).not.toHaveBeenCalled();
+  });
+
+  describe("서머타임이 있는 시간대", () => {
+    const originalTz = process.env.TZ;
+    afterEach(() => {
+      if (originalTz == null) delete process.env.TZ;
+      else process.env.TZ = originalTz;
+    });
+
+    it("날짜만 준 시작과 끝에 각 날짜의 offset 을 붙인다", async () => {
+      process.env.TZ = "America/New_York";
+
+      await run(["my-project", "--created", "2026-01-15~2026-07-15"]);
+
+      expect(listParams().createdAt).toBe("2026-01-15T00:00:00-05:00~2026-07-15T23:59:59-04:00");
+    });
   });
 
   it("같은 날짜 하나로 만든 범위는 그 날 하루라 받는다", async () => {
@@ -451,6 +515,34 @@ describe("post list --order", () => {
       code: "commander.invalidArgument",
     });
     expect(mocks.client.getPosts).not.toHaveBeenCalled();
+  });
+});
+
+describe("post list --page / --size / --all", () => {
+  it("주지 않으면 page 0, size 20 으로 한 번 조회한다", async () => {
+    await run(["my-project"]);
+
+    expect(listParams()).toMatchObject({ page: 0, size: 20 });
+  });
+
+  it("--page·--size 를 숫자로 바꿔 보낸다", async () => {
+    await run(["my-project", "--page", "3", "--size", "50"]);
+
+    expect(listParams()).toMatchObject({ page: 3, size: 50 });
+  });
+
+  it("--all 은 size 100 으로 page 0 부터 totalCount 를 채울 때까지 조회한다", async () => {
+    mocks.client.getPosts
+      .mockResolvedValueOnce({ result: [makePost(1), makePost(2)], totalCount: 3 })
+      .mockResolvedValueOnce({ result: [makePost(3)], totalCount: 3 });
+
+    // --all 이면 --page·--size 는 쓰지 않는다.
+    await run(["my-project", "--all", "--page", "5", "--size", "7"]);
+
+    const calls = mocks.client.getPosts.mock.calls;
+    expect(calls).toHaveLength(2);
+    expect(calls[0][1]).toMatchObject({ page: 0, size: 100 });
+    expect(calls[1][1]).toMatchObject({ page: 1, size: 100 });
   });
 });
 
