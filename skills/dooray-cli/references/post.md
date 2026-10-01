@@ -40,6 +40,43 @@ dooray post file upload   --url <url> --file ./report.pdf
 
 TTY 확인, non-TTY 실행, `-y`와 `--yes` 사용법은 [SKILL.md](../SKILL.md#삭제-명령의-확인-동작)를 따른다.
 
+## 업무 목록 거르기
+
+`post list` 의 필터는 함께 줄 수 있고 `--all` 이면 모든 페이지에 같은 조건이 걸린다.
+
+```bash
+dooray post list <project> --from me --created 2026-09-01~           # 9월 이후 내가 등록한 업무
+dooray post list <project> --to me --parent <project>/42              # 42번의 하위 업무 중 내 담당
+dooray post list <project> --cc me --updated prev-7d --order -postUpdatedAt
+dooray post list <project> --to "김철수" --to user@example.com --all
+```
+
+| 옵션 | 동작 |
+| --- | --- |
+| `--from` / `--to` / `--cc` | 등록자·담당자·참조자. `me`, 멤버 id(15자리 이상), 이메일, 프로젝트 멤버 이름을 받는다. 반복 가능 |
+| `--parent` | 그 업무의 하위 업무만. `<project>/<number>` 또는 postId |
+| `--created` / `--updated` | 등록·수정 기간. 형식은 아래 |
+| `--order` | `createdAt`·`postUpdatedAt`·`postDueAt` 중 하나. 앞에 `-` 를 붙이면 내림차순. 기본 `-createdAt` |
+
+같은 멤버 옵션을 여러 번 주면 `--from` 은 그중 한 사람이라도 등록한 업무, `--to`·`--cc` 는 그 사람이 **모두** 들어 있는 업무가 온다.
+"A 나 B 가 담당인 업무" 를 원하면 `--to` 를 따로 두 번 조회해 합친다.
+
+기간은 네 가지 형태다.
+
+| 형태 | 뜻 |
+| --- | --- |
+| `A~B` | A 부터 B 까지 |
+| `A~` | A 이후 |
+| `~B` | B 이전 |
+| `prev-<N>d` | 최근 N일 |
+
+`~B` 는 따옴표로 감싸 `--created "~2026-09-30"` 처럼 준다. 감싸지 않으면 zsh 는 `~` 를 홈 디렉터리로 해석하다 실패한다.
+
+A·B 는 `2026-09-01` 같은 날짜나 `2026-09-01T09:00:00+09:00` 같은 offset 이 붙은 일시다.
+날짜만 주면 A 는 그 날 `00:00:00`, B 는 그 날 `23:59:59` 로 본다. `2026-09-01~2026-09-01` 은 그 날 하루다.
+날짜 하나만 준 값(`--created 2026-09-01`), offset 없는 일시, 없는 날짜, 끝이 시작보다 앞서거나 같은 범위는
+조회 전에 종료 코드 3 으로 끝난다. `--order` 에 목록 밖의 값을 주어도 조회 전에 끝난다.
+
 ## 업무 생성
 
 ```bash

@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Command } from "commander";
 import type { Post } from "../../api/types.js";
+import { EXIT_PARAM_ERROR } from "../../utils/exit-codes.js";
+import { localOffset } from "../../utils/local-date.js";
 
 const mocks = vi.hoisted(() => ({
   getConfigOrThrow: vi.fn(),
@@ -8,10 +10,26 @@ const mocks = vi.hoisted(() => ({
   lookupTagIds: vi.fn(),
   startSpinner: vi.fn(),
   stopSpinner: vi.fn(),
+  cache: {
+    getMe: vi.fn(),
+    setMe: vi.fn(),
+    getMembers: vi.fn(),
+    setMembers: vi.fn(),
+  },
   client: {
     getPosts: vi.fn(),
+    getMe: vi.fn(),
+    getMemberDetail: vi.fn(),
+    searchMembers: vi.fn(),
+    getProjectMembers: vi.fn(),
   },
 }));
+
+// 멤버 해석은 실제 resolver 를 태우고, 그 아래 캐시와 API 만 가짜로 둔다.
+vi.mock("../../cache/store.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../cache/store.js")>();
+  return { ...actual, ...mocks.cache };
+});
 
 vi.mock("../../config/store.js", () => ({
   getConfigOrThrow: mocks.getConfigOrThrow,
@@ -66,6 +84,9 @@ async function run(args: string[]): Promise<void> {
   program.addCommand(postCommand);
   program.exitOverride();
   program.configureOutput({ writeErr: () => {} });
+  // 옵션 검증 오류는 하위 명령이 낸다. 프로세스를 끝내지 않고 throw 하게 한다.
+  postListCommand.exitOverride();
+  postListCommand.configureOutput({ writeErr: () => {} });
 
   const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
   try {
@@ -86,7 +107,47 @@ beforeEach(() => {
     names.map((n) => `tagid-${n}`),
   );
   mocks.client.getPosts.mockResolvedValue({ result: [makePost(1)], totalCount: 1 });
+
+  mocks.cache.getMe.mockResolvedValue(null);
+  mocks.cache.getMembers.mockResolvedValue(null);
+  mocks.client.getMe.mockResolvedValue({
+    result: { id: MY_ID, name: "홍길동", defaultOrganization: { id: "org-1" } },
+  });
+  mocks.client.getMemberDetail.mockImplementation(async (id: string) => ({
+    result: { id, name: MEMBER_NAMES[id] ?? "" },
+  }));
+  mocks.client.searchMembers.mockImplementation(async (params: { externalEmailAddresses: string }) => ({
+    result: params.externalEmailAddresses === "user@example.com" ? [{ id: EMAIL_ID, name: "김철수" }] : [],
+  }));
+  mocks.client.getProjectMembers.mockResolvedValue({
+    result: Object.keys(MEMBER_NAMES).map((id) => ({ organizationMemberId: id })),
+    totalCount: Object.keys(MEMBER_NAMES).length,
+  });
 });
+
+const MY_ID = "1111222233334444555";
+const EMAIL_ID = "2222333344445555666";
+const NAME_ID = "3333444455556666777";
+const MEMBER_NAMES: Record<string, string> = {
+  [MY_ID]: "홍길동",
+  [EMAIL_ID]: "김철수",
+  [NAME_ID]: "이영희",
+};
+
+/** 목록 조회 호출(postNumber 로 상위 업무를 찾는 호출 제외)의 params. */
+function listParams(): Record<string, unknown> {
+  const calls = mocks.client.getPosts.mock.calls.filter((c) => c[1]?.postNumber == null);
+  expect(calls).toHaveLength(1);
+  return calls[0][1];
+}
+
+async function expectParamError(args: string[]): Promise<void> {
+  await expect(run(args)).rejects.toMatchObject({ exitCode: EXIT_PARAM_ERROR });
+  expect(mocks.client.getPosts).not.toHaveBeenCalled();
+  expect(mocks.resolveProject).not.toHaveBeenCalled();
+  // 기간 검증은 스피너보다 먼저 끝난다.
+  expect(mocks.startSpinner).not.toHaveBeenCalled();
+}
 
 describe("post list --tag", () => {
   it("--tag 를 주지 않으면 tagIds 키 자체가 없고 태그 조회도 하지 않는다", async () => {
@@ -124,5 +185,202 @@ describe("post list --tag", () => {
     }
     // 이름 조회는 페이지마다가 아니라 한 번만 한다.
     expect(mocks.lookupTagIds).toHaveBeenCalledOnce();
+  });
+});
+
+describe("post list --from / --to / --cc", () => {
+  it("주지 않으면 멤버 id 키가 없다", async () => {
+    await run(["my-project"]);
+
+    const args = listParams();
+    expect(args).not.toHaveProperty("fromMemberIds");
+    expect(args).not.toHaveProperty("toMemberIds");
+    expect(args).not.toHaveProperty("ccMemberIds");
+  });
+
+  it("me 는 API 키 주인의 id 로 바꾼다", async () => {
+    await run(["my-project", "--from", "me"]);
+
+    expect(listParams().fromMemberIds).toEqual([MY_ID]);
+    expect(mocks.client.getMe).toHaveBeenCalledOnce();
+  });
+
+  it("id·이메일·이름을 각각 organizationMemberId 로 바꾼다", async () => {
+    await run(["my-project", "--to", MY_ID, "--to", "user@example.com", "--to", "이영희"]);
+
+    expect(listParams().toMemberIds).toEqual([MY_ID, EMAIL_ID, NAME_ID]);
+  });
+
+  it("세 옵션을 함께 주면 각 키에 따로 들어간다", async () => {
+    await run(["my-project", "--from", "me", "--to", "이영희", "--cc", "user@example.com"]);
+
+    const args = listParams();
+    expect(args.fromMemberIds).toEqual([MY_ID]);
+    expect(args.toMemberIds).toEqual([NAME_ID]);
+    expect(args.ccMemberIds).toEqual([EMAIL_ID]);
+  });
+
+  it("같은 사람을 두 번 주면 한 번만 보낸다", async () => {
+    await run(["my-project", "--cc", "me", "--cc", "홍길동"]);
+
+    expect(listParams().ccMemberIds).toEqual([MY_ID]);
+  });
+
+  it("찾을 수 없는 멤버면 어느 옵션의 어느 값인지 알리고 목록을 조회하지 않는다", async () => {
+    await expect(run(["my-project", "--to", "nobody@example.com"])).rejects.toMatchObject({
+      exitCode: EXIT_PARAM_ERROR,
+      message: expect.stringContaining("--to 멤버 'nobody@example.com' 조회 실패"),
+    });
+    expect(mocks.client.getPosts).not.toHaveBeenCalled();
+    // 스피너를 띄운 뒤 실패했으므로 실패로 내려야 한다.
+    expect(mocks.stopSpinner).toHaveBeenCalledWith(false);
+  });
+});
+
+describe("post list --parent", () => {
+  it("project/번호 는 그 업무의 postId 로 바꿔 parentPostId 에 넣는다", async () => {
+    mocks.client.getPosts.mockImplementation(async (_projectId, params) =>
+      params?.postNumber === "42"
+        ? { result: [{ id: "parent-post-id" }], totalCount: 1 }
+        : { result: [makePost(1)], totalCount: 1 },
+    );
+
+    await run(["my-project", "--parent", "my-project/42"]);
+
+    expect(listParams().parentPostId).toBe("parent-post-id");
+  });
+
+  it("슬래시가 없으면 postId 로 보고 그대로 넣는다", async () => {
+    await run(["my-project", "--parent", "1234567890123456789"]);
+
+    expect(listParams().parentPostId).toBe("1234567890123456789");
+  });
+
+  it("주지 않으면 parentPostId 키가 없다", async () => {
+    await run(["my-project"]);
+
+    expect(listParams()).not.toHaveProperty("parentPostId");
+  });
+});
+
+describe("post list --created / --updated", () => {
+  const startOffset = localOffset(new Date(2026, 8, 1, 0, 0, 0));
+  const endOffset = localOffset(new Date(2026, 8, 30, 23, 59, 59));
+
+  it("날짜만 준 범위는 그 날의 시작과 끝으로 늘려 ISO 로 보낸다", async () => {
+    await run(["my-project", "--created", "2026-09-01~2026-09-30"]);
+
+    expect(listParams().createdAt).toBe(
+      `2026-09-01T00:00:00${startOffset}~2026-09-30T23:59:59${endOffset}`,
+    );
+  });
+
+  it("ISO 범위는 그대로 보낸다", async () => {
+    await run(["my-project", "--updated", "2026-09-01T09:00:00+09:00~2026-09-01T18:00:00Z"]);
+
+    expect(listParams().updatedAt).toBe("2026-09-01T09:00:00+09:00~2026-09-01T18:00:00Z");
+  });
+
+  it("시작만 준 범위는 끝을 비워 둔다", async () => {
+    await run(["my-project", "--created", "2026-09-01~"]);
+
+    expect(listParams().createdAt).toBe(`2026-09-01T00:00:00${startOffset}~`);
+  });
+
+  it("끝만 준 범위는 서버가 받도록 시작을 1970-01-01 로 채운다", async () => {
+    await run(["my-project", "--updated", "~2026-09-30"]);
+
+    expect(listParams().updatedAt).toBe(`1970-01-01T00:00:00Z~2026-09-30T23:59:59${endOffset}`);
+  });
+
+  it("prev-<N>d 는 그대로 보낸다", async () => {
+    await run(["my-project", "--created", "prev-7d"]);
+
+    expect(listParams().createdAt).toBe("prev-7d");
+  });
+
+  it("주지 않으면 createdAt·updatedAt 키가 없다", async () => {
+    await run(["my-project"]);
+
+    expect(listParams()).not.toHaveProperty("createdAt");
+    expect(listParams()).not.toHaveProperty("updatedAt");
+  });
+
+  it.each([
+    ["범위가 아닌 날짜 하나", "2026-09-01"],
+    ["알 수 없는 값", "abc"],
+    ["물결표만", "~"],
+    ["물결표 둘", "2026-09-01~2026-09-10~2026-09-20"],
+    ["달력에 없는 날짜", "2026-02-31~"],
+    ["offset 없는 ISO", "2026-09-01T00:00:00~"],
+    ["실재하지 않는 시각", "2026-09-01T25:00:00+09:00~"],
+    ["주 단위 prev", "prev-1w"],
+    ["뒤집힌 범위", "2026-09-30~2026-09-01"],
+    ["시작과 끝이 같은 시각", "2026-09-01T00:00:00+09:00~2026-09-01T00:00:00+09:00"],
+  ])("%s(%s)는 API 를 부르기 전에 거부한다", async (_label, value) => {
+    await expectParamError(["my-project", "--created", value]);
+  });
+
+  it("--updated 도 같은 검증을 거치고 오류에 옵션 이름을 적는다", async () => {
+    await expect(run(["my-project", "--updated", "abc"])).rejects.toThrow(/--updated 값을 읽을 수 없습니다/);
+    expect(mocks.client.getPosts).not.toHaveBeenCalled();
+  });
+
+  it("같은 날짜 하나로 만든 범위는 그 날 하루라 받는다", async () => {
+    await run(["my-project", "--created", "2026-09-01~2026-09-01"]);
+
+    expect(listParams().createdAt).toBe(
+      `2026-09-01T00:00:00${startOffset}~2026-09-01T23:59:59${localOffset(new Date(2026, 8, 1, 23, 59, 59))}`,
+    );
+  });
+});
+
+describe("post list --order", () => {
+  it("주지 않으면 -createdAt 로 보낸다", async () => {
+    await run(["my-project"]);
+
+    expect(listParams().order).toBe("-createdAt");
+  });
+
+  it("고른 정렬을 보낸다", async () => {
+    await run(["my-project", "--order", "postDueAt"]);
+
+    expect(listParams().order).toBe("postDueAt");
+  });
+
+  it("서버가 무시할 값은 API 를 부르기 전에 거부한다", async () => {
+    await expect(run(["my-project", "--order", "bogus"])).rejects.toMatchObject({
+      code: "commander.invalidArgument",
+    });
+    expect(mocks.client.getPosts).not.toHaveBeenCalled();
+  });
+});
+
+describe("post list 필터 조합", () => {
+  it("기존 옵션과 새 필터를 함께 주면 --all 의 모든 페이지에 같은 조건이 들어간다", async () => {
+    mocks.client.getPosts
+      .mockResolvedValueOnce({ result: [makePost(1)], totalCount: 2 })
+      .mockResolvedValueOnce({ result: [makePost(2)], totalCount: 2 });
+
+    await run([
+      "my-project",
+      "--subject", "배포",
+      "--tag", "긴급",
+      "--from", "me",
+      "--created", "prev-30d",
+      "--order", "-postUpdatedAt",
+      "--all",
+    ]);
+
+    expect(mocks.client.getPosts).toHaveBeenCalledTimes(2);
+    for (const call of mocks.client.getPosts.mock.calls) {
+      expect(call[1]).toMatchObject({
+        subjects: "배포",
+        tagIds: ["tagid-긴급"],
+        fromMemberIds: [MY_ID],
+        createdAt: "prev-30d",
+        order: "-postUpdatedAt",
+      });
+    }
   });
 });

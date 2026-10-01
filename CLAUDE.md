@@ -80,7 +80,7 @@ dooray                # 글로벌 링크 시
 - **파괴적 삭제 명령**: 확인을 기본으로 하고 `-y`/`--yes` 로 생략한다 (ADR-036)
   - TTY 확인의 기본값은 아니오다. 사용자가 거절하면 API를 호출하지 않고 정상 취소한다
   - non-TTY에서 `-y`/`--yes`가 없으면 설정 조회·resolver·API 호출 전에 `EXIT_PARAM_ERROR`(3)로 중단한다
-- **post 목록 정렬**: 최신순 (`-createdAt`)
+- **post 목록 정렬**: 기본은 최신순 (`-createdAt`). `post list` 만 `--order` 로 바꿀 수 있다
 - **무시되는 옵션**: 다른 옵션 때문에 효력이 없어진 옵션은 무시하고 stderr 로 경고한다
 
 ## 개인 식별 정보 / 사내 식별자 노출 금지 (public OSS)

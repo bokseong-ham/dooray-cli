@@ -119,6 +119,7 @@ Claude 데스크톱 앱은 사용자 컴퓨터의 파일과 명령을 기본 상
 dooray project list                          # 내 프로젝트
 dooray post list <project>                   # 업무 목록
 dooray post list <project> --tag "<태그 이름>"  # 태그로 거르기
+dooray post list <project> --from me --created 2026-09-01~  # 내가 9월 이후 등록한 업무
 dooray post get <project> 42                 # 업무 상세
 dooray post create <project> --title "제목"  # 업무 생성
 dooray post comment add <project> 42 --body "댓글"
@@ -155,6 +156,26 @@ dooray post list <project> --tag "<이름 A>" --tag "<이름 B>"
 옵션을 주지 않으면 출력이 서버 응답 그대로다.
 
 `--tag` 를 여러 번 주면 그 태그를 모두 가진 업무만 온다.
+
+### 사람·상위 업무·기간으로 거르기
+
+```bash
+dooray post list <project> --to me --parent <project>/42      # 42번의 하위 업무 중 내 담당
+dooray post list <project> --from "김철수" --from user@example.com
+dooray post list <project> --cc me --updated prev-7d --order -postUpdatedAt
+dooray post list <project> --created 2026-09-01~2026-09-30
+```
+
+`--from`·`--to`·`--cc` 는 등록자·담당자·참조자다. `me`, 멤버 id, 이메일, 프로젝트 멤버 이름을 받고 여러 번 줄 수 있다.
+여러 번 주면 `--from` 은 그중 한 사람이라도 등록한 업무가, `--to`·`--cc` 는 그 사람이 모두 들어 있는 업무가 온다.
+
+`--created`·`--updated` 는 `A~B`, `A~`(그 뒤로), `~B`(그 앞으로), `prev-<N>d`(최근 N일)를 받는다.
+A·B 는 `2026-09-01` 같은 날짜나 `2026-09-01T09:00:00+09:00` 같은 일시다.
+날짜만 주면 A 는 그 날 0시, B 는 그 날 23시 59분 59초로 본다.
+없는 날짜나 끝이 시작보다 앞선 범위는 조회하기 전에 오류로 끝난다.
+`~` 로 시작하는 값은 셸이 홈 디렉터리로 바꾸려 하므로 `--created "~2026-09-30"` 처럼 따옴표로 감싼다.
+
+`--order` 는 `createdAt`·`postUpdatedAt`·`postDueAt` 중 하나이고 앞에 `-` 를 붙이면 내림차순이다. 기본은 `-createdAt` 이다.
 
 ### 본문 형식
 
