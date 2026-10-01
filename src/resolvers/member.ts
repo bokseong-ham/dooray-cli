@@ -186,6 +186,15 @@ export async function resolveMemberByIdOrEmail(
   return null;
 }
 
+/**
+ * 이 입력을 풀려면 프로젝트 멤버 목록이 필요한지 본다.
+ * id 와 이메일은 목록 없이 풀리고, 그 밖의 값은 `resolveMember` 가 이름으로 찾는다.
+ * 여러 입력을 동시에 풀기 전에 목록을 한 번만 받아 두려는 호출자가 쓴다.
+ */
+export function needsMemberList(input: string): boolean {
+  return !MEMBER_ID_RE.test(input) && !EMAIL_RE.test(input);
+}
+
 export async function resolveMember(
   client: DoorayApiClient,
   projectId: string,

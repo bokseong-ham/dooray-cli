@@ -115,7 +115,7 @@ NHN Dooray REST API 를 래핑한 CLI 다. 이 파일은 라우터이므로, 작
 | 업무 목록 | `dooray post list <project>` — `--all` 로 모든 페이지를 이어 받는다 |
 | 태그로 거르기 | `dooray post list <project> --tag "<이름>"` — 반복 가능하고, 여러 번 주면 그 태그를 모두 가진 업무만 온다 |
 | 사람으로 거르기 | `dooray post list <project> --from me` — 등록자 `--from`, 담당자 `--to`, 참조자 `--cc`. `me`·id·이메일·이름을 받고 반복 가능 |
-| 하위 업무만 | `dooray post list <project> --parent <project>/<number>` — postId 도 받는다 |
+| 하위 업무만 | `dooray post list <project> --parent <number>` — 이 프로젝트의 업무 번호다. `<project>/<number>` 와 postId 도 받는다 |
 | 기간으로 거르기 | `dooray post list <project> --created 2026-09-01~2026-09-30` — 수정 기간은 `--updated`. `A~`, `"~B"`(따옴표 필수), `prev-7d` 도 받는다 |
 | 정렬 바꾸기 | `dooray post list <project> --order -postUpdatedAt` — `createdAt`·`postUpdatedAt`·`postDueAt`, `-` 는 내림차순. 기본 `-createdAt` |
 | 업무 검색 | `dooray post search <project> "<keyword>"` — projectId(15자리 이상 numeric) 를 넣으면 캐시를 우회한다 |
@@ -288,3 +288,7 @@ dooray post get <project> <number> --json --with-tag-names
 `post` 와 `wiki page` 모두 제목은 `--title` 이다.
 `post create` 와 `post edit` 는 `--subject` 를 받지 않는다. 제목은 `--title` 로 준다.
 `post list` 의 `--subject` 는 제목 키워드 필터다.
+
+`--from`·`--to` 는 명령마다 뜻이 다르다.
+`post list` 에서는 등록자·담당자 **멤버** 필터이고, `calendar event list` 에서는 조회 기간의 시작·끝 **날짜**다.
+업무를 기간으로 거르려면 `post list` 의 `--created`(등록)·`--updated`(수정)를 쓴다.

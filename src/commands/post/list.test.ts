@@ -220,6 +220,39 @@ describe("post list --from / --to / --cc", () => {
     expect(args.ccMemberIds).toEqual([EMAIL_ID]);
   });
 
+  it("Me·ME 도 me 로 본다", async () => {
+    await run(["my-project", "--from", "Me", "--to", "ME"]);
+
+    const args = listParams();
+    expect(args.fromMemberIds).toEqual([MY_ID]);
+    expect(args.toMemberIds).toEqual([MY_ID]);
+    // me 를 여러 번 줘도 내 정보는 한 번만 조회하고, 이름 해석이 아니라 멤버 목록도 받지 않는다.
+    expect(mocks.client.getMe).toHaveBeenCalledOnce();
+    expect(mocks.client.getProjectMembers).not.toHaveBeenCalled();
+  });
+
+  it("빈 캐시에서 이름을 여럿 줘도 멤버 목록은 한 번만 받는다", async () => {
+    let cached: { data: unknown; updatedAt: string } | null = null;
+    mocks.cache.getMembers.mockImplementation(async () => cached);
+    mocks.cache.setMembers.mockImplementation(async (_projectId: string, data: unknown) => {
+      cached = { data, updatedAt: new Date().toISOString() };
+    });
+
+    await run(["my-project", "--to", "이영희", "--cc", "김철수", "--from", "홍길동"]);
+
+    expect(mocks.client.getProjectMembers).toHaveBeenCalledOnce();
+    const args = listParams();
+    expect(args.toMemberIds).toEqual([NAME_ID]);
+    expect(args.ccMemberIds).toEqual([EMAIL_ID]);
+    expect(args.fromMemberIds).toEqual([MY_ID]);
+  });
+
+  it("id·이메일만 주면 멤버 목록을 받지 않는다", async () => {
+    await run(["my-project", "--to", MY_ID, "--cc", "user@example.com"]);
+
+    expect(mocks.client.getProjectMembers).not.toHaveBeenCalled();
+  });
+
   it("같은 사람을 두 번 주면 한 번만 보낸다", async () => {
     await run(["my-project", "--cc", "me", "--cc", "홍길동"]);
 
@@ -254,6 +287,38 @@ describe("post list --parent", () => {
     await run(["my-project", "--parent", "1234567890123456789"]);
 
     expect(listParams().parentPostId).toBe("1234567890123456789");
+  });
+
+  it("짧은 숫자는 이 프로젝트의 업무 번호로 보고 postId 를 찾는다", async () => {
+    mocks.client.getPosts.mockImplementation(async (_projectId, params) =>
+      params?.postNumber === "42"
+        ? { result: [{ id: "parent-post-id" }], totalCount: 1 }
+        : { result: [makePost(1)], totalCount: 1 },
+    );
+
+    await run(["my-project", "--parent", "42"]);
+
+    expect(mocks.client.getPosts).toHaveBeenCalledWith("project-1", { postNumber: "42" });
+    expect(listParams().parentPostId).toBe("parent-post-id");
+  });
+
+  it("번호에 해당하는 업무가 없으면 목록을 조회하지 않는다", async () => {
+    mocks.client.getPosts.mockResolvedValue({ result: [], totalCount: 0 });
+
+    await expect(run(["my-project", "--parent", "42"])).rejects.toMatchObject({
+      exitCode: EXIT_PARAM_ERROR,
+    });
+    expect(mocks.client.getPosts).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ["숫자가 아닌 값", "abc"],
+    ["0번", "0"],
+    ["번호 없는 project/", "my-project/"],
+    ["슬래시가 둘", "my-project/42/1"],
+    ["project/0", "my-project/0"],
+  ])("%s(%s)는 API·스피너 전에 거부한다", async (_label, value) => {
+    await expectParamError(["my-project", "--parent", value]);
   });
 
   it("주지 않으면 parentPostId 키가 없다", async () => {
@@ -317,6 +382,10 @@ describe("post list --created / --updated", () => {
     ["주 단위 prev", "prev-1w"],
     ["뒤집힌 범위", "2026-09-30~2026-09-01"],
     ["시작과 끝이 같은 시각", "2026-09-01T00:00:00+09:00~2026-09-01T00:00:00+09:00"],
+    // 날짜만 준 1969-12-31 의 끝(23:59:59)은 UTC 서쪽 시간대에서 1970-01-01 이후가 된다. 시간대와 무관한 값으로 본다.
+    ["채운 시작보다 앞선 날짜", "~1969-12-30"],
+    ["채운 시작보다 앞선 일시", "~1969-12-31T23:59:59Z"],
+    ["채운 시작과 같은 끝", "~1970-01-01T00:00:00Z"],
   ])("%s(%s)는 API 를 부르기 전에 거부한다", async (_label, value) => {
     await expectParamError(["my-project", "--created", value]);
   });
