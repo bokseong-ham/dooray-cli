@@ -668,6 +668,8 @@ export interface MessengerChannelUser {
 }
 
 // direct 방과 일부 private 방은 title 이 빈값이다 (ADR-066).
+// `id`·`type` 은 응답에 빠질 수 있어 `messenger channels` 의 표 출력은 둘이 없는 방도 방어한다.
+// 필수로 선언한 것은 title 매칭(resolveMessengerChannel)이 두 값이 있다고 보기 때문이다.
 // title 매칭(resolveMessengerChannel)은 id·title·type 만 쓰고, 나머지는 `messenger channels` 가 쓴다.
 export interface MessengerChannel {
   id: string;
