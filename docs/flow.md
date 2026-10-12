@@ -914,7 +914,9 @@ flowchart TD
 ```
 
 - API 가 `size` 를 비롯한 파라미터를 무시하고 전체를 주므로 필터와 정렬은 모두 클라이언트에서 한다.
-- 기본으로 `archivedAt` 이 있는 방, 숨긴 방(`displayed: false`), `status` 가 `normal` 이 아닌 방을 뺀다. `--all` 이면 모두 남긴다. `displayed`·`status` 키가 없는 방은 남긴다.
+- 기본으로 `archivedAt` 이 있는 방, 숨긴 방(`displayed: false`), `status` 가 `normal` 이 아닌 방을 뺀다. `--all` 이면 모두 남긴다(`status` 가 `deleted` 인 방도 들어온다). `displayed`·`status` 키가 없는 방은 남긴다.
+- 기본 제외로 빠진 방이 있으면 이유별 수와 `--all` 안내를 stderr 한 줄로 알린다. `--type`·`--since` 로 어차피 빠질 방은 세지 않고, stdout(`--json`, `--quiet`)은 바뀌지 않는다.
+- 응답에 `type` 이나 `id` 가 없는 방도 표가 죽지 않는다. 종류 칸과 id 칸은 비우고, `--quiet` 은 id 가 없는 방을 뺀다.
 - 정렬과 `--since` 는 `updatedAt`(수정 시각) 기준이다. 표 머리도 `수정 시각` 이다.
 - `--since` 는 날짜만 주면 그 날 로컬 00:00 이고, 시각을 주면 offset 이 있어야 한다. `updatedAt` 이 없는 방은 `--since` 에서 빠진다.
 - 종류 열은 `direct`→`DM`, `private`→`그룹`, `me`→`나와의 대화`, `bot`→`봇` 이고, 문서에 없는 값은 원문을 그대로 보인다.
