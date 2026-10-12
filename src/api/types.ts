@@ -676,7 +676,11 @@ export interface MessengerChannel {
   type: string;
   /** 공식 문서: `system` / `normal` / `archived` / `deleted` */
   status?: string;
-  /** 공식 문서의 응답 예시 주석: 숨기기 여부. `false` 면 숨긴 방이다. */
+  /**
+   * 공식 문서의 응답 예시 주석은 「숨기기 여부」 뿐이라 `true`·`false` 중 무엇이 숨김인지 정해지지 않는다.
+   * 2026-10-13 메신저에서 방을 숨겨 `true` → `false` 로 바뀌는 것을 확인했다. `false` 가 숨긴 방이다.
+   * 숨김을 해제했을 때의 값은 확인하지 못했다.
+   */
   displayed?: boolean;
   capacity?: number;
   createdAt?: string;
