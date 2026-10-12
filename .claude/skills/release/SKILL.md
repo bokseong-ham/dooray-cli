@@ -153,11 +153,13 @@ git push origin "v$VERSION"
 **본문은 파일로 쓰고 `--notes-file` 로 넘긴다.** 인라인 `--notes` 와 heredoc 은 쓰지 않는다.
 7단계가 본문의 escape 잔재를 확인한다.
 
+**Release 를 만들기 전에 `/fos-skills:korean-check` 스킬을 호출해 노트 파일을 검사한다.**
+검사기의 위치와 판정 기준은 그 스킬이 소유한다. 검사기에 걸리면 문장을 고친 뒤 아래를 실행한다.
+
 ```bash
 VERSION="" # package.json 에 넣은 버전에서 v를 뺀 값을 넣는다.
 NOTES="" # 작성하고 검사한 릴리스 노트 파일 경로를 넣는다.
 : "${VERSION:?VERSION을 넣는다}" "${NOTES:?NOTES를 넣는다}"
-~/.claude/scripts/korean-check.sh "$NOTES"
 gh release create "v$VERSION" --title "v$VERSION" --notes-file "$NOTES" --verify-tag
 ```
 
