@@ -196,7 +196,7 @@ describe("post file download-all 의 본문 참조 합치기", () => {
     await program.parseAsync([...baseArgs, "--json"]);
 
     expect(mocks.client.downloadPostFile).toHaveBeenCalledOnce();
-    expect(mocks.client.downloadPostFile).toHaveBeenCalledWith("project-1", "post-1", "111");
+    expect(mocks.client.downloadPostFile).toHaveBeenCalledWith("project-1", "post-1", "111", undefined);
   });
 
   it("본문 조회가 실패해도 첨부 목록은 그대로 받는다", async () => {

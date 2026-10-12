@@ -139,6 +139,7 @@ CLI 에러 발생 시 복구 방법:
 | `멤버를 찾을 수 없습니다: xxx` | 해당 프로젝트에 멤버 없음 | `dooray project members <project>` 로 멤버 목록 확인 |
 | `워크플로우를 찾을 수 없습니다: xxx` | 워크플로우 이름 오류 | `dooray project workflows <project>` 로 확인 |
 | `API 호출 실패 (401)` | API 키 만료/오류 | `dooray doctor` 로 설정 검증 |
+| `mise ERROR No version is set for shim: dooray` | 저장소가 mise 설정(`mise.toml`, `.tool-versions` 등)으로 Node.js 를 고정해, 전역 Node.js 에만 깔린 shim 이 CLI 가 뜨기 전에 실패함. `dooray doctor` 로도 잡을 수 없음 | `mise use -g npm:@bifos/dooray-cli` 로 mise 에 전역 등록 (버전을 생략하면 최신 버전으로 고정됨) |
 | non-TTY 삭제 실행이 종료 코드 3으로 중단됨 | 삭제 확인용 yes 플래그가 없음 | `-y` 또는 `--yes`를 붙여 다시 실행 |
 
 ---

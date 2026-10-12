@@ -5,6 +5,8 @@ import { resolvePostInput } from "../../../resolvers/post-input.js";
 import { openInEditor } from "../../../editor/index.js";
 import { startSpinner, stopSpinner } from "../../../utils/spinner.js";
 import { readBodyInputOrNull } from "../../../utils/body-input.js";
+import { DoorayCliError } from "../../../utils/errors.js";
+import { EXIT_PARAM_ERROR } from "../../../utils/exit-codes.js";
 import type { OutputOptions } from "../../../formatters/table.js";
 import { printJson } from "../../../formatters/table.js";
 import { resolveMember, buildMemberNameMap } from "../../../resolvers/member.js";
@@ -45,10 +47,14 @@ export const commentAddCommand = new Command("add")
 
     if (bodyContent == null) {
       bodyContent = await openInEditor("");
-      if (!bodyContent.trim()) {
-        process.stdout.write("빈 댓글은 작성할 수 없습니다.\n");
-        return;
-      }
+    }
+
+    // --body, --body-file, $EDITOR 어느 경로든 API 호출 전에 빈 본문을 거부한다 (ADR-068)
+    if (!bodyContent.trim()) {
+      throw new DoorayCliError(
+        "댓글 본문이 비어 있습니다. 빈 댓글은 등록하지 않습니다.",
+        EXIT_PARAM_ERROR,
+      );
     }
 
     startSpinner("댓글 추가 중...");

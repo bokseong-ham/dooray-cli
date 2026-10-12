@@ -93,6 +93,7 @@ dooray wiki page replace --id <page-id> --old "TODO" --new "완료" --all
 ## 첨부 일괄 내려받기
 
 ```bash
+dooray wiki page file download <project> <page-id> <file-id> --output-file <path>   # 저장 파일 경로 지정, -o 는 무시
 dooray wiki page file download-all <project> <page-id> -o <dir>
 dooray wiki page file list <project> <page-id>   # type 컬럼으로 general 과 inline_image 구분
 ```

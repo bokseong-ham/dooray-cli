@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import { writeFile, mkdir } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { join } from "node:path";
 import { getConfigOrThrow } from "../../../config/store.js";
 import { DoorayApiClient } from "../../../api/client.js";
 import { resolvePostInput } from "../../../resolvers/post-input.js";
@@ -83,9 +83,9 @@ export const fileDownloadAllCommand = new Command("download-all")
 
     for (const file of targets) {
       try {
-        const { buffer, fileName } = await client.downloadPostFile(projectId, postId, file.id);
-        // CLI7: path-traversal 방지 — basename + decodeURIComponent
-        const safeName = basename(decodeURIComponent(fileName));
+        const { buffer, fileName } = await client.downloadPostFile(projectId, postId, file.id, file.name);
+        // 클라이언트가 이미 basename·NFC 로 정리한 이름이다 (ADR-067)
+        const safeName = fileName;
         const outputPath = join(opts.output, safeName);
         await writeFile(outputPath, Buffer.from(buffer));
         succeeded.push({ path: outputPath, fileName: safeName });

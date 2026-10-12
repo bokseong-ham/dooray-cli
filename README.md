@@ -33,6 +33,9 @@ Node.js 20 이상이 필요해요.
 npm install -g @bifos/dooray-cli
 ```
 
+mise 로 Node.js 를 고정한 저장소에서는 `mise use -g npm:@bifos/dooray-cli` 로 설치해요.
+`npm install -g` 로 깐 `dooray` shim 은 그 저장소에서 `No version is set for shim: dooray` 로 실패해요.
+
 ### 2. Dooray 계정을 연결해요
 
 먼저 Dooray 웹의 **설정 → API → 인증 토큰** 에서 토큰을 만들어요.

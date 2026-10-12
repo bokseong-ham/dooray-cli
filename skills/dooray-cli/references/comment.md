@@ -7,6 +7,8 @@ dooray post comment add <project> <number> --body "댓글 내용"
 dooray post comment add <project> <number> --body-file ./comment.md
 ```
 
+본문이 비었거나 공백뿐이면 등록하지 않고 종료 코드 3 으로 끝난다. `--json` 은 `{"id": "<comment-id>"}` 를, `--quiet` 은 댓글 id 만 낸다.
+
 ## 목록 필터
 
 | 옵션 | 동작 |

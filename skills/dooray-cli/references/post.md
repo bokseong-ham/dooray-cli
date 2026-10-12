@@ -24,6 +24,7 @@ positional 모드에서 세 번째 인자였던 값이 옵션으로 바뀐다.
 dooray post comment edit  --url <url> --comment-id <commentId> --body "..."
 dooray post comment delete --url <url> --comment-id <commentId>
 dooray post file download --url <url> --file-id <fileId> -o ./downloads
+dooray post file download --url <url> --file-id <fileId> --output-file ./downloads/report.pdf   # 저장 파일 경로 지정, -o 는 무시
 dooray post file delete   --url <url> --file-id <fileId>
 dooray post file upload   --url <url> --file ./report.pdf
 ```

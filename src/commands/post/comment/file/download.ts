@@ -1,13 +1,15 @@
 import { Command } from "commander";
-import { writeFile } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { basename } from "node:path";
 import { getConfigOrThrow } from "../../../../config/store.js";
 import { DoorayApiClient } from "../../../../api/client.js";
 import {
   resolveCommentFileInput,
   FILE_ID_SECONDARY_LABEL,
 } from "../../../../resolvers/comment-file-input.js";
+import { checkOutputFile, saveDownload } from "../../../../utils/download-target.js";
 import { startSpinner, stopSpinner } from "../../../../utils/spinner.js";
+import type { OutputOptions } from "../../../../formatters/table.js";
+import { emitDownloadResult } from "../../../../formatters/file-output.js";
 
 export const downloadCommentFileCommand = new Command("download")
   .description(
@@ -22,7 +24,10 @@ export const downloadCommentFileCommand = new Command("download")
   .option("--comment-id <logId>", "댓글 ID (positional 대체)")
   .option("--file-id <fileId>", "파일 ID (positional 대체)")
   .option("--out <path>", "저장 경로 (미지정 시 현재 디렉토리에 원본 파일명으로 저장)", ".")
+  .option("--output-file <path>", "저장할 파일 경로 (지정하면 --out 는 무시)")
   .action(async (arg1, arg2, arg3, arg4, opts) => {
+    const globalOpts = downloadCommentFileCommand.optsWithGlobals() as OutputOptions;
+    await checkOutputFile({ command: downloadCommentFileCommand, dirKey: "out", dirFlag: "--out", outputFile: opts.outputFile });
     const config = await getConfigOrThrow();
     const client = new DoorayApiClient(config.apiKey, config.baseUrl);
 
@@ -39,12 +44,27 @@ export const downloadCommentFileCommand = new Command("download")
     });
 
     startSpinner("파일 다운로드 중...");
-    const { buffer, fileName } = await client.downloadPostFile(projectId, postId, fileId);
+    try {
+      const { buffer, fileName } = await client.downloadPostFile(projectId, postId, fileId);
 
-    const safeName = basename(fileName);
-    const outputPath = join(opts.out, safeName);
-    await writeFile(outputPath, Buffer.from(buffer));
-    stopSpinner(true, "다운로드 완료");
+      const safeName = fileName;
+      const outputPath = await saveDownload(
+        {
+          command: downloadCommentFileCommand,
+          dirKey: "out",
+          dirFlag: "--out",
+          dirValue: opts.out,
+          outputFile: opts.outputFile,
+          fileName: safeName,
+        },
+        new Uint8Array(buffer),
+      );
+      stopSpinner(true, "다운로드 완료");
 
-    process.stdout.write(`${outputPath}\n`);
+      // ADR-031: --json / --quiet / plain 3 모드 분기
+      emitDownloadResult(globalOpts, { outputPath, fileName: basename(outputPath), size: buffer.byteLength });
+    } catch (e) {
+      stopSpinner(false);
+      throw e;
+    }
   });

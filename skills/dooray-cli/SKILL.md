@@ -203,13 +203,13 @@ dooray post get <project> <number> --json --with-tag-names
 | 의도 | 커맨드 |
 | --- | --- |
 | 첨부 목록 | `dooray post file list <project> <number>` |
-| 첨부 다운로드 | `dooray post file download <project> <number> <file-id>` |
+| 첨부 다운로드 | `dooray post file download <project> <number> <file-id>` — 저장 파일 경로를 정하려면 `--output-file <path>` (주면 `-o` 는 무시) |
 | 첨부 일괄 다운로드 | `dooray post file download-all <project> <number>` — 첨부 목록과 본문에 삽입된 파일을 함께 받는다. 본문 쪽을 빼려면 `--no-inline` |
 | 첨부 업로드 | `dooray post file upload <project> <number> <file-path>` |
 | 첨부 삭제 | `dooray post file delete <project> <number> <file-id>` — 확인 있음, `-y`/`--yes`로 생략 |
 | 댓글 첨부 목록 | `dooray post comment file list <project> <number> <comment-id>` |
 | 댓글 첨부 업로드 | `dooray post comment file upload <project> <number> <comment-id> <path>` — 댓글 본문이 `text/html` 이면 파일을 올리기 전에 종료 코드 3 으로 멈춘다 |
-| 댓글 첨부 다운로드 | `dooray post comment file download <project> <number> <comment-id> <file-id>` — 저장 경로는 `--out <path>` 다. 다른 download 명령의 `-o, --output <dir>` 와 옵션 이름이 다르다 |
+| 댓글 첨부 다운로드 | `dooray post comment file download <project> <number> <comment-id> <file-id>` — 저장 경로는 `--out <path>` 다. 다른 download 명령의 `-o, --output <dir>` 와 옵션 이름이 다르다. 저장 파일 경로를 정하려면 `--output-file <path>` (주면 `--out` 은 무시). `--json` 은 `{ outputPath, fileName, size }` |
 | 댓글 첨부 삭제 | `dooray post comment file delete <project> <number> <comment-id> <file-id>` — 확인 있음, `-y`/`--yes`로 생략. 본문에서 그 파일의 참조를 찾지 못하면 본문도 파일도 건드리지 않고 종료 코드 3 으로 멈춘다 |
 
 - 댓글 파일 업로드는 이미지 확장자면 이미지 마크다운을, 그 외에는 일반 링크를 만든다.
@@ -240,7 +240,7 @@ dooray post get <project> <number> --json --with-tag-names
 | 페이지 삭제 | `dooray wiki page delete <project> <page-id>` — 확인 있음, `-y`/`--yes`로 생략. 하위 페이지는 삭제한 페이지의 부모 아래로 재부착되어 orphan 이 생기지 않는다 |
 | 첨부 목록 | `dooray wiki page file list <project> <page-id>` — general 과 inline 을 합쳐 보여준다 |
 | 첨부 업로드 | `dooray wiki page file upload <project> <page-id> --file <path> [--type inline_image]` |
-| 첨부 다운로드 | `dooray wiki page file download <project> <page-id> --file-id <id> -o <dir>` |
+| 첨부 다운로드 | `dooray wiki page file download <project> <page-id> --file-id <id> -o <dir>` — 저장 파일 경로를 정하려면 `--output-file <path>` (주면 `-o` 는 무시) |
 | 첨부 일괄 다운로드 | `dooray wiki page file download-all <project> <page-id> -o <dir>` |
 | 첨부 삭제 | `dooray wiki page file delete <project> <page-id> --file-id <id>` — 확인 있음, `-y`/`--yes`로 생략 |
 | 댓글 목록 | `dooray wiki page comment list <project> <page-id> [--latest N]` (최신순) |

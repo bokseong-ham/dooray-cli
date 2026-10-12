@@ -160,6 +160,24 @@ dooray post file download-all <project> 42 -o ./files --no-inline
 본문에 이미지를 붙여 넣기만 한 업무는 첨부 목록이 비어 있어도 그 이미지를 받는다.
 본문 쪽을 제외하려면 `--no-inline` 을 준다.
 
+### 한 파일 내려받기와 저장 이름
+
+```bash
+dooray post file download <project> 42 <file-id> -o ./files
+dooray post file download <project> 42 <file-id> --output-file ./files/보고서.pdf
+dooray post comment file download <project> 42 <comment-id> <file-id> --output-file ./보고서.pdf
+dooray wiki page file download <project> <page-id> <file-id> --output-file ./가이드.pdf
+```
+
+저장 이름은 서버가 보낸 `Content-Disposition` 에서 풀어 NFC 로 정규화한다.
+이름을 풀지 못하거나 255바이트를 넘으면 첨부 목록의 이름, 그것도 안 되면 `<file-id>.<확장자>` 로 저장한다.
+
+`--output-file <path>` 는 저장 파일 경로를 직접 정한다. 부모 디렉터리가 없으면 만든다.
+디렉터리 옵션(`-o, --output`, 댓글 첨부는 `--out`)을 함께 주면 디렉터리 옵션을 무시하고 stderr 로 경고한다.
+`download-all` 에는 이 옵션이 없다.
+
+`--json` 은 세 명령 모두 `{ outputPath, fileName, size }` 를 낸다. `--json` 은 명령 앞뒤 어디에 둬도 된다.
+
 ## 삭제 명령의 확인
 
 | 영역 | 삭제 명령 |

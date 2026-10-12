@@ -4,6 +4,7 @@ import { readFile, stat } from "node:fs/promises";
 import { basename } from "node:path";
 import { DoorayCliError } from "../utils/errors.js";
 import { normalizeDoorayMessage } from "../utils/dooray-message.js";
+import { fallbackFileName, parseContentDispositionFileName } from "../utils/content-disposition.js";
 import { EXIT_API_ERROR, EXIT_AUTH_ERROR } from "../utils/exit-codes.js";
 import { createTokenBucket, parseRateLimitHeaders } from "./rate-limiter.js";
 import { parseJsonPreservingLargeIntegers } from "./json-large-integer.js";
@@ -720,7 +721,13 @@ export class DoorayApiClient {
     }
   }
 
-  async downloadPostFile(projectId: string, postId: string, fileId: string): Promise<{ buffer: ArrayBuffer; fileName: string }> {
+  // fileName 은 ADR-067 규칙으로 푼 안전한 저장 이름이다. knownName 은 호출자가 이미 가진 목록의 name 이다.
+  async downloadPostFile(
+    projectId: string,
+    postId: string,
+    fileId: string,
+    knownName?: string,
+  ): Promise<{ buffer: ArrayBuffer; fileName: string }> {
     try {
       const res = await this.api
         .get(`project/v1/projects/${projectId}/posts/${postId}/files/${fileId}`, {
@@ -743,10 +750,15 @@ export class DoorayApiClient {
       }
 
       const disposition = fileRes.headers.get("content-disposition");
-      let fileName = `file-${fileId}`;
-      if (disposition) {
-        const match = disposition.match(/filename\*?=(?:UTF-8''|"?)([^";]+)/i);
-        if (match) fileName = decodeURIComponent(match[1].replace(/"/g, ""));
+      let fileName = parseContentDispositionFileName(disposition);
+      if (!fileName) {
+        let listName = knownName;
+        if (!listName) {
+          // 디코딩에 실패했을 때만 목록을 조회한다 (호출 수 증가를 실패 경로로 한정)
+          const list = await this.getPostFiles(projectId, postId).catch(() => null);
+          listName = list?.result.find((f) => f.id === fileId)?.name;
+        }
+        fileName = fallbackFileName(fileId, listName, disposition);
       }
 
       const buffer = await fileRes.arrayBuffer();
@@ -872,6 +884,7 @@ export class DoorayApiClient {
     wikiId: string,
     pageId: string,
     fileId: string,
+    knownName?: string,
   ): Promise<{ buffer: ArrayBuffer; fileName: string }> {
     try {
       const res = await this.api
@@ -902,11 +915,15 @@ export class DoorayApiClient {
       }
 
       const disposition = fileRes.headers.get("content-disposition");
-      let fileName = `file-${fileId}`;
-      if (disposition) {
-        const match = disposition.match(/filename\*?=(?:UTF-8''|"?)([^";]+)/i);
-        // basename 으로 path traversal 방지 (서버 응답 헤더의 ../ 등 제거)
-        if (match) fileName = basename(decodeURIComponent(match[1].replace(/"/g, "")));
+      let fileName = parseContentDispositionFileName(disposition);
+      if (!fileName) {
+        let listName = knownName;
+        if (!listName) {
+          const page = await this.getWikiPage(wikiId, pageId).catch(() => null);
+          const files = [...(page?.result.files ?? []), ...(page?.result.images ?? [])];
+          listName = files.find((f) => f.id === fileId)?.name;
+        }
+        fileName = fallbackFileName(fileId, listName, disposition);
       }
 
       const buffer = await fileRes.arrayBuffer();
