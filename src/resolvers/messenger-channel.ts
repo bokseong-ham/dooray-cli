@@ -24,7 +24,7 @@ export async function resolveMessengerChannel(
   const match = matchByName(adapter, input, "대화방", (ch) => `${ch.name} (${ch.id})`, {
     // matchByName 이 앞에 "전체 목록: " 을 붙인다. 1:1 방은 제목이 없어 이름으로 못 찾으므로 id 를 얻는 길을 알린다.
     helpHint:
-      "dooray messenger channels — 여기서 찾은 channelId 직접 입력 (1:1 방은 제목이 없어 id 로만 넘길 수 있다)",
+      "dooray messenger channels --all — 여기서 찾은 channelId 직접 입력 (1:1 방은 제목이 없어 id 로만 넘길 수 있다. --all 이 없으면 숨긴 방과 보관된 방은 목록에서 빠진다)",
   });
   return match.id;
 }

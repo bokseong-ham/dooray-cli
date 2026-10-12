@@ -90,6 +90,44 @@ function isActive(ch: MessengerChannel): boolean {
   );
 }
 
+/** 기본 목록에서 빠진 이유별 방 수. 보관(`archivedAt`·`archived`) → 숨김 → 그 밖의 `status` 순으로 한 방을 한 번만 센다. */
+export interface ExcludedCounts {
+  archived: number;
+  hidden: number;
+  otherStatus: number;
+}
+
+/**
+ * 기본 제외로 빠진 방을 이유별로 센다. `--type`·`--since` 로 어차피 빠질 방은 세지 않는다.
+ * 사용자가 거른 조건에서 `--all` 만 더하면 나오는 방 수여야 알림이 맞다.
+ */
+export function countExcludedByDefault(
+  channels: MessengerChannel[],
+  opts: { type?: string; sinceMs?: number },
+): ExcludedCounts {
+  const counts: ExcludedCounts = { archived: 0, hidden: 0, otherStatus: 0 };
+  for (const ch of channels) {
+    if (isActive(ch)) continue;
+    if (opts.type != null && ch.type !== opts.type) continue;
+    if (opts.sinceMs != null && updatedAtMs(ch) < opts.sinceMs) continue;
+    if (ch.archivedAt || ch.status === "archived") counts.archived++;
+    else if (ch.displayed === false) counts.hidden++;
+    else counts.otherStatus++;
+  }
+  return counts;
+}
+
+/** 제외된 방이 있으면 stderr 로 한 줄 알릴 문구. 없으면 null. stdout 은 건드리지 않는다. */
+export function formatExcludedNotice(counts: ExcludedCounts, resultCount: number): string | null {
+  const parts: string[] = [];
+  if (counts.hidden > 0) parts.push(`숨긴 방 ${counts.hidden}개`);
+  if (counts.archived > 0) parts.push(`보관된 방 ${counts.archived}개`);
+  if (counts.otherStatus > 0) parts.push(`시스템·삭제 등 status 가 normal 이 아닌 방 ${counts.otherStatus}개`);
+  if (parts.length === 0) return null;
+  const tail = resultCount === 0 ? " 찾는 방이 이 안에 있을 수 있다." : "";
+  return `ℹ  ${parts.join(", ")}를 뺐다. --all 로 모두 본다.${tail}\n`;
+}
+
 function updatedAtMs(ch: MessengerChannel): number {
   const ms = ch.updatedAt ? Date.parse(ch.updatedAt) : NaN;
   return Number.isNaN(ms) ? -Infinity : ms;
@@ -160,7 +198,9 @@ function matchesSearch(
   return others.some((id) => nameMap.get(id)?.toLowerCase().includes(keyword) ?? false);
 }
 
-function channelKind(type: string): string {
+// 응답에 type 이 없을 수 있어 빈 문자열로 받는다.
+function channelKind(type: string | undefined): string {
+  if (type == null) return "";
   return CHANNEL_KIND_LABELS.get(type) ?? type;
 }
 
@@ -183,6 +223,11 @@ async function fallbackMyId(
   }
 }
 
+// id 가 없는 방은 --quiet 의 id 줄에서 뺀다.
+function channelIds(channels: MessengerChannel[]): string[] {
+  return channels.map((ch) => ch.id).filter((id): id is string => !!id);
+}
+
 export const messengerChannelsCommand = new Command("channels")
   .description(
     "내가 속한 메신저 대화방 목록 (updatedAt(수정 시각) 최신순). logs·channel-send 에 넘길 id 를 찾는다",
@@ -198,7 +243,7 @@ export const messengerChannelsCommand = new Command("channels")
     "--since <date>",
     "updatedAt(수정 시각)이 이 시각 이후인 방만 (YYYY-MM-DD 또는 offset 붙은 ISO8601)",
   )
-  .option("--all", "보관된 방, 숨긴 방, 시스템 방도 포함")
+  .option("--all", "보관된 방, 숨긴 방, status 가 normal 이 아닌 방(system·archived·deleted)도 포함")
   .action(async (opts: ChannelsOptions) => {
     const globalOpts = messengerChannelsCommand.optsWithGlobals() as OutputOptions;
 
@@ -211,9 +256,12 @@ export const messengerChannelsCommand = new Command("channels")
 
     startSpinner("대화방 조회 중...");
     let channels: MessengerChannel[];
+    let excluded: ExcludedCounts | undefined;
     try {
       const res = await client.getMessengerChannels();
-      channels = filterAndSortChannels(res.result ?? [], { type: opts.type, sinceMs, all: opts.all });
+      const received = res.result ?? [];
+      channels = filterAndSortChannels(received, { type: opts.type, sinceMs, all: opts.all });
+      if (!opts.all) excluded = countExcludedByDefault(received, { type: opts.type, sinceMs });
     } catch (e) {
       stopSpinner(false);
       throw e;
@@ -222,19 +270,19 @@ export const messengerChannelsCommand = new Command("channels")
     // 표는 이름 열에, --search 는 제목 없는 방의 매칭에 이름이 필요하다.
     // --json·--quiet 만 있으면 이름을 쓰지 않으므로 방마다 붙는 멤버 조회를 건너뛴다.
     const tableMode = !globalOpts.json && !globalOpts.quiet;
-    const labels = new Map<string, string>();
+    const labels = new Map<MessengerChannel, string>();
     if (keyword != null || tableMode) {
       const untitled = channels.filter((ch) => !ch.title);
       let nameMap: Map<string, string>;
-      const othersById = new Map<string, string[]>();
+      const othersByChannel = new Map<MessengerChannel, string[]>();
       try {
         const myFallback = await fallbackMyId(client, untitled);
         for (const ch of untitled) {
-          othersById.set(ch.id, otherParticipantIds(ch, ch.me?.member?.organizationMemberId ?? myFallback));
+          othersByChannel.set(ch, otherParticipantIds(ch, ch.me?.member?.organizationMemberId ?? myFallback));
         }
         // 나는 조회하지 않는다. 검색은 모든 참여자가 대상이고, 표만 그릴 때는 화면에 나올 앞 몇 명이면 된다.
         const lookupIds = untitled.flatMap((ch) => {
-          const others = othersById.get(ch.id)!;
+          const others = othersByChannel.get(ch)!;
           return keyword != null ? others : others.slice(0, MAX_NAMES_IN_LABEL);
         });
         nameMap = await buildOrganizationMemberNameMap(client, lookupIds);
@@ -242,7 +290,7 @@ export const messengerChannelsCommand = new Command("channels")
         if (tableMode) {
           for (const ch of channels) {
             const myId = ch.me?.member?.organizationMemberId ?? myFallback;
-            labels.set(ch.id, ch.title || buildUntitledLabel(ch, myId, nameMap));
+            labels.set(ch, ch.title || buildUntitledLabel(ch, myId, nameMap));
           }
         }
       } catch (e) {
@@ -252,11 +300,11 @@ export const messengerChannelsCommand = new Command("channels")
 
       if (keyword != null) {
         channels = channels.filter((ch) =>
-          matchesSearch(ch, othersById.get(ch.id) ?? [], nameMap, keyword),
+          matchesSearch(ch, othersByChannel.get(ch) ?? [], nameMap, keyword),
         );
         // 이름을 못 얻은 참여자로는 찾을 수 없다. 조용히 빠지면 "그 사람과의 방이 없다" 로 읽히므로 알린다.
         const unresolved = new Set(
-          untitled.flatMap((ch) => othersById.get(ch.id)!).filter((id) => !nameMap.has(id)),
+          untitled.flatMap((ch) => othersByChannel.get(ch)!).filter((id) => !nameMap.has(id)),
         );
         if (unresolved.size > 0) {
           process.stderr.write(
@@ -268,6 +316,10 @@ export const messengerChannelsCommand = new Command("channels")
 
     stopSpinner(true, channels.length > 0 ? "조회 완료" : "대화방 없음");
 
+    // 기본 제외로 빠진 방을 알린다. 빈 결과가 「방이 없다」 로 읽히지 않게 하는 것이 목적이라 stdout 은 그대로 둔다.
+    const notice = excluded ? formatExcludedNotice(excluded, channels.length) : null;
+    if (notice) process.stderr.write(notice);
+
     if (globalOpts.json) {
       // 서버 응답 원형 (필터·정렬만 적용) — 만든 표시명을 끼워넣지 않는다.
       printJson(channels);
@@ -277,7 +329,7 @@ export const messengerChannelsCommand = new Command("channels")
     if (globalOpts.quiet) {
       // 빈 배열에 printQuiet 를 부르면 빈 줄 하나가 나간다. 아무것도 내지 않는다.
       if (channels.length > 0) {
-        output(globalOpts, { headers: [], rows: [], raw: channels, ids: channels.map((ch) => ch.id) });
+        output(globalOpts, { headers: [], rows: [], raw: channels, ids: channelIds(channels) });
       }
       return;
     }
@@ -289,16 +341,16 @@ export const messengerChannelsCommand = new Command("channels")
 
     const rows = channels.map((ch) => [
       // 서버가 준 문자열은 외부 통제 값이라 출력 직전 control char 를 없앤다.
-      sanitizeForTerminal(labels.get(ch.id) ?? ""),
+      sanitizeForTerminal(labels.get(ch) ?? ""),
       sanitizeForTerminal(channelKind(ch.type)),
       // formatSentAt 은 형식이 다르면 원문을 그대로 돌려주므로 시각도 거친다.
       sanitizeForTerminal(formatSentAt(ch.updatedAt)),
-      sanitizeForTerminal(ch.id),
+      sanitizeForTerminal(ch.id ?? ""),
     ]);
     output(globalOpts, {
       headers: ["이름", "종류", "수정 시각", "id"],
       rows,
       raw: channels,
-      ids: channels.map((ch) => ch.id),
+      ids: channelIds(channels),
     });
   });

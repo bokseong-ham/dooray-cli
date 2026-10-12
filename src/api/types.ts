@@ -668,6 +668,8 @@ export interface MessengerChannelUser {
 }
 
 // direct 방과 일부 private 방은 title 이 빈값이다 (ADR-066).
+// `id`·`type` 은 응답에 빠질 수 있어 `messenger channels` 의 표 출력은 둘이 없는 방도 방어한다.
+// 필수로 선언한 것은 title 매칭(resolveMessengerChannel)이 두 값이 있다고 보기 때문이다.
 // title 매칭(resolveMessengerChannel)은 id·title·type 만 쓰고, 나머지는 `messenger channels` 가 쓴다.
 export interface MessengerChannel {
   id: string;
@@ -676,7 +678,10 @@ export interface MessengerChannel {
   type: string;
   /** 공식 문서: `system` / `normal` / `archived` / `deleted` */
   status?: string;
-  /** 공식 문서의 응답 예시 주석: 숨기기 여부. `false` 면 숨긴 방이다. */
+  /**
+   * 공식 문서의 응답 예시 주석은 「숨기기 여부」 뿐이라 `true`·`false` 중 무엇이 숨김인지 정해지지 않는다.
+   * 2026-10-13 숨기기 `true` → `false`, 해제 `false` → `true` 를 양방향으로 실측했다. `false` 가 숨긴 방이다.
+   */
   displayed?: boolean;
   capacity?: number;
   createdAt?: string;
