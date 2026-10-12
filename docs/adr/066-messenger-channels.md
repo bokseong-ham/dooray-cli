@@ -38,7 +38,8 @@ endpoint 는 `resolveMessengerChannel` 이 이름 해석에 이미 쓰고 있었
 - **`displayed` 방향 실측 (2026-10-13).** 메신저에서 그룹(`private`) 방 하나를 「숨기기」 한 직후 `channels --all --json` 을 다시 받았다.
   그 방의 `displayed` 가 `true` → `false` 로 바뀌었고 `false` 인 방은 17개 → 18개가 되었다(늘어난 1개가 그 방이다).
   기본 목록의 `--search` 로는 그 방이 찾히지 않았다. `false` 가 숨긴 방이라는 해석이 확인됐다.
-  **숨김을 해제했을 때 `true` 로 돌아오는지는 UI 에서 해제 방법을 찾지 못해 확인하지 못했다.**
+  같은 방의 숨김을 해제하자 `displayed` 가 `false` → `true` 로 돌아왔고 `false` 인 방은 18개 → 17개가 되었다.
+  숨기기 `true` → `false`, 해제 `false` → `true` 양방향을 실측했다(2026-10-13).
 - **`title` 이 빈 방이 154개다.** 1:1 방 144개 전부와 그룹방 10개다.
 - `users.participants` 는 `{ type, member: { organizationMemberId } }` 의 배열이고 **이름이 없다.**
   `me` 는 `{ type, member: { organizationMemberId }, role }` 이다.
