@@ -136,11 +136,8 @@ done
 
 `Edit`, `Write`, `MultiEdit` 가 Markdown 파일을 바꿀 때만 훅이 돈다.
 Bash 로 만든 `.md` 는 훅을 거치지 않는다.
-그래서 만든 방법과 무관하게 파일 경로로 검사기를 직접 실행한다.
-
-```bash
-~/.claude/scripts/korean-check.sh <파일>
-```
+그래서 만든 방법과 무관하게 `/fos-skills:korean-check` 스킬을 호출해 대상 파일을 검사한다.
+검사기의 위치와 판정 기준은 그 스킬이 소유한다.
 
 검사기가 잡지 못하는 항목만 수동으로 본다.
 
