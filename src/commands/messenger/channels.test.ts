@@ -717,6 +717,97 @@ describe("messenger channels — 표 출력", () => {
   });
 });
 
+describe("messenger channels — 기본 제외 알림", () => {
+  it("제외된 방이 있으면 이유별 수를 stderr 로 한 줄 알린다", async () => {
+    setServerChannels([TEAM, HIDDEN, ARCHIVED, SYSTEM]);
+    await run(["--json", "messenger", "channels"]);
+    expect(lastStderr).toBe(
+      "ℹ  숨긴 방 1개, 보관된 방 1개, 시스템·삭제 등 status 가 normal 이 아닌 방 1개를 뺐다. --all 로 모두 본다.\n",
+    );
+  });
+
+  it("제외된 방이 없으면 알리지 않는다", async () => {
+    setServerChannels([TEAM, DM_HONG]);
+    await run(["--json", "messenger", "channels"]);
+    expect(lastStderr).toBe("");
+  });
+
+  it("--all 이면 알리지 않는다", async () => {
+    setServerChannels([TEAM, HIDDEN, ARCHIVED]);
+    await run(["--json", "messenger", "channels", "--all"]);
+    expect(lastStderr).toBe("");
+  });
+
+  it("--type·--since 로 어차피 빠질 방은 세지 않는다", async () => {
+    const hiddenDm = channel({ id: "ch-hidden-dm", type: "direct", displayed: false });
+    setServerChannels([TEAM, HIDDEN, hiddenDm]);
+    await run(["--json", "messenger", "channels", "--type", "direct"]);
+    expect(lastStderr).toBe("ℹ  숨긴 방 1개를 뺐다. --all 로 모두 본다. 찾는 방이 이 안에 있을 수 있다.\n");
+    await run(["--json", "messenger", "channels", "--since", "2026-09-25"]);
+    expect(lastStderr).toBe("");
+  });
+
+  it("결과가 0건이면 찾는 방이 제외된 방 안에 있을 수 있다고 덧붙인다", async () => {
+    setServerChannels([HIDDEN]);
+    await run(["--quiet", "messenger", "channels", "--search", "숨긴"]);
+    expect(lastStderr).toContain("찾는 방이 이 안에 있을 수 있다");
+  });
+
+  it("stdout 은 알림과 상관없이 같다 (--json·--quiet)", async () => {
+    setServerChannels([TEAM, HIDDEN]);
+    expect(await run(["--quiet", "messenger", "channels"])).toBe(`${TEAM.id}\n`);
+    expect(await runJson(["messenger", "channels"])).toEqual([TEAM]);
+    setServerChannels([HIDDEN]);
+    expect(await run(["--quiet", "messenger", "channels"])).toBe("");
+  });
+});
+
+describe("messenger channels — type·id 가 없는 응답", () => {
+  const NO_TYPE = withoutKey(
+    channel({ id: "ch-no-type", title: "종류 없는 방" }),
+    "type",
+  );
+  const NO_ID = withoutKey(channel({ id: "x", title: "id 없는 방" }), "id");
+
+  it("type 이 없어도 표가 죽지 않고 종류 칸을 비운다", async () => {
+    setServerChannels([NO_TYPE]);
+    const out = await run(["messenger", "channels"]);
+    expect(tableRow(out, NO_TYPE.id)[1]).toBe("");
+  });
+
+  it("제목 없는 방에 type 이 없어도 표시명을 만든다", async () => {
+    const untitled = withoutKey(
+      channel({ id: "ch-untitled-no-type", users: { participants: [ME_ID, HONG_ID].map(participant) } }),
+      "type",
+    );
+    setServerChannels([untitled]);
+    const out = await run(["messenger", "channels"]);
+    expect(tableRow(out, untitled.id)[0]).toBe("홍길동");
+  });
+
+  it("id 가 없어도 표가 죽지 않고 --quiet 은 그 방을 id 줄에서 뺀다", async () => {
+    setServerChannels([NO_ID, TEAM]);
+    const out = await run(["messenger", "channels"]);
+    expect(out).toContain("id 없는 방");
+    expect(await run(["--quiet", "messenger", "channels"])).toBe(`${TEAM.id}\n`);
+  });
+
+  it("id 가 없는 제목 없는 방이 둘이어도 표시명이 섞이지 않는다", async () => {
+    const a = withoutKey(
+      channel({ id: "a", type: "direct", users: { participants: [ME_ID, HONG_ID].map(participant) } }),
+      "id",
+    );
+    const b = withoutKey(
+      channel({ id: "b", type: "direct", users: { participants: [ME_ID, KIM_ID].map(participant) } }),
+      "id",
+    );
+    setServerChannels([a, b]);
+    const out = await run(["messenger", "channels"]);
+    expect(out).toContain("DM: 홍길동");
+    expect(out).toContain("DM: 김철수");
+  });
+});
+
 describe("messenger channels — 0건", () => {
   beforeEach(() => setServerChannels([]));
 
