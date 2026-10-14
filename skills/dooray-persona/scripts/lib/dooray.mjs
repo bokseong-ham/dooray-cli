@@ -1,5 +1,6 @@
+import { execFile } from "node:child_process";
 import { readFile } from "node:fs/promises";
-import { homedir } from "node:os";
+import { homedir, userInfo } from "node:os";
 import { join } from "node:path";
 
 const EMPTY_PAGE_RETRY_DELAY_MS = 1_000;
@@ -15,8 +16,42 @@ function configError(configPath) {
   );
 }
 
+/**
+ * macOS 에서 dooray CLI 는 API 토큰을 config.json 이 아니라 로그인 키체인에 둔다.
+ * 읽기는 argv 에 비밀값이 없어 execFile 로 불러도 된다. 항목이 없으면 undefined 다.
+ */
+export function readKeychainApiKey() {
+  return new Promise((resolve, reject) => {
+    execFile(
+      "/usr/bin/security",
+      ["find-generic-password", "-s", "dooray-cli", "-a", "apiKey", "-w"],
+      // security 는 로그인 키체인을 $HOME 에서 찾는다. HOME 이 바뀌어 있어도 계정의 실제 홈을 쓴다.
+      { env: { ...process.env, HOME: userInfo().homedir } },
+      (error, stdout, stderr) => {
+        if (error) {
+          if (error.code === 44) {
+            resolve(undefined);
+            return;
+          }
+          reject(
+            new Error(
+              `macOS 키체인에서 Dooray API 토큰을 읽지 못했습니다: ${String(stderr).trim() || error.message}\n` +
+                "로그인 키체인이 잠겨 있거나 접근이 거부됐을 수 있습니다.",
+            ),
+          );
+          return;
+        }
+        // 끝 개행 하나만 뗀다. 값 앞뒤의 공백은 값의 일부다.
+        const value = String(stdout);
+        resolve(value.endsWith("\n") ? value.slice(0, -1) : value);
+      },
+    );
+  });
+}
+
 export async function loadApiConfig(
   configPath = join(homedir(), ".dooray", "config.json"),
+  { platform = process.platform, readKeychain = readKeychainApiKey } = {},
 ) {
   let raw;
   try {
@@ -34,6 +69,13 @@ export async function loadApiConfig(
   }
 
   const config = JSON.parse(raw);
+  // macOS 에서 키체인으로 옮겨진 뒤에는 파일에 apiKey 가 없다. 그때만 키체인을 본다.
+  const fileApiKeyMissing =
+    typeof config.apiKey !== "string" || config.apiKey.trim() === "";
+  if (fileApiKeyMissing && platform === "darwin") {
+    const keychainApiKey = await readKeychain();
+    if (keychainApiKey !== undefined) config.apiKey = keychainApiKey;
+  }
   if (
     typeof config.apiKey !== "string" ||
     config.apiKey.trim() === "" ||

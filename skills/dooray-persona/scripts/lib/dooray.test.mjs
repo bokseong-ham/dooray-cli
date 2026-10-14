@@ -1,5 +1,5 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { tmpdir, userInfo } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
@@ -8,7 +8,13 @@ import {
   getAllPages,
   getMe,
   loadApiConfig,
+  readKeychainApiKey,
 } from "./dooray.mjs";
+
+const { execFileMock } = vi.hoisted(() => ({ execFileMock: vi.fn() }));
+
+// 실제 security 를 띄우지 않는다.
+vi.mock("node:child_process", () => ({ execFile: execFileMock }));
 
 const MEMBER_ID = "1234567890123456789";
 const OTHER_MEMBER_ID = "9876543210987654321";
@@ -164,5 +170,98 @@ describe("loadApiConfig", () => {
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
+  });
+});
+
+describe("loadApiConfig 키체인", () => {
+  async function withConfig(content, fn) {
+    const directory = await mkdtemp(join(tmpdir(), "dooray-persona-"));
+    const configPath = join(directory, "config.json");
+    try {
+      await writeFile(configPath, JSON.stringify(content));
+      await fn(configPath);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  }
+
+  const BASE_URL = "https://api.dooray.com";
+
+  it("macOS 에서 파일에 apiKey 가 없으면 키체인 값을 쓴다", async () => {
+    await withConfig({ version: 1, baseUrl: BASE_URL }, async (configPath) => {
+      const readKeychain = vi.fn().mockResolvedValue("dummy-keychain-key");
+
+      await expect(
+        loadApiConfig(configPath, { platform: "darwin", readKeychain }),
+      ).resolves.toEqual({ apiKey: "dummy-keychain-key", baseUrl: BASE_URL });
+      expect(readKeychain).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("macOS 에서도 파일에 apiKey 가 있으면 키체인을 부르지 않는다", async () => {
+    await withConfig(
+      { version: 1, apiKey: "dummy-file-key", baseUrl: BASE_URL },
+      async (configPath) => {
+        const readKeychain = vi.fn();
+
+        await expect(
+          loadApiConfig(configPath, { platform: "darwin", readKeychain }),
+        ).resolves.toEqual({ apiKey: "dummy-file-key", baseUrl: BASE_URL });
+        expect(readKeychain).not.toHaveBeenCalled();
+      },
+    );
+  });
+
+  it("macOS 가 아니면 키체인을 부르지 않고 dooray setup 을 안내한다", async () => {
+    await withConfig({ version: 1, baseUrl: BASE_URL }, async (configPath) => {
+      const readKeychain = vi.fn();
+
+      await expect(
+        loadApiConfig(configPath, { platform: "linux", readKeychain }),
+      ).rejects.toThrow(/dooray setup/);
+      expect(readKeychain).not.toHaveBeenCalled();
+    });
+  });
+
+  it("키체인에도 없으면 dooray setup 을 안내한다", async () => {
+    await withConfig({ version: 1, apiKey: "", baseUrl: BASE_URL }, async (configPath) => {
+      const readKeychain = vi.fn().mockResolvedValue(undefined);
+
+      await expect(
+        loadApiConfig(configPath, { platform: "darwin", readKeychain }),
+      ).rejects.toThrow(/dooray setup/);
+    });
+  });
+});
+
+describe("readKeychainApiKey", () => {
+  it("dooray-cli 서비스의 apiKey 항목을 읽고 끝 개행 하나만 뗀다", async () => {
+    execFileMock.mockImplementationOnce((_file, _args, _options, callback) => {
+      callback(null, " dummy-key \n", "");
+    });
+
+    await expect(readKeychainApiKey()).resolves.toBe(" dummy-key ");
+    expect(execFileMock).toHaveBeenCalledWith(
+      "/usr/bin/security",
+      ["find-generic-password", "-s", "dooray-cli", "-a", "apiKey", "-w"],
+      { env: expect.objectContaining({ HOME: userInfo().homedir }) },
+      expect.any(Function),
+    );
+  });
+
+  it("종료 코드 44 는 항목 없음이라 undefined 다", async () => {
+    execFileMock.mockImplementationOnce((_file, _args, _options, callback) => {
+      callback(Object.assign(new Error("exit 44"), { code: 44 }), "", "not found");
+    });
+
+    await expect(readKeychainApiKey()).resolves.toBeUndefined();
+  });
+
+  it("그 밖의 실패는 키체인 안내와 함께 던진다", async () => {
+    execFileMock.mockImplementationOnce((_file, _args, _options, callback) => {
+      callback(Object.assign(new Error("exit 51"), { code: 51 }), "", "locked");
+    });
+
+    await expect(readKeychainApiKey()).rejects.toThrow(/키체인/);
   });
 });

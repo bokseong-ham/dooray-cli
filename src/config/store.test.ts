@@ -40,6 +40,13 @@ vi.mock("node:fs/promises", () => ({
   unlink: unlinkMock,
 }));
 
+// 실행 OS 와 무관하게 파일 모드로 고정한다. macOS 에서 실제 키체인을 건드리지 않게 한다.
+// 키체인 모드는 store.keychain.test.ts 가 가짜 저장소로 검증한다.
+vi.mock("./secret-store.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./secret-store.js")>()),
+  getSecretStore: () => null,
+}));
+
 const ENOENT = () => Object.assign(new Error("ENOENT"), { code: "ENOENT" });
 
 function writtenConfig(): Record<string, unknown> {
