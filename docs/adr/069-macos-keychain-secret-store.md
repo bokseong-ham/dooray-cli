@@ -2,10 +2,11 @@
 
 **결정**: macOS 에서 `apiKey` 와 `imapPassword` 를 `~/.dooray/config.json` 이 아니라 로그인 키체인에 저장한다.
 service 는 `dooray-cli`, account 는 필드 이름(`apiKey`, `imapPassword`)이다.
+config 경로가 계정 홈의 기본 경로가 아니면 account 에 경로 해시를 붙인다(아래 「account 규칙」).
 옵트인 설정 없이 기본으로 쓴다. macOS 가 아닌 OS 는 지금처럼 config.json 에 0600 평문으로 저장한다.
 
 - 비밀 저장소는 `src/config/secret-store.ts` 의 `SecretStore` 인터페이스(`get`·`set`·`delete`) 뒤에 둔다.
-  `getSecretStore()` 가 macOS 에서 키체인 구현을, 그 밖에서 `null` 을 돌려준다.
+  `getSecretStore(configPath)` 가 macOS 에서 키체인 구현을, 그 밖에서 `null` 을 돌려준다.
   Linux·Windows 백엔드는 이 인터페이스를 구현해 붙인다.
 - 호출부는 바꾸지 않는다. `src/config/store.ts` 의 `getConfig`·`saveConfig`·`setConfigValue`·`clearMailCredentials` 가
   저장 위치를 감춘다.
@@ -32,8 +33,8 @@ service 는 `dooray-cli`, account 는 필드 이름(`apiKey`, `imapPassword`)이
 - **`find-generic-password -w` 는 출력할 수 없는 바이트가 있는 값을 hex 로 출력한다.**
   원래 값이 우연히 hex 문자열인 경우와 구별할 수 없다. 줄바꿈은 `-i` 로 넘기는 명령 한 줄을 끊는다.
 - **항목이 없으면 종료 코드 44 다.** `find-generic-password` 와 `delete-generic-password` 모두 그렇고,
-  `-i` 모드도 안의 명령이 항목을 못 찾으면 44 를 돌려줬다.
-  `-i` 에서 `add-generic-password` 가 실패할 때의 종료 코드는 확인하지 못했다. 0 이 아니면 실패로 본다.
+  `-i` 모드도 안의 명령이 실패하면 0 이 아닌 그 코드를 그대로 돌려줬다. 항목을 못 찾으면 44, 알 수 없는 명령이면 1 이었다.
+  그래서 `-i` 로 넘긴 `add-generic-password` 의 실패도 종료 코드로 판정한다. 0 이 아니면 실패다.
 - **`find-generic-password -w` 의 출력은 값 뒤에 개행 하나가 붙는다.** 그 하나만 뗀다. `trim` 은 값 앞뒤 공백을 지우므로 쓰지 않는다.
 - **`security` 는 로그인 키체인을 `$HOME/Library/Keychains` 에서 찾는다.** `HOME` 을 다른 경로로 두면
   `default-keychain` 이 「A default keychain could not be found」 로 실패하고, 쓰기에서는 macOS 가
@@ -73,6 +74,24 @@ service 는 `dooray-cli`, account 는 필드 이름(`apiKey`, `imapPassword`)이
   되돌리기는 best-effort 다. 키체인이 그 사이에 잠기면 되돌리기도 실패할 수 있다.
   그때는 원래 오류의 종료 코드를 유지하고, 메시지에 「키체인 일부가 새 값으로 남았을 수 있다」 와 해당 필드 이름을 덧붙인다.
   남은 새 값은 파일에 같은 필드의 평문이 있으면 읽기 우선순위 때문에 쓰이지 않는다.
+- **구버전 비ASCII 값을 파일에 남길 때 같은 필드의 키체인 항목은 지운다.** 읽기는 파일이 앞서므로 남은 키체인 값은 지금은 쓰이지 않는다.
+  그러나 사용자가 나중에 파일에서 그 필드를 지우면 낡은 키체인 값이 되살아난다. 지우기는 「새 값이 비었을 때」 와 같은 경로라 되돌리기 대상에도 든다.
+- **account 규칙.** config 경로를 `path.resolve` 로 정규화해 계정 홈의 `~/.dooray/config.json`(`os.userInfo().homedir` 기준)과 같으면
+  account 는 필드 이름이다. 다르면 `<field>:<정규화한 경로의 sha256 16진수 앞 16자>` 다.
+  `HOME` 을 바꿔 여러 Dooray 계정을 쓰던 사용자는 config.json 이 경로마다 따로 있었다. account 가 필드 이름 하나뿐이면
+  그 계정들이 같은 키체인 항목을 공유해 서로의 토큰을 덮는다. 이 리그레션을 막으려고 경로로 나눈다.
+  경로를 그대로 account 에 넣지 않고 해시하는 이유는 공백·따옴표·한글이 든 경로가 `security -i` 명령 줄에서
+  어떻게 인용·인코딩되는지 실측하지 않았기 때문이다. 해시는 ASCII 라 위에서 실측한 범위 안이다.
+  심볼릭 링크는 풀지 않는다. 같은 파일을 서로 다른 경로로 가리키면 다른 항목이 된다.
+  기본 경로의 account 를 필드 이름 그대로 두어 이미 옮긴 항목과 호환을 지킨다. `dooray-persona` 스크립트도 같은 규칙으로 계산한다.
+- **config.json 에 `apiKey` 가 없으면 OS 와 무관하게 「설정 미완료」 다.** 문자열이 아닌 값은 여전히 손상이다.
+  macOS 에서 옮긴 config.json 은 `apiKey` 가 없고, 이 파일이 dotfiles 동기화로 Linux 에 가면 손상 판정이 났다.
+  손상이면 `dooray setup` 대신 파일을 고치라는 안내가 나가 복구가 어렵다. 없으면 `getConfig` 가 `apiKey: ""` 를 채우고
+  `getConfigOrThrow` 가 `dooray setup` 을 안내한다. `isConfig` 는 `Config` 타입 가드라 `apiKey` 를 계속 요구한다.
+- **키체인 읽기 실패는 `unreadable` 에 `source: "keychain"` 을 붙여 돌려준다.** ADR-049 의 `unreadable` 은
+  「설정은 있지만 지금 읽을 수 없다」 는 상태라 키체인 잠김과 뜻이 같다. `getConfigOrThrow`, `config get`, `doctor` 가
+  이것을 보고 파일 권한 대신 키체인 실패와 이유를 보인다. 오류 메시지에는 잠금 해제(`security unlock-keychain`)와
+  항목 삭제 뒤 `dooray setup` 이라는 해결 방법을 넣는다.
 - **config.json 이 없으면 키체인을 보지 않고 `absent` 다.** 설정 파일이 설정의 존재를 정한다.
 - **같은 프로세스 안에서는 키체인 값을 기억한다.** `config set` 은 한 번에 `getConfig` 를 세 번 부른다.
   키체인 구현 인스턴스가 읽은 값과 쓴 값을 기억하고, 쓰기와 지우기가 성공하면 그 값으로 바꾼다. 실패는 기억하지 않는다.
@@ -108,7 +127,15 @@ service 는 `dooray-cli`, account 는 필드 이름(`apiKey`, `imapPassword`)이
 - 감당할 것: 파일에 비밀값이 없는 명령마다 읽기용 `security` 를 최대 두 번 띄운다. 처음 읽을 때 키체인 접근 허용을 묻는 창이 뜰 수 있다.
   키체인으로 옮긴 뒤 이전 버전 CLI 로 돌아가면 config.json 에 `apiKey` 가 없어 손상으로 판정된다. 그때는 `dooray setup` 을 다시 한다.
   비ASCII 비밀값은 macOS 에서 새로 저장할 수 없다. 구버전이 남긴 비ASCII 값은 config.json 에 평문으로 남는다.
-  되돌리기가 실패하면 키체인 일부가 새 값으로 남을 수 있다.
+  되돌리기가 실패하면 키체인 일부가 새 값으로 남을 수 있다. 메시지에는 실제로 되돌리지 못한 필드만 나열한다.
+  `HOME` 을 바꿔 쓰는 config 는 기본 경로와 다른 account 를 쓰므로, 같은 config 를 다른 `HOME` 경로로 가리키면 키체인 값을 찾지 못한다.
+
+**알려진 제약**:
+
+- **SSH 같은 원격·비대화형 세션에서 로그인 키체인이 잠겨 있으면, 키체인으로 옮긴 뒤 모든 명령이 실패한다.**
+  `apiKey` 를 키체인에서 읽어야 하기 때문이다. 복구 경로인 `config set` 과 `setup` 도 저장 전에 현재 키체인 값을 읽으므로 같이 막힌다.
+  해결은 `security unlock-keychain` 으로 잠금을 풀거나, 키체인 접근 앱에서 `dooray-cli` 항목을 지우고 `dooray setup` 을 다시 하는 것이다.
+  파일 저장으로 돌아가는 옵트아웃 설정은 두지 않았다. 키체인을 기본으로 쓴다는 결정과 충돌한다. 필요해지면 후속 과제로 다룬다.
 
 **후속 과제**:
 
@@ -117,3 +144,8 @@ service 는 `dooray-cli`, account 는 필드 이름(`apiKey`, `imapPassword`)이
   메일 클라이언트가 `Config` 를 동기 객체로 받아 쓰는 부분까지 바꿔야 해서 이번 범위에서 뺐다.
 - **`src/index.ts` 의 전역 오류 처리가 `trackLastRun` 을 보려고 `getConfig` 를 다시 부른다.** 같은 프로세스 안이라 키체인 값은
   기억에서 나오지만, 앞선 읽기가 실패했으면 키체인을 한 번 더 띄운다. 비밀 필드가 필요 없는 읽기 경로를 따로 두면 없앨 수 있다.
+- **저장 때 현재 키체인 값을 읽지 못해도 덮어쓰기로 진행하게 한다.** 지금은 비교와 되돌리기에 쓸 현재 값을 먼저 읽고,
+  그 읽기가 실패하면 저장 전체가 실패한다. 덮어쓰기로 진행하려면 읽지 못한 다른 비밀 필드를 「없음」 으로 보고 지우는 일이
+  없도록, 필드마다 「값 / 없음 / 읽지 못함」 을 구분하는 상태 모델로 바꿔야 한다.
+- **저장 한 번에 config.json 을 여러 번 읽는다.** `setConfigValue` 가 `getConfig` 로 한 번, `writeConfig` 가 이전 상태를 보려고
+  한 번 더 읽는다. `config set` 은 캐시 무효화 판정까지 합쳐 더 읽는다. 읽은 결과를 넘겨받게 하면 줄일 수 있다.

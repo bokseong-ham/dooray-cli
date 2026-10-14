@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir, userInfo } from "node:os";
 import { join } from "node:path";
@@ -7,6 +8,7 @@ import {
   createRateLimiter,
   getAllPages,
   getMe,
+  keychainApiKeyAccount,
   loadApiConfig,
   readKeychainApiKey,
 } from "./dooray.mjs";
@@ -195,6 +197,20 @@ describe("loadApiConfig 키체인", () => {
         loadApiConfig(configPath, { platform: "darwin", readKeychain }),
       ).resolves.toEqual({ apiKey: "dummy-keychain-key", baseUrl: BASE_URL });
       expect(readKeychain).toHaveBeenCalledTimes(1);
+      // 임시 경로는 기본 경로가 아니라 경로별 account 로 읽는다.
+      expect(readKeychain).toHaveBeenCalledWith(keychainApiKeyAccount(configPath));
+      expect(readKeychain.mock.calls[0][0]).toMatch(/^apiKey:[0-9a-f]{16}$/);
+    });
+  });
+
+  it("공백뿐인 apiKey 는 CLI 와 같이 없음으로 보지 않아 키체인을 부르지 않고 실패한다", async () => {
+    await withConfig({ version: 1, apiKey: "   ", baseUrl: BASE_URL }, async (configPath) => {
+      const readKeychain = vi.fn().mockResolvedValue("dummy-keychain-key");
+
+      await expect(
+        loadApiConfig(configPath, { platform: "darwin", readKeychain }),
+      ).rejects.toThrow(/dooray setup/);
+      expect(readKeychain).not.toHaveBeenCalled();
     });
   });
 
@@ -234,7 +250,39 @@ describe("loadApiConfig 키체인", () => {
   });
 });
 
+describe("keychainApiKeyAccount", () => {
+  it("계정 홈의 기본 config 경로면 apiKey 다", () => {
+    expect(
+      keychainApiKeyAccount(join(userInfo().homedir, ".dooray", "config.json")),
+    ).toBe("apiKey");
+  });
+
+  it("다른 경로면 apiKey:<경로 sha256 앞 16자> 다", () => {
+    const configPath = "/tmp/other-home/.dooray/config.json";
+    const hash = createHash("sha256").update(configPath).digest("hex").slice(0, 16);
+
+    expect(keychainApiKeyAccount(configPath)).toBe(`apiKey:${hash}`);
+  });
+});
+
 describe("readKeychainApiKey", () => {
+  it("주어진 account 로 읽는다", async () => {
+    execFileMock.mockImplementationOnce((_file, _args, _options, callback) => {
+      callback(null, "dummy-key\n", "");
+    });
+
+    await readKeychainApiKey("apiKey:0123456789abcdef");
+
+    expect(execFileMock.mock.calls.at(-1)[1]).toEqual([
+      "find-generic-password",
+      "-s",
+      "dooray-cli",
+      "-a",
+      "apiKey:0123456789abcdef",
+      "-w",
+    ]);
+  });
+
   it("dooray-cli 서비스의 apiKey 항목을 읽고 끝 개행 하나만 뗀다", async () => {
     execFileMock.mockImplementationOnce((_file, _args, _options, callback) => {
       callback(null, " dummy-key \n", "");

@@ -278,6 +278,17 @@ describe("키체인 모드 저장", () => {
     expect(stderr.join("")).not.toContain("dummy");
   });
 
+  it("구버전 비ASCII 값을 파일에 남길 때 같은 필드의 키체인 항목은 지운다", async () => {
+    store.values.set("imapPassword", "dummy-stale-pw");
+    fileWith({ ...BASE, apiKey: "dummy-file-key", imapPassword: "dummy비밀" });
+
+    await setConfigValue("tenant-name", "example");
+
+    expect(store.delete).toHaveBeenCalledWith("imapPassword");
+    expect(store.values.has("imapPassword")).toBe(false);
+    expect(writtenConfig().imapPassword).toBe("dummy비밀");
+  });
+
   it("새로 지정한 값을 키체인에 저장할 수 없으면 어느 쪽에도 쓰기 전에 거절하고 값을 메시지에 넣지 않는다", async () => {
     fileWith({ ...BASE, apiKey: "dummy-file-key" });
 
@@ -342,28 +353,37 @@ describe("키체인 모드 저장", () => {
     expect(store.delete).toHaveBeenCalledWith("imapPassword");
   });
 
-  it("되돌리기마저 실패하면 원래 오류에 키체인 일부가 새 값으로 남았을 수 있다고 덧붙인다", async () => {
+  it("되돌리기마저 실패하면 실제로 되돌리지 못한 필드만 나열해 덧붙인다", async () => {
     store.values.set("apiKey", "dummy-old-key");
     renameMock.mockRejectedValueOnce(
       Object.assign(new Error("EACCES"), { code: "EACCES" }),
     );
+    // 저장: apiKey set, imapPassword set 성공. 되돌리기: imapPassword delete 성공, apiKey set 실패.
     store.set
+      .mockImplementationOnce(async (name: SecretField, value: string) => {
+        store.values.set(name, value);
+      })
       .mockImplementationOnce(async (name: SecretField, value: string) => {
         store.values.set(name, value);
       })
       .mockRejectedValueOnce(new DoorayCliError("키체인 잠김", EXIT_CONFIG_ERROR));
 
-    const err = await saveConfig({ ...BASE, apiKey: "dummy-new-key" }).catch(
-      (e: unknown) => e,
-    );
+    const err = await saveConfig({
+      ...BASE,
+      apiKey: "dummy-new-key",
+      imapPassword: "dummy-pw",
+    }).catch((e: unknown) => e);
 
     expect(err).toMatchObject({
       name: "DoorayCliError",
       exitCode: EXIT_IO_ERROR,
       message: expect.stringContaining("EACCES"),
     });
-    expect((err as Error).message).toContain("새 값으로 남았을 수 있습니다");
-    expect((err as Error).message).not.toContain("dummy");
+    const message = (err as Error).message;
+    expect(message).toContain("키체인 일부(apiKey)가 새 값으로 남았을 수 있습니다");
+    expect(message).not.toContain("imapPassword");
+    expect(message).not.toContain("dummy");
+    expect(store.values.has("imapPassword")).toBe(false);
   });
 
   it("clearMailCredentials 는 키체인의 imapPassword 를 지운다", async () => {

@@ -1,9 +1,16 @@
+import { createHash } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { userInfo } from "node:os";
+import { join } from "node:path";
 import { PassThrough } from "node:stream";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EXIT_CONFIG_ERROR, EXIT_PARAM_ERROR } from "../utils/exit-codes.js";
-import { createKeychainSecretStore, securityEnv } from "./secret-store.js";
+import {
+  createKeychainSecretStore,
+  getSecretStore,
+  keychainAccount,
+  securityEnv,
+} from "./secret-store.js";
 
 const { spawnMock } = vi.hoisted(() => ({ spawnMock: vi.fn() }));
 
@@ -227,5 +234,87 @@ describe("securityEnv", () => {
     } finally {
       vi.unstubAllEnvs();
     }
+  });
+});
+
+describe("keychainAccount", () => {
+  it("계정 홈의 기본 config 경로면 필드 이름 그대로다", () => {
+    const defaultPath = join(userInfo().homedir, ".dooray", "config.json");
+
+    expect(keychainAccount("apiKey", defaultPath)).toBe("apiKey");
+    expect(keychainAccount("imapPassword", defaultPath)).toBe("imapPassword");
+  });
+
+  it("다른 경로면 <field>:<경로 sha256 앞 16자> 다", () => {
+    const configPath = "/tmp/other home/.dooray/config.json";
+    const hash = createHash("sha256").update(configPath).digest("hex").slice(0, 16);
+
+    expect(keychainAccount("apiKey", configPath)).toBe(`apiKey:${hash}`);
+    expect(keychainAccount("imapPassword", configPath)).toBe(`imapPassword:${hash}`);
+  });
+
+  it("경로는 resolve 로 정규화해 비교한다", () => {
+    const messy = join(userInfo().homedir, ".dooray", "..", ".dooray", "config.json");
+
+    expect(keychainAccount("apiKey", messy)).toBe("apiKey");
+  });
+});
+
+describe("경로별 account", () => {
+  const otherPath = "/tmp/other-home/.dooray/config.json";
+  const account = keychainAccount("apiKey", otherPath);
+
+  it("-i 명령 줄에 해시 account 가 들어간다", async () => {
+    const run = queueRun({ code: 0 });
+
+    await createKeychainSecretStore((field) => keychainAccount(field, otherPath)).set(
+      "apiKey",
+      "dummy-key",
+    );
+
+    expect(account).toMatch(/^apiKey:[0-9a-f]{16}$/);
+    expect(run.stdin()).toBe(
+      `add-generic-password -U -s dooray-cli -a ${account} -w "dummy-key"\n`,
+    );
+  });
+
+  it("읽기와 지우기 argv 에도 해시 account 를 쓴다", async () => {
+    const store = createKeychainSecretStore((field) => keychainAccount(field, otherPath));
+    queueRun({ code: 44 });
+    queueRun({ code: 0 });
+
+    await store.get("apiKey");
+    await store.delete("apiKey");
+
+    expect(spawnMock.mock.calls[0][1]).toEqual([
+      "find-generic-password", "-s", "dooray-cli", "-a", account, "-w",
+    ]);
+    expect(spawnMock.mock.calls[1][1]).toEqual([
+      "delete-generic-password", "-s", "dooray-cli", "-a", account,
+    ]);
+  });
+
+  it.runIf(process.platform === "darwin")(
+    "getSecretStore 는 넘긴 config 경로의 account 로 저장소를 만든다",
+    async () => {
+      queueRun({ code: 44 });
+
+      await getSecretStore(otherPath)?.get("apiKey");
+
+      expect(spawnMock.mock.calls[0][1]).toContain(account);
+    },
+  );
+});
+
+describe("키체인 실패 안내", () => {
+  it("잠금 해제와 항목 삭제 후 setup 을 안내한다", async () => {
+    queueRun({ code: 51, stderr: "User interaction is not allowed." });
+
+    const err = await createKeychainSecretStore().get("apiKey").catch((e: unknown) => e);
+
+    const message = (err as Error).message;
+    expect(message).toContain("security unlock-keychain");
+    expect(message).toContain("dooray-cli");
+    expect(message).toContain("dooray setup");
   });
 });

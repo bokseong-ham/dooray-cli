@@ -131,9 +131,11 @@ const API_ENDPOINTS = {
 
 | OS | 저장 위치 | config.json 에 남는가 |
 | --- | --- | --- |
-| macOS | 로그인 키체인. service `dooray-cli`, account 는 필드 이름(`apiKey`, `imapPassword`) | 저장한 뒤에는 남지 않는다 |
+| macOS | 로그인 키체인. service `dooray-cli`, account 는 아래 규칙 | 저장한 뒤에는 남지 않는다 |
 | 그 밖 | `config.json` 평문 (0600) | 남는다 |
 
+- account 는 config 경로가 계정 홈의 `~/.dooray/config.json` 이면 필드 이름(`apiKey`, `imapPassword`)이다.
+  `HOME` 을 바꿔 다른 경로의 config 를 쓰면 `<field>:<정규화한 경로의 sha256 앞 16자>` 다. 경로는 `path.resolve` 로만 정규화한다.
 - macOS 에서 읽을 때는 필드마다 `config.json` 의 값이 앞선다. 비어 있지 않은 값이 있으면 그 값을 쓰고 키체인은 읽지 않는다.
   필드가 없거나 빈 문자열일 때만 키체인을 읽고, 둘 다 없으면 미설정이다.
   파일에 값이 남아 있는 것은 아직 옮기지 않은 구버전 값이거나 구버전 CLI 가 나중에 쓴 값이다.
@@ -142,9 +144,12 @@ const API_ENDPOINTS = {
 - 키체인에 먼저 쓰고 파일을 쓴다. 뒤 단계가 실패하면 이번 저장에서 바꾼 키체인 항목을 이전 값으로 되돌린다(이전에 없었으면 지운다).
   되돌리기는 best-effort 이고, 실패하면 오류 메시지에 키체인 일부가 새 값으로 남았을 수 있다고 덧붙인다.
 - macOS 에서 새로 지정하는 비밀값은 출력 가능한 ASCII(0x20-0x7E)만 쓸 수 있다. 그 밖의 문자가 있으면 저장하지 않고 종료 코드 3 으로 끝난다.
-  `config.json` 에 있던 구버전 값이 그렇다면 거절하지 않고 그 필드만 파일에 평문으로 남긴 채 stderr 로 경고한다.
+  `config.json` 에 있던 구버전 값이 그렇다면 거절하지 않고 그 필드만 파일에 평문으로 남긴 채 stderr 로 경고한다. 같은 필드의 키체인 항목은 지운다.
 - 키체인에 접근하지 못하면(잠김, 접근 거부 등) `getConfig` 는 `unreadable` 에 `source: "keychain"` 을 붙여 돌려준다.
-- 그래서 macOS 의 `config.json` 에는 `apiKey` 가 없을 수 있고, 검증도 그것을 허용한다.
+  SSH 같은 원격 세션에서 로그인 키체인이 잠겨 있으면 이렇게 된다. `security unlock-keychain` 으로 잠금을 풀거나,
+  키체인 접근 앱에서 `dooray-cli` 항목을 지우고 `dooray setup` 을 다시 한다.
+- `config.json` 에는 `apiKey` 가 없을 수 있고, 검증은 OS 와 무관하게 그것을 허용한다(문자열이 아닌 값은 손상이다).
+  macOS 에서 옮긴 파일을 다른 OS 로 동기화한 경우도 이에 해당한다.
   `getConfig` 는 그때 `apiKey: ""` 를 채워 돌려주므로 키체인에도 없으면 「설정 미완료」 로 안내한다.
 
 `getConfig` 는 설정 파일 읽기 결과를 네 상태로 돌려준다 (ADR-049).

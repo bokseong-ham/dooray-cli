@@ -66,7 +66,7 @@ interface AppliedSecretChange {
  * 되돌리기는 best-effort 다. 그것마저 실패하면 원래 오류에 그 사실을 덧붙인다.
  */
 async function writeConfig(config: Config): Promise<void> {
-  const secrets = getSecretStore();
+  const secrets = getSecretStore(CONFIG_PATH);
   if (!secrets) {
     await writeConfigFile(config);
     return;
@@ -89,8 +89,10 @@ async function writeConfig(config: Config): Promise<void> {
     if (value !== undefined && !isStorableSecret(value)) {
       if (!migrating) assertStorableSecret(field, value);
       // 구버전이 파일에 남긴 값이라 거절하지 않는다. 그대로 파일에 둔다.
+      // 같은 필드의 키체인 항목은 지운다. 나중에 파일에서 그 필드를 지우면 낡은 값이 되살아나기 때문이다.
       fileConfig[field] = value;
       keptInFile.push(field);
+      plan.push({ field, value: undefined });
       continue;
     }
     plan.push({ field, value });
@@ -129,17 +131,17 @@ async function rollbackSecrets(
   applied: AppliedSecretChange[],
   err: unknown,
 ): Promise<unknown> {
-  let rollbackFailed = false;
+  const failed: SecretField[] = [];
   for (const { field, previous } of [...applied].reverse()) {
     try {
       if (previous === undefined) await secrets.delete(field);
       else await secrets.set(field, previous);
     } catch {
-      rollbackFailed = true;
+      failed.push(field);
     }
   }
-  if (!rollbackFailed) return err;
-  const fields = applied.map((change) => change.field).join(", ");
+  if (failed.length === 0) return err;
+  const fields = failed.join(", ");
   return new DoorayCliError(
     `${reasonOf(err)}\n` +
       `키체인을 이전 값으로 되돌리지 못했습니다. 키체인 일부(${fields})가 새 값으로 남았을 수 있습니다.`,
@@ -217,8 +219,10 @@ function isNodeError(err: unknown): err is NodeJS.ErrnoException {
 }
 
 /**
- * `apiKeyOptional` 은 비밀 저장소가 있을 때 켠다.
- * 그때 config.json 에는 `apiKey` 가 없는 것이 정상이다 (ADR-069).
+ * `apiKeyOptional` 은 config.json 을 읽을 때 OS 와 무관하게 켠다 (ADR-069).
+ * macOS 에서 키체인으로 옮긴 파일에는 `apiKey` 가 없고, 그 파일이 다른 OS 로 동기화될 수도 있다.
+ * 없으면 `getConfig` 가 빈 문자열로 채워 「설정 미완료」 로 안내한다. 문자열이 아닌 값은 여전히 손상이다.
+ * `isConfig` 는 `Config` 타입 가드라 `apiKey` 를 요구한다.
  */
 function invalidConfigReason(
   value: unknown,
@@ -271,14 +275,11 @@ export function isConfig(value: unknown): value is Config {
   return invalidConfigReason(value) === null;
 }
 
-/** config.json 에 적힌 그대로의 형태다. 비밀 저장소를 쓰면 `apiKey` 가 없을 수 있다. */
+/** config.json 에 적힌 그대로의 형태다. `apiKey` 가 없을 수 있다. */
 type StoredConfig = Omit<Config, "apiKey"> & { apiKey?: string };
 
-function isStoredConfig(
-  value: unknown,
-  options: { apiKeyOptional: boolean },
-): value is StoredConfig {
-  return invalidConfigReason(value, options) === null;
+function isStoredConfig(value: unknown): value is StoredConfig {
+  return invalidConfigReason(value, { apiKeyOptional: true }) === null;
 }
 
 export function configReadErrorMessage(
@@ -304,7 +305,7 @@ type ConfigFileReadResult =
   | { state: "ok"; stored: StoredConfig }
   | Exclude<ConfigReadResult, { state: "ok" }>;
 
-/** config.json 을 읽고 검증한다. 비밀 저장소가 있으면 `apiKey` 가 없어도 통과시킨다. */
+/** config.json 을 읽고 검증한다. `apiKey` 가 없어도 통과시킨다. */
 async function readConfigFile(): Promise<ConfigFileReadResult> {
   let parsed: unknown;
   try {
@@ -319,10 +320,9 @@ async function readConfigFile(): Promise<ConfigFileReadResult> {
     return { state: "unreadable", reason: reasonOf(err) };
   }
 
-  const options = { apiKeyOptional: getSecretStore() !== null };
-  if (!isStoredConfig(parsed, options)) {
+  if (!isStoredConfig(parsed)) {
     const invalidReason =
-      invalidConfigReason(parsed, options) ??
+      invalidConfigReason(parsed, { apiKeyOptional: true }) ??
       "설정 파일 형식이 올바르지 않습니다.";
     return { state: "invalid", reason: invalidReason };
   }
@@ -361,7 +361,7 @@ async function fillSecrets(
 export async function getConfig(): Promise<ConfigReadResult> {
   const file = await readConfigFile();
   if (file.state !== "ok") return file;
-  const secrets = getSecretStore();
+  const secrets = getSecretStore(CONFIG_PATH);
   // apiKey 가 어디에도 없으면 빈 문자열로 채운다. getConfigOrThrow 가 그것을 「설정 미완료」 로 본다.
   if (!secrets) {
     return {

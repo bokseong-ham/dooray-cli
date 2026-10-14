@@ -9,7 +9,9 @@
  * 비밀값이 argv 와 오류 메시지에 들어가지 않게 하는 것이 이 파일의 가장 중요한 불변식이다.
  */
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 import { userInfo } from "node:os";
+import { join, resolve } from "node:path";
 import { DoorayCliError } from "../utils/errors.js";
 import { EXIT_CONFIG_ERROR, EXIT_PARAM_ERROR } from "../utils/exit-codes.js";
 
@@ -50,6 +52,25 @@ export function assertStorableSecret(name: SecretField, value: string): void {
       EXIT_PARAM_ERROR,
     );
   }
+}
+
+/**
+ * 키체인 항목의 account 를 정한다.
+ *
+ * config 경로가 계정 홈의 기본 경로(`~/.dooray/config.json`)면 필드 이름 그대로다.
+ * `HOME` 을 바꿔 다른 경로의 config 를 쓰면 `<field>:<경로 sha256 앞 16자>` 로 나눈다.
+ * 그렇지 않으면 여러 Dooray 계정이 같은 항목을 공유해 서로의 토큰을 덮는다.
+ *
+ * 경로를 그대로 넣지 않고 해시하는 이유는 공백·따옴표·한글이 든 경로가
+ * `security -i` 명령 줄에서 어떻게 인용·인코딩되는지 확인하지 않았기 때문이다. 해시는 ASCII 다.
+ * 경로는 `path.resolve` 로만 정규화하고 심볼릭 링크는 풀지 않는다.
+ */
+export function keychainAccount(field: SecretField, configPath: string): string {
+  const resolved = resolve(configPath);
+  const defaultPath = resolve(join(userInfo().homedir, ".dooray", "config.json"));
+  if (resolved === defaultPath) return field;
+  const hash = createHash("sha256").update(resolved).digest("hex").slice(0, 16);
+  return `${field}:${hash}`;
 }
 
 interface RunResult {
@@ -121,8 +142,9 @@ function keychainError(
   return new DoorayCliError(
     `macOS 키체인에서 ${name} 를 ${action} 못했습니다.\n` +
       `이유: ${detail || "알 수 없음"}\n` +
-      "로그인 키체인이 잠겨 있거나 접근이 거부됐을 수 있습니다. " +
-      "키체인 접근 앱에서 로그인 키체인을 잠금 해제하거나 접근 허용 요청을 승인한 뒤 다시 실행하세요.",
+      "로그인 키체인이 잠겨 있거나 접근이 거부됐을 수 있습니다. 접근 허용을 묻는 창이 떴다면 승인한 뒤 다시 실행하세요.\n" +
+      "SSH 같은 원격·비대화형 세션이면 `security unlock-keychain` 으로 로그인 키체인의 잠금을 푼 뒤 다시 실행하세요.\n" +
+      "계속 실패하면 키체인 접근 앱에서 이름이 `dooray-cli` 인 항목을 지우고 `dooray setup` 을 다시 실행하세요.",
     EXIT_CONFIG_ERROR,
     cause === undefined ? undefined : { cause },
   );
@@ -134,12 +156,15 @@ function failureDetail(result: RunResult, secret?: string): string {
 }
 
 /**
- * macOS 로그인 키체인 구현이다. service 는 `dooray-cli`, account 는 필드 이름이다.
+ * macOS 로그인 키체인 구현이다. service 는 `dooray-cli`, account 는 `accountFor` 가 정한다.
+ * 기본은 필드 이름이다. `getSecretStore` 는 `keychainAccount` 로 config 경로별 account 를 넘긴다.
  *
  * 한 프로세스 안에서 `getConfig` 가 여러 번 불려도 `security` 를 다시 띄우지 않게
  * 읽은 값과 쓴 값을 인스턴스에 기억한다. 실패는 기억하지 않는다.
  */
-export function createKeychainSecretStore(): SecretStore {
+export function createKeychainSecretStore(
+  accountFor: (field: SecretField) => string = (field) => field,
+): SecretStore {
   const cache = new Map<SecretField, string | undefined>();
 
   async function run(
@@ -165,7 +190,7 @@ export function createKeychainSecretStore(): SecretStore {
         "-s",
         KEYCHAIN_SERVICE,
         "-a",
-        name,
+        accountFor(name),
         "-w",
       ]);
       if (result.code === EXIT_ITEM_NOT_FOUND) {
@@ -188,7 +213,7 @@ export function createKeychainSecretStore(): SecretStore {
       // `-w <값>` 은 ps 에 보이고, `-w` 만 주면 tty 에서 읽느라 멈춘다.
       // 그래서 `security -i` 의 stdin 으로 명령 한 줄을 넘긴다.
       const line =
-        `add-generic-password -U -s ${KEYCHAIN_SERVICE} -a ${name} ` +
+        `add-generic-password -U -s ${KEYCHAIN_SERVICE} -a ${accountFor(name)} ` +
         `-w ${quoteForInteractive(value)}\n`;
       const result = await run("저장하지", name, ["-i"], line, value);
       if (result.code !== 0) {
@@ -204,7 +229,7 @@ export function createKeychainSecretStore(): SecretStore {
         "-s",
         KEYCHAIN_SERVICE,
         "-a",
-        name,
+        accountFor(name),
       ]);
       if (result.code !== 0 && result.code !== EXIT_ITEM_NOT_FOUND) {
         cache.delete(name);
@@ -215,16 +240,21 @@ export function createKeychainSecretStore(): SecretStore {
   };
 }
 
-let keychainStore: SecretStore | undefined;
+const keychainStores = new Map<string, SecretStore>();
 
 /**
  * 이 OS 의 비밀 저장소를 돌려준다. `null` 이면 config.json 에 평문으로 저장한다.
+ * `configPath` 는 비밀값의 주인인 config.json 경로다. 키체인 account 를 이 경로로 나눈다.
  *
  * 테스트는 이 모듈을 `vi.mock` 해서 `null` 이나 가짜 저장소를 돌려주게 한다.
  * 실행 OS 에 따라 실제 키체인을 건드리지 않게 하기 위해서다.
  */
-export function getSecretStore(): SecretStore | null {
+export function getSecretStore(configPath: string): SecretStore | null {
   if (process.platform !== "darwin") return null;
-  keychainStore ??= createKeychainSecretStore();
-  return keychainStore;
+  let store = keychainStores.get(configPath);
+  if (!store) {
+    store = createKeychainSecretStore((field) => keychainAccount(field, configPath));
+    keychainStores.set(configPath, store);
+  }
+  return store;
 }

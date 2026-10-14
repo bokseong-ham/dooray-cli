@@ -147,14 +147,47 @@ describe("getConfig", () => {
     await expect(getConfig()).resolves.toMatchObject({ state: "invalid" });
   });
 
-  it("필수 필드가 없으면 invalid 를 돌려준다", async () => {
+  it("apiKey 가 없으면 OS 와 무관하게 손상이 아니라 빈 값으로 채운다 (키체인으로 옮긴 파일을 동기화한 경우)", async () => {
     readFileMock.mockResolvedValueOnce(
       JSON.stringify({ version: 1, baseUrl: "https://api.dooray.com" }),
+    );
+
+    await expect(getConfig()).resolves.toEqual({
+      state: "ok",
+      config: { version: 1, apiKey: "", baseUrl: "https://api.dooray.com" },
+    });
+  });
+
+  it("apiKey 가 없으면 getConfigOrThrow 는 설정 미완료로 setup 을 안내한다", async () => {
+    readFileMock.mockResolvedValueOnce(
+      JSON.stringify({ version: 1, baseUrl: "https://api.dooray.com" }),
+    );
+
+    await expect(getConfigOrThrow()).rejects.toMatchObject({
+      exitCode: EXIT_CONFIG_ERROR,
+      message: expect.stringContaining("dooray setup"),
+    });
+  });
+
+  it("apiKey 가 문자열이 아니면 invalid 를 돌려준다", async () => {
+    readFileMock.mockResolvedValueOnce(
+      JSON.stringify({ version: 1, apiKey: 123, baseUrl: "https://api.dooray.com" }),
     );
 
     await expect(getConfig()).resolves.toMatchObject({
       state: "invalid",
       reason: expect.stringContaining("apiKey"),
+    });
+  });
+
+  it("baseUrl 이 없으면 invalid 를 돌려준다", async () => {
+    readFileMock.mockResolvedValueOnce(
+      JSON.stringify({ version: 1, apiKey: "api-key" }),
+    );
+
+    await expect(getConfig()).resolves.toMatchObject({
+      state: "invalid",
+      reason: expect.stringContaining("baseUrl"),
     });
   });
 
