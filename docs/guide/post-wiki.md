@@ -7,7 +7,7 @@
 ```bash
 dooray project list                          # 내 프로젝트
 dooray post list <project>                   # 업무 목록
-dooray post list <project> --tag "<태그 이름>"  # 태그로 거르기
+dooray post list <project> --tag "<태그 이름>"  # 태그로 필터링
 dooray post list <project> --from me --created 2026-09-01~  # 내가 9월 이후 등록한 업무
 dooray post get <project> 42                 # 업무 상세
 dooray post create <project> --title "제목"  # 업무 생성
@@ -47,7 +47,7 @@ dooray post list <project> --tag "<이름 A>" --tag "<이름 B>"
 
 `--tag` 를 여러 번 주면 그 태그를 모두 가진 업무만 온다.
 
-## 사람·상위 업무·기간으로 거르기
+## 사람·상위 업무·기간으로 필터링
 
 ```bash
 dooray post list <project> --to me --parent 42               # 42번의 하위 업무 중 내 담당
