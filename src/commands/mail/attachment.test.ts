@@ -155,16 +155,17 @@ describe("mailAttachmentCommand", () => {
     expect(process.exitCode).toBe(1);
   });
 
-  it("대상 메일 줄은 평문에서만 stderr 에 한 번 쓴다", async () => {
+  it("대상 메일 줄은 평문, --json, --quiet 모두 stderr 에 한 번씩 쓴다", async () => {
     await run(["337"]);
     expect(stderr().match(/대상 메일: UID 337 "제목"/g)).toHaveLength(1);
 
     vi.mocked(process.stderr.write).mockClear();
     await run(["337", "--force"], ["--json"]);
-    expect(stderr()).not.toContain("대상 메일: UID");
+    expect(stderr().match(/대상 메일: UID 337 "제목"/g)).toHaveLength(1);
 
+    vi.mocked(process.stderr.write).mockClear();
     await run(["337", "--force"], ["--quiet"]);
-    expect(stderr()).not.toContain("대상 메일: UID");
+    expect(stderr().match(/대상 메일: UID 337 "제목"/g)).toHaveLength(1);
   });
 
   it("--quiet 는 저장한 경로만 stdout 에 쓴다", async () => {

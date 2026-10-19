@@ -55,9 +55,7 @@ export const mailAttachmentCommand = new Command("attachment")
       const { subject, attachments } = await getMailAttachments(config, uid, mailbox);
       stopSpinner(true, "메일 조회 완료");
 
-      if (plain) {
-        process.stderr.write(`대상 메일: UID ${uid} "${sanitizeForTerminal(subject)}"\n`);
-      }
+      process.stderr.write(`대상 메일: UID ${uid} "${sanitizeForTerminal(subject)}"\n`);
 
       if (attachments.length === 0 && requested.length === 0) {
         if (globalOpts.json) {
