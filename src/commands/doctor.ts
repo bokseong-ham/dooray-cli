@@ -72,6 +72,10 @@ export const doctorCommand = new Command("doctor")
       if (config.state === "invalid" || config.state === "unreadable") {
         payload.reason = config.reason;
       }
+      // 텍스트 모드는 키체인 실패와 파일 읽기 실패를 다른 줄로 보인다. JSON 도 구분할 수 있게 한다.
+      if (config.state === "unreadable") {
+        payload.source = config.source ?? "file";
+      }
       // 진단 명령이므로 「설정이 되었는가」 와 「실제로 접속되는가」 를 함께 낸다.
       // 설정이 갖춰지지 않아 시도하지 않은 경우를 skipped 로 구분한다.
       payload.apiConnection = apiKeyOk && baseUrlOk ? await probeApiConnection() : "skipped";

@@ -214,6 +214,17 @@ describe("loadApiConfig 키체인", () => {
     });
   });
 
+  it("문자열이 아닌 apiKey 는 CLI 와 같이 손상으로 보아 키체인으로 메우지 않고 실패한다", async () => {
+    await withConfig({ version: 1, apiKey: 123, baseUrl: BASE_URL }, async (configPath) => {
+      const readKeychain = vi.fn().mockResolvedValue("dummy-keychain-key");
+
+      await expect(
+        loadApiConfig(configPath, { platform: "darwin", readKeychain }),
+      ).rejects.toThrow(/dooray setup/);
+      expect(readKeychain).not.toHaveBeenCalled();
+    });
+  });
+
   it("macOS 에서도 파일에 apiKey 가 있으면 키체인을 부르지 않는다", async () => {
     await withConfig(
       { version: 1, apiKey: "dummy-file-key", baseUrl: BASE_URL },
@@ -262,6 +273,21 @@ describe("keychainApiKeyAccount", () => {
     const hash = createHash("sha256").update(configPath).digest("hex").slice(0, 16);
 
     expect(keychainApiKeyAccount(configPath)).toBe(`apiKey:${hash}`);
+  });
+
+  // 같은 규칙을 CLI 와 이 스크립트가 따로 구현한다. 한쪽만 바뀌면 스크립트가 다른 항목을 찾는다.
+  it("CLI 의 keychainAccount 와 같은 값을 낸다", async () => {
+    const { keychainAccount } = await import("../../../../src/config/secret-store.ts");
+    const paths = [
+      join(userInfo().homedir, ".dooray", "config.json"),
+      join(userInfo().homedir, ".dooray", "..", ".dooray", "config.json"),
+      "/tmp/other-home/.dooray/config.json",
+      "relative/.dooray/config.json",
+    ];
+
+    for (const configPath of paths) {
+      expect(keychainApiKeyAccount(configPath)).toBe(keychainAccount("apiKey", configPath));
+    }
   });
 });
 

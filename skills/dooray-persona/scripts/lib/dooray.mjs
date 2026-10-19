@@ -83,9 +83,9 @@ export async function loadApiConfig(
 
   const config = JSON.parse(raw);
   // macOS 에서 키체인으로 옮겨진 뒤에는 파일에 apiKey 가 없다. 그때만 키체인을 본다.
-  // CLI 와 같이 빈 문자열만 「없음」 이다. 공백뿐인 값은 아래 검사에서 실패한다.
-  const fileApiKeyMissing =
-    typeof config.apiKey !== "string" || config.apiKey === "";
+  // CLI 와 같이 필드가 없거나 빈 문자열일 때만 「없음」 이다.
+  // 공백뿐인 값과 문자열이 아닌 값은 CLI 가 손상으로 보는 파일이라 키체인으로 메우지 않고 아래 검사에서 실패한다.
+  const fileApiKeyMissing = config.apiKey === undefined || config.apiKey === "";
   if (fileApiKeyMissing && platform === "darwin") {
     const keychainApiKey = await readKeychain(keychainApiKeyAccount(configPath));
     if (keychainApiKey !== undefined) config.apiKey = keychainApiKey;
