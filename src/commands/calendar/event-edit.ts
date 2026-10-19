@@ -14,10 +14,13 @@ import { DoorayApiClient } from "../../api/client.js";
 import type { CalendarEventWriteRequest } from "../../api/types.js";
 import type { OutputOptions } from "../../formatters/table.js";
 import { printJson } from "../../formatters/table.js";
-import { resolveWritableCalendar, type ResolvedCalendar } from "../../resolvers/calendar.js";
+import {
+  formatCalendarLabel,
+  resolveWritableCalendar,
+  type ResolvedCalendar,
+} from "../../resolvers/calendar.js";
 import { DoorayCliError } from "../../utils/errors.js";
 import { EXIT_PARAM_ERROR } from "../../utils/exit-codes.js";
-import { sanitizeForTerminal } from "../../utils/sanitize.js";
 import { startSpinner, stopSpinner } from "../../utils/spinner.js";
 import {
   instanceOriginalId,
@@ -31,6 +34,7 @@ import {
   hasEventFieldOption,
   prepareEventFields,
   resolveEventRequest,
+  warnDryRunOutputOptions,
 } from "./event-write.js";
 
 function nothingToEdit(): DoorayCliError {
@@ -63,6 +67,7 @@ export const calendarEventEditCommand = addEventFieldOptions(
   rejectInstanceId(eventId);
   if (!hasEventFieldOption(opts)) throw nothingToEdit();
   const prepared = await prepareEventFields(opts);
+  if (opts.dryRun) warnDryRunOutputOptions(globalOpts);
 
   const config = await getConfigOrThrow();
   const client = new DoorayApiClient(config.apiKey, config.baseUrl);
@@ -87,9 +92,7 @@ export const calendarEventEditCommand = addEventFieldOptions(
     stopSpinner(false);
     throw nothingToEdit();
   }
-  const calendarLabel = calendar.name
-    ? `${sanitizeForTerminal(calendar.name)} (${calendar.id})`
-    : calendar.id;
+  const calendarLabel = formatCalendarLabel(calendar);
 
   if (opts.dryRun) {
     stopSpinner(true, `dry-run: ${calendarLabel} 의 일정 ${eventId} 에 보낼 요청입니다. API 는 부르지 않았습니다.`);

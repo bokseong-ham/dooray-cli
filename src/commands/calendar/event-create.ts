@@ -12,16 +12,16 @@ import { getConfigOrThrow } from "../../config/store.js";
 import { DoorayApiClient } from "../../api/client.js";
 import type { OutputOptions } from "../../formatters/table.js";
 import { printJson } from "../../formatters/table.js";
-import { resolveWritableCalendar } from "../../resolvers/calendar.js";
+import { formatCalendarLabel, resolveWritableCalendar } from "../../resolvers/calendar.js";
 import { DoorayCliError } from "../../utils/errors.js";
 import { EXIT_PARAM_ERROR } from "../../utils/exit-codes.js";
-import { sanitizeForTerminal } from "../../utils/sanitize.js";
 import { startSpinner, stopSpinner } from "../../utils/spinner.js";
 import {
   addEventFieldOptions,
   type EventFieldOptions,
   prepareEventFields,
   resolveEventRequest,
+  warnDryRunOutputOptions,
 } from "./event-write.js";
 
 export const calendarEventCreateCommand = addEventFieldOptions(
@@ -41,6 +41,7 @@ export const calendarEventCreateCommand = addEventFieldOptions(
     );
   }
   const prepared = await prepareEventFields(opts);
+  if (opts.dryRun) warnDryRunOutputOptions(globalOpts);
 
   const config = await getConfigOrThrow();
   const client = new DoorayApiClient(config.apiKey, config.baseUrl);
@@ -55,9 +56,7 @@ export const calendarEventCreateCommand = addEventFieldOptions(
     stopSpinner(false);
     throw e;
   }
-  const calendarLabel = calendar.name
-    ? `${sanitizeForTerminal(calendar.name)} (${calendar.id})`
-    : calendar.id;
+  const calendarLabel = formatCalendarLabel(calendar);
 
   if (opts.dryRun) {
     stopSpinner(true, `dry-run: ${calendarLabel} 에 보낼 요청입니다. API 는 부르지 않았습니다.`);

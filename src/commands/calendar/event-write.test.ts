@@ -230,6 +230,40 @@ describe("calendar event create", () => {
     });
   });
 
+  it.each([[["--to", ""]], [["--to", " ", "  "]], [["--cc", " "]]])(
+    "참석자 %j 처럼 빈 값만 주면 설정을 읽기 전에 끝낸다",
+    async (memberArgs) => {
+      await expectParamErrorBeforeConfig(
+        run([
+          "calendar", "event", "create", CALENDAR_ID,
+          "--title", "휴가", "--start", "2026-09-18", ...memberArgs,
+        ]),
+      );
+    },
+  );
+
+  it.each([["--json"], ["--quiet"]])(
+    "--dry-run 에 전역 %s 를 주면 무시한다고 stderr 로 알린다",
+    async (flag) => {
+      const out = await run([
+        flag, "calendar", "event", "create", CALENDAR_ID,
+        "--title", "휴가", "--start", "2026-09-18", "--dry-run",
+      ]);
+      expect(stderr).toHaveBeenCalledWith(
+        expect.stringMatching(new RegExp(`^⚠ .*--dry-run.*${flag} 을 무시`)),
+      );
+      expect(JSON.parse(out)).toMatchObject({ subject: "휴가" });
+    },
+  );
+
+  it("--dry-run 만 주면 출력 옵션 경고를 내지 않는다", async () => {
+    await run([
+      "calendar", "event", "create", CALENDAR_ID,
+      "--title", "휴가", "--start", "2026-09-18", "--dry-run",
+    ]);
+    expect(stderr).not.toHaveBeenCalledWith(expect.stringContaining("--dry-run 은"));
+  });
+
   it("동명이인이 있으면 쓰기 API 를 부르지 않고 끝낸다", async () => {
     mocks.client.searchMembers.mockResolvedValue({
       result: [
@@ -263,6 +297,26 @@ describe("calendar event create", () => {
 describe("calendar event edit", () => {
   it("수정할 옵션이 없으면 설정을 읽기 전에 끝낸다", async () => {
     await expectParamErrorBeforeConfig(run(["calendar", "event", "edit", CALENDAR_ID, EVENT_ID]));
+  });
+
+  it("공백뿐인 --title 은 설정을 읽기 전에 끝낸다", async () => {
+    await expectParamErrorBeforeConfig(
+      run(["calendar", "event", "edit", CALENDAR_ID, EVENT_ID, "--title", "   "]),
+    );
+  });
+
+  it("--cc 에 빈 값만 주면 설정을 읽기 전에 끝낸다", async () => {
+    await expectParamErrorBeforeConfig(
+      run(["calendar", "event", "edit", CALENDAR_ID, EVENT_ID, "--cc", ""]),
+    );
+  });
+
+  it("--dry-run 에 전역 --json 을 주면 무시한다고 stderr 로 알린다", async () => {
+    await run([
+      "--json", "calendar", "event", "edit", CALENDAR_ID, EVENT_ID, "--title", "새 제목", "--dry-run",
+    ]);
+    expect(stderr).toHaveBeenCalledWith(expect.stringMatching(/^⚠ .*--json 을 무시/));
+    expect(mocks.client.updateCalendarEvent).not.toHaveBeenCalled();
   });
 
   it("--mime-type 이나 --dry-run 만으로는 수정할 항목이 아니다", async () => {

@@ -8,6 +8,7 @@
 
 import type { DoorayApiClient } from "../api/client.js";
 import type { Calendar } from "../api/types.js";
+import { sanitizeForTerminal } from "../utils/sanitize.js";
 import { matchByName } from "./match.js";
 
 const CALENDAR_ID_RE = /^\d{15,}$/;
@@ -37,4 +38,9 @@ export async function resolveWritableCalendar(
     helpHint: "dooray calendar list — 구독 캘린더는 일정을 쓸 수 없어 이름 후보에서 빠진다",
   });
   return { id: match.id, name: match.name };
+}
+
+/** 출력에 쓸 캘린더 표기. 이름을 알면 `이름 (id)`, id 로만 받았으면 id. 이름은 외부 문자열이라 control char 를 없앤다. */
+export function formatCalendarLabel(calendar: ResolvedCalendar): string {
+  return calendar.name ? `${sanitizeForTerminal(calendar.name)} (${calendar.id})` : calendar.id;
 }

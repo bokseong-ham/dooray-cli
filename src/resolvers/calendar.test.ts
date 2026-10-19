@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { DoorayApiClient } from "../api/client.js";
 import type { Calendar } from "../api/types.js";
 import { EXIT_PARAM_ERROR } from "../utils/exit-codes.js";
-import { resolveWritableCalendar } from "./calendar.js";
+import { formatCalendarLabel, resolveWritableCalendar } from "./calendar.js";
 
 function mockClient(calendars: Calendar[]): DoorayApiClient {
   return {
@@ -51,5 +51,18 @@ describe("resolveWritableCalendar", () => {
       exitCode: EXIT_PARAM_ERROR,
       message: expect.stringContaining("구독 캘린더"),
     });
+  });
+});
+
+describe("formatCalendarLabel", () => {
+  it("이름을 알면 이름과 id, 모르면 id 만 낸다", () => {
+    expect(formatCalendarLabel({ id: "1111222233334444555", name: "팀 캘린더" })).toBe(
+      "팀 캘린더 (1111222233334444555)",
+    );
+    expect(formatCalendarLabel({ id: "1111222233334444555" })).toBe("1111222233334444555");
+  });
+
+  it("이름의 control char 를 없앤다", () => {
+    expect(formatCalendarLabel({ id: "1", name: "팀\u001b[31m" })).not.toContain("\u001b");
   });
 });

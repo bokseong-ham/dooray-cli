@@ -7,16 +7,20 @@
  */
 
 import { Command, Option } from "commander";
+import type { OutputOptions } from "../../formatters/table.js";
 import type { DoorayApiClient } from "../../api/client.js";
 import type { CalendarEventWriteRequest } from "../../api/types.js";
 import { ensureMe } from "../../resolvers/me.js";
 import { resolveOrganizationMember } from "../../resolvers/member.js";
 import { BODY_MIME_TYPES, readBodyInput } from "../../utils/body-input.js";
+import { DoorayCliError } from "../../utils/errors.js";
+import { EXIT_PARAM_ERROR } from "../../utils/exit-codes.js";
 import {
   buildEventRequest,
   buildRecurrenceRule,
   EVENT_BODY_DEFAULT_MIME,
   type EventRequestMode,
+  hasRepeatDetail,
   type EventRequestParts,
   localTimezoneName,
   parseAlarm,
@@ -97,11 +101,7 @@ export function hasEventFieldOption(opts: EventFieldOptions): boolean {
     (opts.alarm ?? []).length > 0 ||
     opts.private === true ||
     opts.repeat != null ||
-    opts.repeatInterval != null ||
-    opts.repeatUntil != null ||
-    opts.repeatByday != null ||
-    opts.repeatBymonth != null ||
-    opts.repeatBymonthday != null
+    hasRepeatDetail(opts)
   );
 }
 
@@ -112,16 +112,43 @@ export interface PreparedEventFields {
   ccInputs?: string[];
 }
 
-function cleanInputs(values: string[] | undefined): string[] | undefined {
-  return values?.map((v) => v.trim()).filter((v) => v !== "");
+/**
+ * 앞뒤 공백을 떼고 빈 값을 버린다. 준 값이 모두 비면 오류다.
+ * `--to ""` 를 참석자 비우기로 받으면 의도치 않게 참석자가 모두 빠질 수 있어, 비우는 동작은 두지 않는다.
+ */
+function cleanInputs(flag: string, values: string[] | undefined): string[] | undefined {
+  if (values == null) return undefined;
+  const cleaned = values.map((v) => v.trim()).filter((v) => v !== "");
+  if (cleaned.length === 0) {
+    throw new DoorayCliError(
+      `${flag} 에 빈 값만 주었습니다. 참석자를 비우는 기능은 없습니다. 멤버를 하나 이상 주세요.`,
+      EXIT_PARAM_ERROR,
+    );
+  }
+  return cleaned;
+}
+
+/** `--dry-run` 은 요청 본문 JSON 만 내므로 전역 출력 옵션이 효력이 없다. 무시되는 옵션은 stderr 로 알린다. */
+export function warnDryRunOutputOptions(globalOpts: OutputOptions): void {
+  const ignored = [globalOpts.json && "--json", globalOpts.quiet && "--quiet"].filter(Boolean);
+  if (ignored.length === 0) return;
+  process.stderr.write(
+    `⚠  --dry-run 은 요청 본문 JSON 만 출력하므로 ${ignored.join("·")} 을 무시합니다.\n`,
+  );
 }
 
 /**
- * 네트워크 없이 끝나는 검증과 본문 읽기. 시각·알림·반복 형식 오류는 여기서 `EXIT_PARAM_ERROR` 로 끝난다.
+ * 네트워크 없이 끝나는 검증과 본문 읽기. 공백뿐인 제목, 빈 참석자 목록, 시각·알림·반복 형식 오류는
+ * 여기서 `EXIT_PARAM_ERROR` 로 끝난다.
  *
  * `--mime-type` 을 줬는데 본문이 비어 있으면 효력이 없으므로 stderr 로 알리고 넘어간다.
  */
 export async function prepareEventFields(opts: EventFieldOptions): Promise<PreparedEventFields> {
+  if (opts.title != null && opts.title.trim() === "") {
+    throw new DoorayCliError("--title 이 비어 있습니다.", EXIT_PARAM_ERROR);
+  }
+  const toInputs = cleanInputs("--to", opts.to);
+  const ccInputs = cleanInputs("--cc", opts.cc);
   const schedule = resolveEventSchedule(opts.start, opts.end);
   const alarms = (opts.alarm ?? []).map(parseAlarm);
   const recurrenceRule = buildRecurrenceRule(opts, localTimezoneName());
@@ -145,8 +172,8 @@ export async function prepareEventFields(opts: EventFieldOptions): Promise<Prepa
       isPrivate: opts.private === true,
       recurrenceRule,
     },
-    toInputs: cleanInputs(opts.to),
-    ccInputs: cleanInputs(opts.cc),
+    toInputs,
+    ccInputs,
   };
 }
 

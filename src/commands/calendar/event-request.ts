@@ -91,7 +91,7 @@ function parseIntListInRange(flag: string, value: string, min: number, max: numb
 }
 
 /** 부속 옵션 가운데 하나라도 주어졌는지. `--repeat` 없이 주면 오류로 끊는다. */
-function hasRepeatDetail(opts: RepeatOptions): boolean {
+export function hasRepeatDetail(opts: RepeatOptions): boolean {
   return (
     opts.repeatInterval != null ||
     opts.repeatUntil != null ||
