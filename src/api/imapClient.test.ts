@@ -20,7 +20,7 @@ vi.mock("imapflow", () => ({
   },
 }));
 
-import { getMail, resolveUidByMailId } from "./imapClient.js";
+import { getMail, getMailAttachments, resolveUidByMailId } from "./imapClient.js";
 
 const config: Config = {
   version: 1,
@@ -572,5 +572,103 @@ describe("getMail", () => {
     expect(client.getMailboxLock).toHaveBeenCalledWith("INBOX");
     expect(client.release).toHaveBeenCalled();
     expect(client.logout).toHaveBeenCalled();
+  });
+});
+
+function makeAttachmentMessage(
+  uid: number,
+  parts: Array<{ filename?: string; type: string; content: string; inline?: boolean }>,
+): FetchMessageObject {
+  const lines = [
+    "Subject: with files",
+    "From: Sender <sender@example.com>",
+    "To: Receiver <receiver@example.com>",
+    "MIME-Version: 1.0",
+    'Content-Type: multipart/mixed; boundary="b1"',
+    "",
+    "--b1",
+    "Content-Type: text/plain; charset=utf-8",
+    "",
+    "본문",
+  ];
+  for (const part of parts) {
+    const name = part.filename ? `; name="${part.filename}"` : "";
+    const disp = part.inline ? "inline" : "attachment";
+    const dispName = part.filename ? `; filename="${part.filename}"` : "";
+    lines.push(
+      "--b1",
+      `Content-Type: ${part.type}${name}`,
+      "Content-Transfer-Encoding: base64",
+      `Content-Disposition: ${disp}${dispName}`,
+      "",
+      Buffer.from(part.content).toString("base64"),
+    );
+  }
+  lines.push("--b1--", "");
+  return {
+    seq: uid,
+    uid,
+    envelope: { subject: "with files" },
+    flags: new Set(),
+    source: Buffer.from(lines.join("\r\n")),
+  };
+}
+
+describe("메일 첨부", () => {
+  it("getMail 이 첨부 메타데이터를 순번과 함께 돌려준다", async () => {
+    setClient([makeAttachmentMessage(1, [
+      { filename: "a.crt", type: "application/x-x509-ca-cert", content: "hello" },
+      { filename: "logo.png", type: "image/png", content: "pngdata!!", inline: true },
+    ])]);
+
+    const mail = await getMail(config, 1);
+
+    expect(mail.attachments).toEqual([
+      { index: 1, fileName: "a.crt", size: 5, contentType: "application/x-x509-ca-cert", inline: false },
+      { index: 2, fileName: "logo.png", size: 9, contentType: "image/png", inline: true },
+    ]);
+    expect(mail.attachments[0]).not.toHaveProperty("content");
+  });
+
+  it("첨부가 없으면 빈 배열이다", async () => {
+    setClient([makeMessage(1, Date.UTC(2026, 0, 1), "hello")]);
+
+    expect((await getMail(config, 1)).attachments).toEqual([]);
+  });
+
+  it("getMailAttachments 가 내용 Buffer 와 제목을 돌려준다", async () => {
+    const client = setClient([makeAttachmentMessage(1, [
+      { filename: "a.crt", type: "application/octet-stream", content: "hello" },
+    ])]);
+
+    const result = await getMailAttachments(config, 1);
+
+    expect(result.subject).toBe("with files");
+    expect(result.attachments).toHaveLength(1);
+    expect(result.attachments[0].index).toBe(1);
+    expect(result.attachments[0].content.toString()).toBe("hello");
+    expect(client.release).toHaveBeenCalled();
+    expect(client.logout).toHaveBeenCalled();
+  });
+
+  it("getMailAttachments 는 없는 UID 에서 DoorayCliError 를 던진다", async () => {
+    setClient([makeAttachmentMessage(1, [])]);
+
+    const error = await catchError(getMailAttachments(config, 99));
+
+    expect(error).toBeInstanceOf(DoorayCliError);
+    expect(error.message).toBe("메일을 찾을 수 없습니다: UID 99");
+    expect(error.exitCode).toBe(1);
+  });
+
+  it("같은 이름의 첨부는 두 번째부터 순번을 붙여 구분한다", async () => {
+    setClient([makeAttachmentMessage(1, [
+      { filename: "a.crt", type: "application/octet-stream", content: "one" },
+      { filename: "a.crt", type: "application/octet-stream", content: "two" },
+    ])]);
+
+    const mail = await getMail(config, 1);
+
+    expect(mail.attachments.map((a) => a.fileName)).toEqual(["a.crt", "a-2.crt"]);
   });
 });
