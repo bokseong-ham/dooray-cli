@@ -41,7 +41,7 @@ dooray post file upload   --url <url> --file ./report.pdf
 
 TTY 확인, non-TTY 실행, `-y`와 `--yes` 사용법은 [SKILL.md](../SKILL.md#삭제-명령의-확인-동작)를 따른다.
 
-## 업무 목록 거르기
+## 업무 목록 필터링
 
 `post list` 의 필터는 함께 줄 수 있고 `--all` 이면 모든 페이지에 같은 조건이 걸린다.
 

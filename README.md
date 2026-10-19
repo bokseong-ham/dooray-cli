@@ -135,7 +135,7 @@ dooray post comment add --id "$POST_ID" --body "시작합니다"
 | 문서 | 내용 |
 | --- | --- |
 | [설치와 설정](docs/guide/setup.md) | 설정 값 바꾸기, 토큰을 안전하게 넣는 방법, 스킬 관리, 출력 모드 |
-| [업무와 위키](docs/guide/post-wiki.md) | 태그와 기간으로 거르기, 본문 일부 치환, 본문 형식, 멘션, 첨부 파일, 삭제 확인 |
+| [업무와 위키](docs/guide/post-wiki.md) | 태그와 기간으로 필터링, 본문 일부 치환, 본문 형식, 멘션, 첨부 파일, 삭제 확인 |
 | [메신저](docs/guide/messenger.md) | 메시지 보내기, 스레드, 대화방 목록, 메시지 조회 |
 | [캘린더](docs/guide/calendar.md) | 캘린더와 일정 조회, 일정 만들기·고치기·지우기 |
 | [문체 페르소나](docs/guide/persona.md) | 내 Dooray 글을 모아 에이전트가 내 문체로 쓰게 하는 스킬 |

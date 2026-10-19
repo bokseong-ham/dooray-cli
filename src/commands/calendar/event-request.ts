@@ -76,7 +76,7 @@ function parseIntInRange(flag: string, value: string, min: number, max: number):
 }
 
 /**
- * 쉼표 목록(`18,19,20`)의 각 값을 범위로 거르고 공백 없이 다시 잇는다.
+ * 쉼표 목록(`18,19,20`)의 각 값을 범위로 검증하고 공백 없이 다시 잇는다.
  * 서버는 쉼표 목록을 받아 각 값으로 전개한다(실측). 빈 항목(`18,,20`)은 거부한다.
  */
 function parseIntListInRange(flag: string, value: string, min: number, max: number): string {
@@ -105,7 +105,7 @@ export function hasRepeatDetail(opts: RepeatOptions): boolean {
  * `--repeat*` 옵션을 `recurrenceRule` 로 조립한다. `--repeat` 이 없으면 `undefined`.
  *
  * `timezoneName` 은 실행 장비의 시간대를 넣는다. `byday` 는 문서가 보여주는 표기가 여럿이라
- * (`TH`, `1 MO`, `-1 WE`) 손대지 않고 넘긴다. `bymonth`·`bymonthday` 는 쉼표 목록을 받고 각 값을 문서의 범위로 거른다.
+ * (`TH`, `1 MO`, `-1 WE`) 손대지 않고 넘긴다. `bymonth`·`bymonthday` 는 쉼표 목록을 받고 각 값을 문서의 범위로 검증한다.
  * `monthly` + `byday TH` + `bymonthday 18,...,24` 는 매월 18-24일 사이의 목요일이 된다(실측).
  */
 export function buildRecurrenceRule(
