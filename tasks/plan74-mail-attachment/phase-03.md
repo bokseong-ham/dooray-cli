@@ -33,13 +33,13 @@
 - 설명: `메일 첨부 파일 저장`
 - 인자: `<target>` — `메일 UID / 메일 웹 주소 / 웹 주소의 mail id`
 - 옵션:
-  - `--id <index>`: `저장할 첨부 순번 (mail get 이 보여 준 값, 여러 번 줄 수 있다. 없으면 모두 저장)`. 값마다 모아 배열로 받는다.
+  - `--id <index>`: `저장할 첨부 순번 (mail get 이 보여 준 값, 여러 번 줄 수 있다. 없으면 모두 저장)`. 값마다 commander 의 누적 파서로 모아 배열로 받는다. 값 검증은 아래 2번과 같은 자리(설정 조회 전)에서 한다.
   - `-o, --output <dir>`: `저장 디렉토리`, 기본 `.`
   - `--force`: `같은 이름의 파일을 덮어쓴다`
 - 동작 순서:
   1. `resolveMailTarget(target)` 으로 입력을 검사한다.
   2. `--id` 값이 1 이상의 정수가 아니면 `EXIT_PARAM_ERROR` 로 중단한다. 중복 값은 하나로 합친다. 여기까지는 설정 조회 전이다.
-  3. `getConfigOrThrow()`, `resolveMailUid(config, target)`, `getMailAttachments(config, uid, mailbox)`.
+  3. `getConfigOrThrow()`, `resolveMailUid(config, target)`, `getMailAttachments(config, uid, mailbox)`. 스피너는 `get.ts` 와 같게 조회 전체를 `try` 로 감싸고, `getMailAttachments` 직후 `stopSpinner(true, ...)` 를 부른다. 이후 단계(6번, `mkdir`)의 오류는 `catch` 에서 `stopSpinner(false)` 후 다시 던진다. 4번의 stderr 줄과 8번의 출력은 스피너를 끈 뒤에 쓴다. 5번의 조기 종료도 스피너를 끈 뒤다.
   4. `--json` 도 `--quiet` 도 아니면 stderr 에 `대상 메일: UID <uid> "<제목>"` 을 한 줄 쓴다. 제목은 `sanitizeForTerminal` 을 거친다.
   5. 첨부가 없고 `--id` 도 없으면 `--json` 은 `{ count: 0, succeeded: [], failed: [] }`, `--quiet` 는 아무것도 쓰지 않고, 그 밖에는 `첨부파일이 없습니다.` 를 stdout 에 쓰고 종료 코드 0 으로 끝낸다. 첨부가 없는데 `--id` 가 있으면 아래 6번으로 간다.
   6. `--id` 로 준 순번 중 메일에 없는 것이 있으면 파일을 하나도 쓰기 전에 `EXIT_PARAM_ERROR` 로 중단한다. 메시지에 없는 순번과 유효한 범위(`1-<n>`, 첨부가 없으면 `첨부 없음`)를 쓴다.
@@ -49,6 +49,7 @@
      - `EEXIST` 면 `failed` 에 `{ fileId: String(index), error: "이미 있습니다 (덮어쓰려면 --force): <path>" }` 를 더한다.
      - 그 밖의 오류는 `failed` 에 `{ fileId: String(index), error: <오류 메시지> }` 를 더한다.
      - 실패는 `--json` 이 아니면 stderr 에 `✗ <fileName> (<index>): <error>` 로 쓴다.
+     - `✓`, `✗` 줄과 오류 메시지에 들어가는 fileName 과 path 는 `sanitizeForTerminal` 을 거쳐 쓴다. `--json` 과 `--quiet` 의 경로 출력(`emitDownloadAllResult`)은 그대로 둔다.
   9. `emitDownloadAllResult(globalOpts, { count: 대상 수, succeeded, failed })`. `failed` 가 있으면 `process.exitCode = 1`.
 - 로직이 길어지면 `src/commands/post/file/download-all.ts` 처럼 한 파일 안의 action 에 둔다. 새 유틸 파일은 만들지 않는다.
 
@@ -65,6 +66,8 @@
 - 같은 이름의 파일이 이미 있으면 그 첨부는 실패하고(`failed` 에 순번) 기존 내용이 그대로이며 `process.exitCode` 가 1 이다. `--force` 를 주면 덮어쓴다.
 - 없는 순번(`--id 9`)은 `EXIT_PARAM_ERROR` 로 중단하고 어떤 파일도 쓰지 않는다. `--id 0` 과 `--id abc` 는 `getConfigOrThrow` 호출 전에 중단한다.
 - 첨부가 없는 메일(`--id` 없음)은 종료 코드 0 이고 파일을 만들지 않는다.
+- 쓰기 오류(EEXIST 가 아닌 것, 예: 출력 경로 자리에 디렉터리가 있음)는 그 첨부만 `failed` 로 세고 나머지는 계속 저장한다.
+- stderr 에 `대상 메일: UID` 줄이 평문 모드에서 한 번 나오고 `--json` 과 `--quiet` 에서는 나오지 않는다 (`process.stderr.write` 스파이). `--quiet` 의 stdout 은 저장한 경로뿐이다.
 - 메일 웹 주소 입력은 `resolveUidByMailId` 로 UID 를 찾는다 (`get.test.ts` 의 같은 이름 테스트를 참고).
 
 `process.exitCode` 를 바꾸는 테스트는 끝에서 `process.exitCode = undefined` 로 되돌린다.

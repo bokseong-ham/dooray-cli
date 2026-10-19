@@ -34,7 +34,7 @@ export function assignAttachmentFileNames(
 
 - `index` 는 1부터 시작하는 순번이다. 반환 Map 의 키도 `index` 다.
 - 이름은 `sanitizeFileName(filename)` 으로 정한다. `filename` 이 없거나 null 이 나오면 `attachment-<index>` 다.
-- 이미 쓰인 이름과 같으면(대소문자를 구분한다) `<확장자 앞까지>-<index><확장자>` 로 바꾼다. 확장자는 마지막 `.` 이후이고, 이름이 `.` 으로 시작하는 파일(`.env`)이나 `.` 이 없는 이름은 확장자가 없다. 바꾼 이름도 255바이트를 넘으면 `attachment-<index>` 로 대체한다.
+- 이미 쓰인 이름과 같으면 `<확장자 앞까지>-<index><확장자>` 로 바꾼다. 같은지는 NFC 로 정규화한 뒤 소문자로 바꾼 키로 비교한다 (macOS 기본 파일 시스템은 대소문자를 구분하지 않아 `A.crt` 와 `a.crt` 가 같은 파일이다). 바꾼 이름도 이미 쓰였으면 `<확장자 앞까지>-<index>-<n><확장자>` (n 은 2부터)로 비는 이름이 나올 때까지 올린다. 처리는 `index` 오름차순이고, `attachment-<index>` 대체 이름도 같은 중복 검사를 거친다. 모든 첨부의 최종 이름은 키 기준으로 서로 달라야 한다. 확장자는 마지막 `.` 이후이고, 이름이 `.` 으로 시작하는 파일(`.env`)이나 `.` 이 없는 이름은 확장자가 없다. 바꾼 이름도 255바이트를 넘으면 `attachment-<index>` 로 대체한다.
 - 파일 시스템에는 의존하지 않는다 (순수 함수).
 
 ### 2. `src/api/imapClient.ts` 변경
@@ -59,11 +59,11 @@ export function assignAttachmentFileNames(
   ```
 
   메일이 없으면 `getMail` 과 같은 메시지(`메일을 찾을 수 없습니다: UID ${uid}`)와 종료 코드 1 의 `DoorayCliError` 를 던진다. `subject` 는 envelope 의 제목이고 없으면 `(제목 없음)` 이다.
-- 두 함수가 `parsed.attachments` 를 같은 방식으로 `MailAttachmentInfo` 로 바꾸도록 비공개 헬퍼 하나로 묶는다. 이름은 이 헬퍼가 `mail-attachment-name.ts` 의 `assignAttachmentFileNames` 로 정한다.
+- 두 함수가 `parsed.attachments` 를 같은 방식으로 `MailAttachmentInfo` 로 바꾸도록 비공개 헬퍼 하나로 묶는다. 이 헬퍼가 `assignAttachmentFileNames` 를 호출해 `fileName` 을 정한다.
 
 ### 3. 테스트
 
-- `src/utils/mail-attachment-name.test.ts` 신규: 정상(이름 그대로), 이름 없음(`attachment-<index>`), 경로가 든 이름(`../a/b.txt` → `b.txt`), 같은 이름 둘(`a.crt`, `a-2.crt`), 확장자 없는 이름과 `.env` 의 중복, 255바이트 초과(`attachment-<index>`)를 확인한다.
+- `src/utils/mail-attachment-name.test.ts` 신규: 정상(이름 그대로), 이름 없음(`attachment-<index>`), 경로가 든 이름(`../a/b.txt` → `b.txt`), 같은 이름 둘(`a.crt`, `a-2.crt`), 확장자 없는 이름과 `.env` 의 중복, 255바이트 초과(`attachment-<index>`), 바꾼 이름이 또 겹치는 경우(`a`, `a-3`, `a` 순서), 대소문자만 다른 이름(`A.crt`, `a.crt`)을 확인한다.
 - `src/api/imapClient.test.ts` 에 추가: 첨부가 둘인 원문에서 `getMail` 의 `attachments` 가 순번 1, 2 와 이름과 크기와 `inline` 값을 돌려주고, 첨부가 없는 원문은 빈 배열을 돌려준다. `getMailAttachments` 가 `content` Buffer 를 돌려주고, 없는 UID 에서 `DoorayCliError` 를 던진다. 같은 이름 둘이 `a.crt`, `a-2.crt` 로 나온다.
 - 기존 `getMail` 테스트는 그대로 통과해야 한다.
 

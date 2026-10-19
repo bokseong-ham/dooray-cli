@@ -26,7 +26,7 @@
 
 ### 1. `src/commands/mail/get.ts` 변경
 
-- `--json` 객체의 `body` 앞이나 뒤가 아니라 **마지막 필드**로 `attachments: mail.attachments` 를 더한다. 항목 필드 이름은 `index`, `fileName`, `size`, `contentType`, `inline` 이고 `getMail` 이 돌려준 객체를 그대로 쓴다.
+- `--json` 객체의 `body` 다음에 **마지막 필드**로 `attachments: mail.attachments` 를 더한다. 항목 필드 이름은 `index`, `fileName`, `size`, `contentType`, `inline` 이고 `getMail` 이 돌려준 객체를 그대로 쓴다.
 - 평문에서 `읽음:` 줄 바로 다음에, `mail.attachments.length > 0` 일 때만 아래를 더한다. 그 뒤의 `\n${mail.body}\n` 구조는 그대로다.
 
   ```
@@ -35,7 +35,7 @@
     2. logo.png (3.0KB) [인라인]
   ```
 
-  굵게 하는 쪽은 `첨부:` 라벨이고 `chalk.bold` 를 다른 라벨과 같게 쓴다. `[인라인]` 은 `inline` 이 true 일 때만 붙인다. 파일 이름은 터미널 제어 문자를 막기 위해 `src/utils/sanitize.ts` 의 `sanitizeForTerminal` 을 거쳐 출력한다 (`imapClient` 의 이름은 이미 제어 문자를 지웠지만 출력 직전 방어를 같은 규약으로 둔다).
+  `첨부:` 라벨은 다른 라벨처럼 `chalk.bold` 로 감싼다. `[인라인]` 은 `inline` 이 true 일 때만 붙인다. 파일 이름은 터미널 제어 문자를 막기 위해 `src/utils/sanitize.ts` 의 `sanitizeForTerminal` 을 거쳐 출력한다 (`imapClient` 의 이름은 이미 제어 문자를 지웠지만 출력 직전 방어를 같은 규약으로 둔다).
 
 ### 2. `src/commands/mail/get.test.ts` 변경
 
