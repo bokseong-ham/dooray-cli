@@ -86,6 +86,7 @@ export const mailAttachmentCommand = new Command("attachment")
       const failed: { fileId: string; error: string }[] = [];
 
       for (const att of targets) {
+        // fileName 은 assignAttachmentFileNames 가 sanitizeFileName 으로 basename 만 남긴 값이라 경로를 벗어나지 않는다.
         const outputPath = join(opts.output, att.fileName);
         try {
           await writeFile(outputPath, att.content, { flag: opts.force ? "w" : "wx" });

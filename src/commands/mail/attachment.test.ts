@@ -179,4 +179,46 @@ describe("mailAttachmentCommand", () => {
     expect(mocks.resolveUidByMailId).toHaveBeenCalledWith(config, "1234567890123456789", "sent");
     expect(mocks.getMailAttachments).toHaveBeenCalledWith(config, 991, "sent");
   });
+
+  it("첨부가 없는 메일에 --id 를 주면 첨부 없음 안내와 함께 중단한다", async () => {
+    mocks.getMailAttachments.mockResolvedValue({ subject: "제목", attachments: [] });
+
+    await expect(run(["337", "--id", "1"])).rejects.toMatchObject({
+      exitCode: EXIT_PARAM_ERROR,
+      message: expect.stringContaining("첨부 없음"),
+    });
+
+    expect(await readdir(dir)).toEqual([]);
+  });
+
+  it("--id 중복은 합치고 오름차순으로 저장한다", async () => {
+    await run(["337", "--id", "2", "--id", "2", "--id", "1"], ["--json"]);
+
+    const result = JSON.parse(stdout());
+    expect(result.count).toBe(2);
+    expect(result.succeeded.map((s: { fileName: string }) => s.fileName)).toEqual(["a.txt", "b.txt"]);
+  });
+
+  it("평문은 저장한 파일마다 체크 줄을 stdout 에 쓴다", async () => {
+    await run(["337"]);
+
+    expect(stdout()).toContain("✓ a.txt\n");
+    expect(stdout()).toContain("✓ b.txt\n");
+  });
+
+  it("제목과 파일 이름의 제어 문자는 터미널 출력에서 ? 로 바꾼다", async () => {
+    mocks.getMailAttachments.mockResolvedValue({
+      subject: "t\x1b[2Jx",
+      attachments: [
+        { index: 1, fileName: "f\x1b[31m.txt", size: 1, contentType: "text/plain", inline: false, content: Buffer.from("A") },
+      ],
+    });
+
+    await run(["337"]);
+
+    expect(stderr()).toContain('"t?[2Jx"');
+    expect(stdout()).toContain("✓ f?[31m.txt");
+    expect(stdout()).not.toContain("\x1b");
+    expect(stderr()).not.toContain("\x1b");
+  });
 });
