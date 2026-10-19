@@ -1,11 +1,12 @@
 import { ImapFlow, type FetchMessageObject } from "imapflow";
-import { simpleParser, type ParsedMail } from "mailparser";
+import { simpleParser, type Attachment, type ParsedMail } from "mailparser";
 import type { Config } from "../config/types.js";
 import { DEFAULTS } from "../config/types.js";
 import { DoorayCliError } from "../utils/errors.js";
 import { EXIT_API_ERROR, EXIT_CONFIG_ERROR } from "../utils/exit-codes.js";
 import { decodeDoorayIdTimeMs } from "../utils/dooray-id.js";
 import { sanitizeFileName } from "../utils/attachment-check.js";
+import { assignAttachmentFileNames } from "../utils/mail-attachment-name.js";
 import { toMailConnectionError } from "./mailErrors.js";
 
 // SEARCH SINCE/BEFORE 는 일자 단위라 질의에 앞뒤 하루씩을 준다 (ADR-040 의 보강 절).
@@ -27,6 +28,15 @@ export interface MailMessage {
   date: Date | null;
   isRead: boolean;
   body?: string;
+}
+
+// 첨부의 식별자는 parsed.attachments 의 순번(1부터)이다. IMAP 에는 안정적인 첨부 ID 가 없다 (ADR-071).
+export interface MailAttachmentInfo {
+  index: number;
+  fileName: string;
+  size: number;
+  contentType: string;
+  inline: boolean;
 }
 
 export interface MailIdCandidate {
@@ -153,7 +163,12 @@ export async function getMail(
   config: Config,
   uid: number,
   mailbox = "INBOX",
-): Promise<MailMessage & { body: string; internalDate: Date | null; messageId: string | null }> {
+): Promise<MailMessage & {
+  body: string;
+  internalDate: Date | null;
+  messageId: string | null;
+  attachments: MailAttachmentInfo[];
+}> {
   const client = createImapClient(config);
 
   try {
@@ -204,6 +219,69 @@ export async function getMail(
         messageId: envelope.messageId ?? null,
         isRead: flags.has("\\Seen"),
         body,
+        attachments: toAttachmentInfos(parsed.attachments).map(({ info }) => info),
+      };
+    } finally {
+      lock.release();
+    }
+  } finally {
+    await closeImapClient(client);
+  }
+}
+
+function toAttachmentInfos(
+  attachments: Attachment[],
+): Array<{ info: MailAttachmentInfo; content: Buffer }> {
+  const names = assignAttachmentFileNames(
+    attachments.map((attachment, i) => ({ index: i + 1, filename: attachment.filename })),
+  );
+  return attachments.map((attachment, i) => ({
+    info: {
+      index: i + 1,
+      fileName: names.get(i + 1) ?? `attachment-${i + 1}`,
+      size: attachment.size,
+      contentType: attachment.contentType,
+      inline: attachment.contentDisposition === "inline" || attachment.related === true,
+    },
+    content: attachment.content,
+  }));
+}
+
+export async function getMailAttachments(
+  config: Config,
+  uid: number,
+  mailbox = "INBOX",
+): Promise<{ subject: string; attachments: Array<MailAttachmentInfo & { content: Buffer }> }> {
+  const client = createImapClient(config);
+
+  try {
+    await connectImapClient(client, config);
+    const lock = await client.getMailboxLock(mailbox);
+
+    try {
+      const msg = await client.fetchOne(String(uid), {
+        uid: true,
+        envelope: true,
+        source: true,
+      }, { uid: true });
+
+      if (!msg) {
+        throw new DoorayCliError(`메일을 찾을 수 없습니다: UID ${uid}`, 1);
+      }
+      if (!msg.source) {
+        throw new DoorayCliError(
+          `메일 메타데이터가 불완전합니다 (UID ${uid}): source 누락`,
+          1,
+        );
+      }
+
+      const parsed: ParsedMail = await simpleParser(msg.source);
+      return {
+        subject: msg.envelope?.subject ?? "(제목 없음)",
+        attachments: toAttachmentInfos(parsed.attachments).map(({ info, content }) => ({
+          ...info,
+          content,
+        })),
       };
     } finally {
       lock.release();

@@ -54,7 +54,7 @@ src/
 
 ```
 commands/* → resolvers/* → cache/store + api/client   (읽기: 이름 → id 번역)
-commands/mail/{get,reply} → resolvers/mail-input → api/imapClient   (캐시 없이 mail id → UID 조회)
+commands/mail/{get,attachment,reply} → resolvers/mail-input → api/imapClient   (캐시 없이 mail id → UID 조회)
 commands/* → services/*  → cache/store + api/client + config/store   (쓰기: 변경과 캐시 무효화, ADR-042)
 commands/* → formatters/*
 commands/* → utils/errors

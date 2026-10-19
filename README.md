@@ -86,7 +86,7 @@ CLI 를 새 버전으로 올린 뒤에는 `dooray skill update` 를 한 번 실�
 | 위키 | 페이지 조회, 생성, 수정, 본문 일부 치환, 이동, 삭제, 댓글, 첨부 파일 | `dooray wiki` | [업무와 위키](docs/guide/post-wiki.md) |
 | 프로젝트 | 프로젝트, 멤버, 태그, 워크플로우, 템플릿 조회와 태그 생성 | `dooray project` | [업무와 위키](docs/guide/post-wiki.md#프로젝트-태그-만들기) |
 | 메신저 | 1:1 메시지, 대화방 메시지, 스레드, 대화방 목록, 메시지 조회 | `dooray messenger` | [메신저](docs/guide/messenger.md) |
-| 메일 | 목록, 상세 조회, 발송, 답장 | `dooray mail` | `dooray mail --help` |
+| 메일 | 목록, 상세 조회, 발송, 답장, 첨부 파일 내려받기 | `dooray mail` | `dooray mail --help` |
 | 캘린더 | 캘린더와 일정 조회 (읽기 전용) | `dooray calendar` | [캘린더](docs/guide/calendar.md) |
 | 멤버 | 조직 멤버 검색과 상세 조회 | `dooray member` | `dooray member --help` |
 
@@ -103,6 +103,7 @@ dooray post replace <project> 42 --old "초안" --new "확정"   # 본문 일부
 dooray post done <project> 42                       # 완료 처리
 dooray wiki pages <project>                         # 위키 페이지 목록
 dooray mail list --unread                           # 안 읽은 메일
+dooray mail attachment <uid> -o ./files             # 메일 첨부 파일 저장
 dooray messenger channel-send --channel "배포알림" --body "배포 완료"
 dooray calendar event list                          # 오늘 일정
 ```
@@ -135,7 +136,7 @@ dooray post comment add --id "$POST_ID" --body "시작합니다"
 | 문서 | 내용 |
 | --- | --- |
 | [설치와 설정](docs/guide/setup.md) | 설정 값 바꾸기, 토큰을 안전하게 넣는 방법, 스킬 관리, 출력 모드 |
-| [업무와 위키](docs/guide/post-wiki.md) | 태그와 기간으로 거르기, 본문 일부 치환, 본문 형식, 멘션, 첨부 파일, 삭제 확인 |
+| [업무와 위키](docs/guide/post-wiki.md) | 태그와 기간으로 필터링, 본문 일부 치환, 본문 형식, 멘션, 첨부 파일, 삭제 확인 |
 | [메신저](docs/guide/messenger.md) | 메시지 보내기, 스레드, 대화방 목록, 메시지 조회 |
 | [캘린더](docs/guide/calendar.md) | 캘린더와 일정 조회 |
 | [문체 페르소나](docs/guide/persona.md) | 내 Dooray 글을 모아 에이전트가 내 문체로 쓰게 하는 스킬 |

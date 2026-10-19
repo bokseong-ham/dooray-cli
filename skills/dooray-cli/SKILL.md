@@ -12,12 +12,12 @@ NHN Dooray REST API 를 래핑한 CLI 다. 이 파일은 라우터이므로, 작
 | 하려는 일 | reference |
 | --- | --- |
 | 설치·초기 설정, 출력 모드, API 제약, 에러 처리, 캐시, 피드백 등록 | [common.md](references/common.md) |
-| 업무 식별·생성·수정·삭제, 목록 거르기, 본문 일부 치환, 참조자·담당자 변경, 첨부 보호, 부모 지정, 태그 | [post.md](references/post.md) |
+| 업무 식별·생성·수정·삭제, 목록 필터링, 본문 일부 치환, 참조자·담당자 변경, 첨부 보호, 부모 지정, 태그 | [post.md](references/post.md) |
 | 업무 댓글 추가·필터·조회 | [comment.md](references/comment.md) |
 | 위키 페이지 조회·트리·삭제, 본문 일부 치환, 첨부와 인라인 이미지, 위키 댓글 | [wiki.md](references/wiki.md) |
 | 그룹 멘션·cc 판단, 멘션·링크 자동 삽입, Dooray 마크다운 링크 | [mention-link.md](references/mention-link.md) |
 | 워크플로우 판단 기준, 정형 task 자동화, 명령 체이닝 | [workflow.md](references/workflow.md) |
-| 메일 원본 선택, 답장 전 확인 | [mail.md](references/mail.md) |
+| 메일 원본 선택, 답장 전 확인, 첨부 저장 | [mail.md](references/mail.md) |
 | 메신저 대화방 찾기, 메시지 읽기, 스레드 보고 | [messenger.md](references/messenger.md) |
 | 캘린더 기간 조회, 일정 상세, 참석자 | [calendar.md](references/calendar.md) |
 
@@ -114,10 +114,10 @@ NHN Dooray REST API 를 래핑한 CLI 다. 이 파일은 라우터이므로, 작
 | 의도 | 커맨드 |
 | --- | --- |
 | 업무 목록 | `dooray post list <project>` — `--all` 로 모든 페이지를 이어 받는다 |
-| 태그로 거르기 | `dooray post list <project> --tag "<이름>"` — 반복 가능하고, 여러 번 주면 그 태그를 모두 가진 업무만 온다 |
-| 사람으로 거르기 | `dooray post list <project> --from me` — 등록자 `--from`, 담당자 `--to`, 참조자 `--cc`. 옵션마다 한 명이고 `me`·id·이메일·이름을 받는다 |
+| 태그로 필터링 | `dooray post list <project> --tag "<이름>"` — 반복 가능하고, 여러 번 주면 그 태그를 모두 가진 업무만 온다 |
+| 사람으로 필터링 | `dooray post list <project> --from me` — 등록자 `--from`, 담당자 `--to`, 참조자 `--cc`. 옵션마다 한 명이고 `me`·id·이메일·이름을 받는다 |
 | 하위 업무만 | `dooray post list <project> --parent <number>` — 이 프로젝트의 업무 번호다. `<project>/<number>` 와 postId 도 받는다 |
-| 기간으로 거르기 | `dooray post list <project> --created 2026-09-01~2026-09-30` — 수정 기간은 `--updated`. `A~`, `"~B"`(따옴표 필수), `prev-7d` 도 받는다 |
+| 기간으로 필터링 | `dooray post list <project> --created 2026-09-01~2026-09-30` — 수정 기간은 `--updated`. `A~`, `"~B"`(따옴표 필수), `prev-7d` 도 받는다 |
 | 정렬 바꾸기 | `dooray post list <project> --order -postUpdatedAt` — `createdAt`·`postUpdatedAt`·`postDueAt`, `-` 는 내림차순. 기본 `-createdAt` |
 | 업무 검색 | `dooray post search <project> "<keyword>"` — projectId(15자리 이상 numeric) 를 넣으면 캐시를 우회한다 |
 | 업무 상세 | `dooray post get <project> <number>` 또는 `dooray post get --id <postId>` — 일반 출력에는 태그가 이름으로 나온다 |
@@ -257,12 +257,13 @@ dooray post get <project> <number> --json --with-tag-names
 | 메일 목록 | `dooray mail list` |
 | 안 읽은 메일 | `dooray mail list --unread` |
 | 제목 검색 | `dooray mail list --search "<keyword>"` |
-| 메일 상세 | `dooray mail get <uid\|url\|mail-id>` — `mail list` 의 UID, 메일 웹 주소, 그 주소의 19자리 id 를 모두 받는다 |
+| 메일 상세 | `dooray mail get <uid\|url\|mail-id>` — `mail list` 의 UID, 메일 웹 주소, 그 주소의 19자리 id 를 모두 받는다. 첨부가 있으면 1부터 시작하는 순번과 함께 목록을 보여 주고, `--json` 은 `attachments` 배열을 준다 |
+| 메일 첨부 저장 | `dooray mail attachment <uid\|url\|mail-id> [--id <순번>]... [-o <dir>] [--force]` — 순번은 `mail get` 이 보여 준 값이고, 주지 않으면 모두 저장한다. 같은 이름의 파일이 있으면 그 첨부는 실패하고 `--force` 일 때만 덮어쓴다 |
 | 메일 발송 | `dooray mail send --to "..." --subject "..." --body "..."` — 숨은참조는 `--bcc`, HTML 본문은 `--html` |
 | 메일 답장 | `dooray mail reply <uid\|url\|mail-id> --body "..."` — HTML 본문은 `--html` |
 | 저장된 인증정보 제거 | `dooray mail logout` (비대화형 환경은 `--yes`) |
 
-답장하거나 메일 웹 주소로 원본을 고를 때는 [mail.md](references/mail.md) 를 먼저 읽는다.
+답장하거나 메일 웹 주소로 원본을 고르거나 첨부를 저장할 때는 [mail.md](references/mail.md) 를 먼저 읽는다.
 
 ## 메신저
 
@@ -295,4 +296,4 @@ dooray post get <project> <number> --json --with-tag-names
 
 `--from`·`--to` 는 명령마다 뜻이 다르다.
 `post list` 에서는 등록자·담당자 **멤버** 필터이고, `calendar event list` 에서는 조회 기간의 시작·끝 **날짜**다.
-업무를 기간으로 거르려면 `post list` 의 `--created`(등록)·`--updated`(수정)를 쓴다.
+업무를 기간으로 필터링하려면 `post list` 의 `--created`(등록)·`--updated`(수정)를 쓴다.

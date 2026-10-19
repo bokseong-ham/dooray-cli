@@ -42,7 +42,7 @@ cd <repo root> && npm publish --access public
 ```
 
 **`--otp=<code>` 를 안내하지 않는다.** 계정의 2단계 인증이 `auth-and-writes` 이면
-npm 이 브라우저 인증 URL 을 띄우고 ENTER 를 기다린다. 코드를 손으로 넣는 흐름이 아니다.
+npm 이 브라우저 인증 URL 을 띄우고 ENTER 를 기다린다. 코드를 직접 입력하는 흐름이 아니다.
 
 게시가 접수되면 npm 이 `Your package is being processed and may take a few minutes to become available.` 를 낸다.
 최신 버전은 몇 분 뒤에 바뀌고, 그 사이 `npm view` 는 이전 버전을 보여 준다.
