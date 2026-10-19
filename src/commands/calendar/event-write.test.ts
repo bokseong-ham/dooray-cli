@@ -294,6 +294,41 @@ describe("calendar event create", () => {
   });
 });
 
+describe("calendar event edit 의 개인 설정 경고", () => {
+  const warnings = (): string =>
+    stderr.mock.calls.map((c: unknown[]) => String(c[0])).join("");
+
+  it("--alarm 만 주면 비공개가 풀린다고 알린다", async () => {
+    await run(["calendar", "event", "edit", CALENDAR_ID, EVENT_ID, "--alarm", "30m"]);
+    expect(warnings()).toContain("공개로 바뀝니다");
+    expect(warnings()).not.toContain("알림이 모두 지워집니다");
+  });
+
+  it("--private 만 주면 알림이 지워진다고 알린다", async () => {
+    await run(["calendar", "event", "edit", CALENDAR_ID, EVENT_ID, "--private"]);
+    expect(warnings()).toContain("알림이 모두 지워집니다");
+    expect(warnings()).not.toContain("공개로 바뀝니다");
+  });
+
+  it("둘 다 주면 알리지 않는다", async () => {
+    await run(["calendar", "event", "edit", CALENDAR_ID, EVENT_ID, "--private", "--alarm", "10m"]);
+    expect(warnings()).not.toContain("⚠");
+  });
+
+  it("알림 없이 종일 시각을 주면 알림이 지워진다고 알린다", async () => {
+    await run(["calendar", "event", "edit", CALENDAR_ID, EVENT_ID, "--start", "2026-09-18"]);
+    expect(warnings()).toContain("종일로 바꾸면");
+  });
+
+  it("일반 시각이나 제목만 고치면 알리지 않는다", async () => {
+    await run([
+      "calendar", "event", "edit", CALENDAR_ID, EVENT_ID,
+      "--title", "회의", "--start", "2026-09-18T10:00:00+09:00", "--end", "2026-09-18T11:00:00+09:00",
+    ]);
+    expect(warnings()).not.toContain("⚠");
+  });
+});
+
 describe("calendar event edit", () => {
   it("수정할 옵션이 없으면 설정을 읽기 전에 끝낸다", async () => {
     await expectParamErrorBeforeConfig(run(["calendar", "event", "edit", CALENDAR_ID, EVENT_ID]));

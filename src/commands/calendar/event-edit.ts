@@ -4,6 +4,7 @@
  * 서버는 빈 값이 아닌 필드만 반영하므로(공식 문서) 사용자가 준 옵션의 필드만 보낸다. 다만 `users` 는 통째로 바뀌므로(실측)
  * `--to`·`--cc` 중 한쪽만 주면 상세를 조회해 다른 쪽을 기존 값으로 채운다.
  * 반복 일정 회차 id 는 거부한다. 회차 id 로 수정하면 남은 회차 전체가 바뀐다(실측).
+ * `personalSettings`(알림·비공개)도 통째로 바뀌는데 상세 응답에 없어 채울 수 없으므로, 지워질 설정을 stderr 로 알린다.
  * 시각은 기존 값을 조회하지 않는다. 일반 일정은 `--start` 와 `--end` 를 함께 줘야 하고 종일은 `--start` 만 줘도 된다.
  * `$EDITOR` 로 폴백하지 않는다. 일정에는 편집기로 고칠 하나의 본문이 아니라 필드가 여럿이다.
  */
@@ -21,6 +22,7 @@ import {
 } from "../../resolvers/calendar.js";
 import { DoorayCliError } from "../../utils/errors.js";
 import { EXIT_PARAM_ERROR } from "../../utils/exit-codes.js";
+import { isDateOnlyForm } from "../../utils/local-date.js";
 import { startSpinner, stopSpinner } from "../../utils/spinner.js";
 import {
   instanceOriginalId,
@@ -56,6 +58,33 @@ export function rejectInstanceId(eventId: string): void {
   );
 }
 
+/**
+ * 수정에서 지워질 수 있는 개인 설정을 stderr 로 알린다.
+ *
+ * 서버는 `personalSettings` 를 통째로 바꾸고(실측) 상세 응답에는 그 값이 없어 기존 값을 채워 보낼 수 없다.
+ * `--alarm` 만 주면 비공개가 공개로, `--private` 만 주면 알림이 모두 지워진다.
+ * 일반 일정을 종일로 바꿔도 알림이 지워진다(실측). 기존 일정이 일반인지 모르므로 종일 시각을 주면 알린다.
+ */
+export function warnPersonalSettingsReset(opts: EventFieldOptions): void {
+  const hasAlarm = (opts.alarm ?? []).length > 0;
+  const isPrivate = opts.private === true;
+  if (hasAlarm && !isPrivate) {
+    process.stderr.write(
+      "⚠  --alarm 만 주면 비공개 일정이 공개로 바뀝니다. 비공개를 유지하려면 --private 를 함께 주세요.\n",
+    );
+  }
+  if (isPrivate && !hasAlarm) {
+    process.stderr.write(
+      "⚠  --private 만 주면 기존 알림이 모두 지워집니다. 알림을 유지하려면 --alarm 을 함께 주세요.\n",
+    );
+  }
+  if (!hasAlarm && opts.start != null && isDateOnlyForm(opts.start)) {
+    process.stderr.write(
+      "⚠  일반 일정을 종일로 바꾸면 기존 알림이 지워집니다. 알림이 필요하면 --alarm 을 함께 주세요.\n",
+    );
+  }
+}
+
 export const calendarEventEditCommand = addEventFieldOptions(
   new Command("edit")
     .description("일정 수정 (준 옵션의 필드만 바꾼다. 반복 일정 회차 id 는 받지 않는다)")
@@ -68,6 +97,7 @@ export const calendarEventEditCommand = addEventFieldOptions(
   if (!hasEventFieldOption(opts)) throw nothingToEdit();
   const prepared = await prepareEventFields(opts);
   if (opts.dryRun) warnDryRunOutputOptions(globalOpts);
+  warnPersonalSettingsReset(opts);
 
   const config = await getConfigOrThrow();
   const client = new DoorayApiClient(config.apiKey, config.baseUrl);
