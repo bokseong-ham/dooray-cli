@@ -70,6 +70,11 @@ import type {
   CalendarListResponse,
   CalendarEventListResponse,
   CalendarEventDetailResponse,
+  CalendarEventWriteRequest,
+  CreateCalendarEventResponse,
+  UpdateCalendarEventResponse,
+  CalendarEventDeleteType,
+  DeleteCalendarEventResponse,
 } from "./types.js";
 
 export interface GetPostsParams {
@@ -1187,6 +1192,54 @@ export class DoorayApiClient {
       return await this.api
         .get(`calendar/v1/calendars/${calendarId}/events/${eventId}`)
         .json<CalendarEventDetailResponse>();
+    } catch (e) {
+      throw await toDoorayCliError(e);
+    }
+  }
+
+  async createCalendarEvent(
+    calendarId: string,
+    body: CalendarEventWriteRequest,
+  ): Promise<CreateCalendarEventResponse> {
+    try {
+      return await this.api
+        .post(`calendar/v1/calendars/${calendarId}/events`, { json: body })
+        .json<CreateCalendarEventResponse>();
+    } catch (e) {
+      throw await toDoorayCliError(e);
+    }
+  }
+
+  /** 빈 값이 아닌 필드만 반영한다(공식 문서). 성공 응답의 `result` 는 `null` 이다. */
+  async updateCalendarEvent(
+    calendarId: string,
+    eventId: string,
+    body: CalendarEventWriteRequest,
+  ): Promise<UpdateCalendarEventResponse> {
+    try {
+      return await this.api
+        .put(`calendar/v1/calendars/${calendarId}/events/${eventId}`, { json: body })
+        .json<UpdateCalendarEventResponse>();
+    } catch (e) {
+      throw await toDoorayCliError(e);
+    }
+  }
+
+  /**
+   * 삭제는 `DELETE` 가 아니라 `POST .../delete` 다(공식 문서).
+   * 반복 일정의 한 회차는 `<eventId>-20240228T013000Z` 같은 id 를 그대로 경로에 넣는다.
+   */
+  async deleteCalendarEvent(
+    calendarId: string,
+    eventId: string,
+    deleteType: CalendarEventDeleteType,
+  ): Promise<DeleteCalendarEventResponse> {
+    try {
+      return await this.api
+        .post(`calendar/v1/calendars/${calendarId}/events/${eventId}/delete`, {
+          json: { deleteType },
+        })
+        .json<DeleteCalendarEventResponse>();
     } catch (e) {
       throw await toDoorayCliError(e);
     }
