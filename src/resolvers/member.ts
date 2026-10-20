@@ -227,7 +227,7 @@ const NAME_SEARCH_MAX_PAGES = 5;
  * 3. 그 밖 → 조직 전체 이름 검색에서 **이름 정확일치만** 인정한다.
  *    조직 전체는 동명이인과 부분일치가 많아 프로젝트 resolver 의 부분일치 폴백을 쓰지 않는다.
  *    0건이면 오류, 정확일치가 여럿이면 이름과 id 를 나열하고 오류로 끝낸다.
- *    검색은 쪽 상한까지만 넘긴다. 상한에 닿으면 그때까지의 정확일치로 판정하고, 0건일 때만 결과가 너무 많다고 알린다.
+ *    검색은 쪽 상한까지만 넘긴다. 상한에 닿으면 정확일치를 찾았어도 오류로 끝내고, 찾은 후보를 함께 보여준다.
  */
 export async function resolveOrganizationMember(
   client: DoorayApiClient,
@@ -243,12 +243,17 @@ export async function resolveOrganizationMember(
   let seen = 0;
   for (let page = 0; ; page++) {
     if (page >= NAME_SEARCH_MAX_PAGES) {
-      // 상한까지 본 결과로 판정한다. 정확일치가 하나면 그 사람을, 여럿이면 아래의 동명이인 오류를 낸다.
-      // 하나도 없을 때만 남은 쪽에 있을 수 있으므로 결과가 너무 많다고 알린다.
-      if (exact.length > 0) break;
+      // 보지 못한 쪽에 같은 이름의 사람이 더 있을 수 있다. 일정 초대는 상대에게 알림이 가서
+      // 틀린 사람을 고르면 되돌릴 수 없으므로, 정확일치를 찾았어도 고르지 않는다.
+      // 대신 찾은 후보를 보여줘 id 로 바로 다시 실행할 수 있게 한다.
+      const found =
+        exact.length > 0
+          ? `\n상한까지 찾은 정확일치 (이 밖에도 더 있을 수 있습니다):\n` +
+            exact.map((m) => `  - ${m.name} (${m.id})`).join("\n")
+          : "";
       throw new DoorayCliError(
-        `이름 "${input}" 의 검색 결과가 너무 많습니다. organizationMemberId 나 이메일로 지정하세요 ` +
-          `(dooray member search 로 확인)`,
+        `이름 "${input}" 의 검색 결과가 너무 많아 끝까지 보지 못했습니다. organizationMemberId 나 이메일로 지정하세요 ` +
+          `(dooray member search 로 확인)${found}`,
         EXIT_PARAM_ERROR,
       );
     }

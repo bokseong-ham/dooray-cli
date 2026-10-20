@@ -12,6 +12,7 @@ import type {
   CalendarEventUser,
   CalendarEventPersonalSettings,
   CalendarEventRecurrenceRule,
+  CalendarEventRecurrenceRuleDetail,
   CalendarEventWriteRequest,
   CalendarEventWriteUser,
 } from "../../api/types.js";
@@ -290,6 +291,57 @@ export function mergeExistingUsers(
 export function needsExistingUsers(req: CalendarEventWriteRequest): boolean {
   const users = req.users;
   return users != null && (users.to != null) !== (users.cc != null);
+}
+
+/** 기존 규칙에서 채울 수 있는 세부 필드와 그 값을 준 옵션. */
+const RECURRENCE_FILL_FIELDS = [
+  ["interval", "repeatInterval"],
+  ["until", "repeatUntil"],
+  ["byday", "repeatByday"],
+  ["bymonth", "repeatBymonth"],
+  ["bymonthday", "repeatBymonthday"],
+] as const;
+
+/** 상세 응답에만 있고 CLI 가 보내지 않는 필드. 응답 형태를 다시 담는 `startedAt`·`endedAt`·`timezoneName` 은 뺀다. */
+const RECURRENCE_ECHO_FIELDS = new Set(["frequency", "startedAt", "endedAt", "timezoneName"]);
+
+/**
+ * 수정 요청의 반복 규칙에서 사용자가 주지 않은 세부 필드를 기존 규칙으로 채운다.
+ *
+ * 서버는 `recurrenceRule` 을 통째로 바꾼다(실측). `--repeat monthly --repeat-until <날짜>` 만 보내면
+ * 간격이 1 로, `byday`·`bymonthday` 가 빈 값으로 바뀐다. `--repeat-until` 을 주지 않으면 종료일도 지워진다.
+ * 주기가 기존과 같을 때만 채운다. 주기가 바뀌면 기존 세부 값이 새 주기와 맞지 않을 수 있어 채우지 않는다.
+ * `dropped` 는 이 수정으로 지워질 기존 필드다. 주기가 바뀌어 채우지 않은 필드와,
+ * CLI 가 다루지 않아 다시 보낼 수 없는 `count`·`bysetpos` 같은 필드가 들어간다.
+ */
+export function mergeExistingRecurrence(
+  rule: CalendarEventRecurrenceRule,
+  given: RepeatOptions,
+  existing: CalendarEventRecurrenceRuleDetail | null | undefined,
+): { rule: CalendarEventRecurrenceRule; dropped: string[] } {
+  if (existing?.frequency == null) return { rule, dropped: [] };
+
+  const merged: CalendarEventRecurrenceRule = { ...rule };
+  const dropped: string[] = [];
+  const sameFrequency = existing.frequency === rule.frequency;
+  for (const [field, option] of RECURRENCE_FILL_FIELDS) {
+    const value = existing[field];
+    if (value == null || given[option] != null) continue;
+    if (!sameFrequency) {
+      // 간격 1 은 서버 기본값과 같아 지워져도 달라지는 것이 없다.
+      if (field !== "interval" || value !== 1) dropped.push(field);
+      continue;
+    }
+    if (field === "interval") merged.interval = value as number;
+    else merged[field] = value as string;
+  }
+
+  const known = new Set<string>(RECURRENCE_FILL_FIELDS.map(([field]) => field));
+  for (const [field, value] of Object.entries(existing)) {
+    if (value == null || known.has(field) || RECURRENCE_ECHO_FIELDS.has(field)) continue;
+    dropped.push(field);
+  }
+  return { rule: merged, dropped };
 }
 
 const INSTANCE_ID_RE = /^(.+)-(\d{8}T\d{6}Z)$/;

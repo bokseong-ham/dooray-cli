@@ -5,7 +5,8 @@
  * `--to`·`--cc` 중 한쪽만 주면 상세를 조회해 다른 쪽을 기존 값으로 채운다.
  * 반복 일정 회차 id 는 거부한다. 회차 id 로 수정하면 남은 회차 전체가 바뀐다(실측).
  * `personalSettings`(알림·비공개)도 통째로 바뀌는데 상세 응답에 없어 채울 수 없으므로, 지워질 설정을 stderr 로 알린다.
- * 시각은 기존 값을 조회하지 않는다. 일반 일정은 `--start` 와 `--end` 를 함께 줘야 하고 종일은 `--start` 만 줘도 된다.
+ * `recurrenceRule` 도 통째로 바뀐다(실측). `--repeat` 을 주면 상세를 조회해, 주기가 같을 때 주지 않은 세부 옵션을 기존 값으로 채운다.
+ * 시각은 기존 값을 조회하지 않는다. 그래서 종일 일정도 `--start` 와 `--end` 를 함께 줘야 한다.
  * `$EDITOR` 로 폴백하지 않는다. 일정에는 편집기로 고칠 하나의 본문이 아니라 필드가 여럿이다.
  */
 
@@ -27,6 +28,7 @@ import { startSpinner, stopSpinner } from "../../utils/spinner.js";
 import {
   instanceOriginalId,
   isEmptyEventRequest,
+  mergeExistingRecurrence,
   mergeExistingUsers,
   needsExistingUsers,
 } from "./event-request.js";
@@ -85,6 +87,19 @@ export function warnPersonalSettingsReset(opts: EventFieldOptions): void {
   }
 }
 
+/**
+ * 반복 규칙 수정으로 지워질 기존 필드를 stderr 로 알린다.
+ * 서버는 `recurrenceRule` 을 통째로 바꾼다(실측). 주기가 같으면 빠진 필드를 기존 값으로 채우지만,
+ * 주기를 바꾸거나 CLI 가 다루지 않는 필드가 있으면 채우지 않는다.
+ */
+export function warnRecurrenceDropped(dropped: string[]): void {
+  if (dropped.length === 0) return;
+  process.stderr.write(
+    `⚠  이 수정으로 기존 반복 규칙의 ${dropped.join(", ")} 이(가) 지워집니다. ` +
+      "--repeat-* 옵션이 있는 값은 함께 주면 유지됩니다.\n",
+  );
+}
+
 export const calendarEventEditCommand = addEventFieldOptions(
   new Command("edit")
     .description("일정 수정 (준 옵션의 필드만 바꾼다. 반복 일정 회차 id 는 받지 않는다)")
@@ -95,7 +110,7 @@ export const calendarEventEditCommand = addEventFieldOptions(
 
   rejectInstanceId(eventId);
   if (!hasEventFieldOption(opts)) throw nothingToEdit();
-  const prepared = await prepareEventFields(opts);
+  const prepared = await prepareEventFields(opts, "edit");
   if (opts.dryRun) warnDryRunOutputOptions(globalOpts);
   warnPersonalSettingsReset(opts);
 
@@ -105,13 +120,19 @@ export const calendarEventEditCommand = addEventFieldOptions(
   startSpinner(opts.dryRun ? "이름 해석 중..." : "일정 수정 중...");
   let calendar: ResolvedCalendar;
   let request: CalendarEventWriteRequest;
+  let recurrenceDropped: string[] = [];
   try {
     calendar = await resolveWritableCalendar(client, calendarInput);
     request = await resolveEventRequest(client, prepared, "edit");
     // dry-run 도 같은 조회를 해서 실제로 보낼 본문을 보여준다.
-    if (needsExistingUsers(request)) {
-      const res = await client.getCalendarEvent(calendar.id, eventId);
-      request = mergeExistingUsers(request, res.result?.users);
+    if (needsExistingUsers(request) || request.recurrenceRule != null) {
+      const existing = (await client.getCalendarEvent(calendar.id, eventId)).result;
+      request = mergeExistingUsers(request, existing?.users);
+      if (request.recurrenceRule != null) {
+        const merged = mergeExistingRecurrence(request.recurrenceRule, opts, existing?.recurrenceRule);
+        request = { ...request, recurrenceRule: merged.rule };
+        recurrenceDropped = merged.dropped;
+      }
     }
   } catch (e) {
     stopSpinner(false);
@@ -123,6 +144,7 @@ export const calendarEventEditCommand = addEventFieldOptions(
     throw nothingToEdit();
   }
   const calendarLabel = formatCalendarLabel(calendar);
+  warnRecurrenceDropped(recurrenceDropped);
 
   if (opts.dryRun) {
     stopSpinner(true, `dry-run: ${calendarLabel} 의 일정 ${eventId} 에 보낼 요청입니다. API 는 부르지 않았습니다.`);

@@ -112,6 +112,16 @@ describe("resolveEventSchedule — 일반 일정", () => {
 });
 
 describe("resolveEventSchedule — 수정 경로", () => {
+  it("종일 시각에 --end 가 없으면 거부한다. 여러 날 일정이 하루로 줄지 않게 한다", () => {
+    expect(() => resolveEventSchedule("2026-10-01", undefined, "edit")).toThrow(/수정에서는 종일 일정도 --end/);
+  });
+
+  it("종일 시각에 --end 를 주면 생성과 같이 보낸다", () => {
+    expect(resolveEventSchedule("2026-10-01", "2026-10-01", "edit")).toEqual(
+      resolveEventSchedule("2026-10-01", "2026-10-01"),
+    );
+  });
+
   it("둘 다 없으면 시각을 건드리지 않는다", () => {
     expect(resolveEventSchedule(undefined, undefined)).toBeNull();
   });

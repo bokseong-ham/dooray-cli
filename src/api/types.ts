@@ -806,9 +806,23 @@ export interface CalendarEventBody {
   content: string;
 }
 
-/** 상세는 목록 항목에 body 가 더해진 형태다. */
+/**
+ * 상세 응답의 반복 규칙. 쓰기 요청에 없는 `count`·`bysetpos`·`wkst` 같은 필드도 오고, 없는 값은 `null` 이다(실측).
+ */
+export interface CalendarEventRecurrenceRuleDetail {
+  frequency?: string | null;
+  interval?: number | null;
+  until?: string | null;
+  byday?: string | null;
+  bymonth?: string | null;
+  bymonthday?: string | null;
+  [field: string]: unknown;
+}
+
+/** 상세는 목록 항목에 body 가 더해진 형태다. 반복 일정이면 recurrenceRule 도 온다. */
 export interface CalendarEventDetail extends CalendarEvent {
   body?: CalendarEventBody;
+  recurrenceRule?: CalendarEventRecurrenceRuleDetail | null;
 }
 
 // 목록 응답에 totalCount 는 없다.

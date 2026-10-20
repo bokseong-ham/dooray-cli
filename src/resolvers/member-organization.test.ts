@@ -111,26 +111,30 @@ describe("resolveOrganizationMember", () => {
       );
     }
 
-    it("정확일치가 한 명이면 그 id 를 쓴다", async () => {
+    // 보지 못한 쪽에 같은 이름이 더 있을 수 있어, 찾은 사람이 있어도 고르지 않는다.
+    it("정확일치가 한 명이어도 고르지 않고 후보를 보여주며 오류로 끝낸다", async () => {
       const search = pagedSearch({ 2: [ID_A] });
-      expect(await resolveOrganizationMember(mockClient(search), "홍길동", noMe)).toBe(ID_A);
+      await expect(resolveOrganizationMember(mockClient(search), "홍길동", noMe)).rejects.toMatchObject({
+        exitCode: EXIT_PARAM_ERROR,
+        message: expect.stringMatching(new RegExp(`너무 많아.*찾은 정확일치.*홍길동 \\(${ID_A}\\)`, "s")),
+      });
       expect(search).toHaveBeenCalledTimes(5);
     });
 
-    it("정확일치가 둘 이상이면 동명이인 오류다", async () => {
+    it("정확일치가 둘 이상이어도 같은 오류에 후보를 모두 보여준다", async () => {
       const search = pagedSearch({ 0: [ID_A], 4: [ID_B] });
       await expect(resolveOrganizationMember(mockClient(search), "홍길동", noMe)).rejects.toMatchObject({
         exitCode: EXIT_PARAM_ERROR,
-        message: expect.stringMatching(new RegExp(`여럿.*${ID_A}.*${ID_B}`, "s")),
+        message: expect.stringMatching(new RegExp(`너무 많아.*${ID_A}.*${ID_B}`, "s")),
       });
     });
 
-    it("정확일치가 없을 때만 결과가 너무 많다고 알린다", async () => {
+    it("정확일치가 없으면 후보 없이 결과가 너무 많다고 알린다", async () => {
       const search = pagedSearch({});
-      await expect(resolveOrganizationMember(mockClient(search), "홍길동", noMe)).rejects.toMatchObject({
-        exitCode: EXIT_PARAM_ERROR,
-        message: expect.stringContaining("너무 많습니다"),
-      });
+      const error = await resolveOrganizationMember(mockClient(search), "홍길동", noMe).catch((e) => e);
+      expect(error).toMatchObject({ exitCode: EXIT_PARAM_ERROR });
+      expect(error.message).toContain("너무 많아");
+      expect(error.message).not.toContain("찾은 정확일치");
       expect(search).toHaveBeenCalledTimes(5);
     });
   });

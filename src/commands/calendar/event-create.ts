@@ -40,7 +40,7 @@ export const calendarEventCreateCommand = addEventFieldOptions(
       EXIT_PARAM_ERROR,
     );
   }
-  const prepared = await prepareEventFields(opts);
+  const prepared = await prepareEventFields(opts, "create");
   if (opts.dryRun) warnDryRunOutputOptions(globalOpts);
 
   const config = await getConfigOrThrow();

@@ -63,12 +63,14 @@ function mixedForm(): DoorayCliError {
  *
  * - 둘 다 없으면 `null` (수정에서 시각을 건드리지 않는 경우). 생성은 부르는 쪽이 `--start` 를 먼저 요구한다.
  * - `--end` 만 주면 오류다. 끝만 옮기려면 기존 시작을 알아야 하는데 조회하지 않는다.
- * - 종일: `--end` 를 생략하면 시작과 같은 날 하루. 마지막 날이 시작보다 앞서면 오류.
+ * - 종일: 생성에서 `--end` 를 생략하면 시작과 같은 날 하루. 마지막 날이 시작보다 앞서면 오류.
+ *   수정에서는 `--end` 가 필수다. 기존 기간을 조회하지 않으므로 생략을 하루로 보면 여러 날 일정이 조용히 하루로 줄어든다.
  * - 일반: `--end` 가 필수이고 시작보다 뒤여야 한다. 길이 0 인 일정은 받지 않는다.
  */
 export function resolveEventSchedule(
   start: string | undefined,
   end: string | undefined,
+  mode: "create" | "edit" = "create",
 ): EventSchedule | null {
   if (start == null && end == null) return null;
   if (start == null) {
@@ -82,6 +84,13 @@ export function resolveEventSchedule(
   const last = end == null ? null : parseValue("--end", end);
 
   if (first.kind === "date") {
+    if (last == null && mode === "edit") {
+      throw new DoorayCliError(
+        "수정에서는 종일 일정도 --end 를 함께 주세요. 하루 일정이면 --end 에 같은 날짜를 줍니다.\n" +
+          "기존 기간을 읽지 않으므로 --start 만 주면 여러 날 일정이 하루로 바뀝니다.",
+        EXIT_PARAM_ERROR,
+      );
+    }
     if (last != null && last.kind !== "date") throw mixedForm();
     const lastDate = last?.date ?? first.date;
     if (compareDates(lastDate, first.date) < 0) {
@@ -119,7 +128,7 @@ export function resolveEventSchedule(
  * `--repeat-until` 을 서버에 보낼 값으로 바꾼다.
  *
  * 공식 문서는 `datetime` 이라고만 적는다. 날짜만 주면 그 날 23:59:59 지역 시각으로 넓혀
- * 그 날 시작하는 반복까지 포함되게 한다. 서버가 기대하는 형식은 실측 전이다.
+ * 그 날 시작하는 반복까지 포함되게 한다. 서버는 넓힌 값을 그대로 저장하고 마지막 날의 회차까지 포함한다(실측).
  */
 export function resolveRepeatUntil(value: string): string {
   const parsed = parseValue("--repeat-until", value);

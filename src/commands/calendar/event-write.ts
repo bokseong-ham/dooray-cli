@@ -143,13 +143,16 @@ export function warnDryRunOutputOptions(globalOpts: OutputOptions): void {
  *
  * `--mime-type` 을 줬는데 본문이 비어 있으면 효력이 없으므로 stderr 로 알리고 넘어간다.
  */
-export async function prepareEventFields(opts: EventFieldOptions): Promise<PreparedEventFields> {
+export async function prepareEventFields(
+  opts: EventFieldOptions,
+  mode: "create" | "edit",
+): Promise<PreparedEventFields> {
   if (opts.title != null && opts.title.trim() === "") {
     throw new DoorayCliError("--title 이 비어 있습니다.", EXIT_PARAM_ERROR);
   }
   const toInputs = cleanInputs("--to", opts.to);
   const ccInputs = cleanInputs("--cc", opts.cc);
-  const schedule = resolveEventSchedule(opts.start, opts.end);
+  const schedule = resolveEventSchedule(opts.start, opts.end, mode);
   const alarms = (opts.alarm ?? []).map(parseAlarm);
   const recurrenceRule = buildRecurrenceRule(opts, localTimezoneName());
 
