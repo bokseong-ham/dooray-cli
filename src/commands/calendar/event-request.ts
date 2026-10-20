@@ -278,6 +278,14 @@ export function mergeExistingUsers(
   const hasTo = users.to != null;
   const hasCc = users.cc != null;
   if (hasTo === hasCc) return req;
+  // 기존 참석자를 읽지 못했는데 빈 목록으로 채우면 주지 않은 쪽 사람이 모두 조용히 빠진다.
+  if (existing == null) {
+    throw new DoorayCliError(
+      "기존 참석자를 읽지 못해 주지 않은 쪽을 채울 수 없습니다. " +
+        "--to 와 --cc 를 둘 다 주면 기존 값을 읽지 않고 준 목록으로 바꿉니다.",
+      EXIT_PARAM_ERROR,
+    );
+  }
   return {
     ...req,
     users: {
@@ -322,8 +330,13 @@ export function mergeExistingRecurrence(
   if (existing?.frequency == null) return { rule, dropped: [] };
 
   const merged: CalendarEventRecurrenceRule = { ...rule };
+  // 반복을 펼치는 기준 시간대는 일정에 속한다. 다른 시간대 장비에서 고쳐도 요일이 옮겨지지 않게 기존 값을 둔다.
+  if (typeof existing.timezoneName === "string" && existing.timezoneName !== "") {
+    merged.timezoneName = existing.timezoneName;
+  }
   const dropped: string[] = [];
-  const sameFrequency = existing.frequency === rule.frequency;
+  // 실측 응답은 소문자였다. 표기가 달라도 같은 주기를 바뀐 것으로 보지 않게 맞춰 견준다.
+  const sameFrequency = existing.frequency.toLowerCase() === rule.frequency.toLowerCase();
   for (const [field, option] of RECURRENCE_FILL_FIELDS) {
     const value = existing[field];
     if (value == null || given[option] != null) continue;

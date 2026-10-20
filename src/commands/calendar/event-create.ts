@@ -14,7 +14,7 @@ import type { OutputOptions } from "../../formatters/table.js";
 import { printJson } from "../../formatters/table.js";
 import { formatCalendarLabel, resolveWritableCalendar } from "../../resolvers/calendar.js";
 import { DoorayCliError } from "../../utils/errors.js";
-import { EXIT_PARAM_ERROR } from "../../utils/exit-codes.js";
+import { EXIT_API_ERROR, EXIT_PARAM_ERROR } from "../../utils/exit-codes.js";
 import { startSpinner, stopSpinner } from "../../utils/spinner.js";
 import {
   addEventFieldOptions,
@@ -69,6 +69,14 @@ export const calendarEventCreateCommand = addEventFieldOptions(
   try {
     const res = await client.createCalendarEvent(calendar.id, request);
     raw = res.result;
+    if (res.result?.id == null) {
+      // 성공 응답인데 id 가 없다. 일정은 만들어졌을 수 있으니 다시 실행해 중복을 만들지 않게 알린다.
+      throw new DoorayCliError(
+        "일정 생성 응답에 id 가 없습니다. 일정이 만들어졌을 수 있으니 다시 실행하기 전에 " +
+          "calendar event list 로 확인하세요.",
+        EXIT_API_ERROR,
+      );
+    }
     id = res.result.id;
   } catch (e) {
     stopSpinner(false);

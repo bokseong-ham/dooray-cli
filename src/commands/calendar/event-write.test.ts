@@ -118,6 +118,13 @@ function expectParamErrorBeforeConfig(promise: Promise<unknown>): Promise<void> 
 }
 
 describe("calendar event create", () => {
+  it("성공 응답에 id 가 없으면 다시 실행하기 전에 목록을 확인하라는 API 오류로 끝낸다", async () => {
+    mocks.client.createCalendarEvent.mockResolvedValue({ result: null });
+    await expect(
+      run(["calendar", "event", "create", CALENDAR_ID, "--title", "회의", "--start", "2026-09-18"]),
+    ).rejects.toMatchObject({ exitCode: 1, message: expect.stringContaining("calendar event list 로 확인") });
+  });
+
   it("--title 이 없으면 설정을 읽기 전에 끝낸다", async () => {
     await expectParamErrorBeforeConfig(
       run(["calendar", "event", "create", CALENDAR_ID, "--start", "2026-09-18"]),
@@ -465,6 +472,14 @@ describe("calendar event edit", () => {
     });
   });
 
+  it("한쪽 참석자만 줬는데 기존 참석자를 읽지 못하면 빈 목록으로 채우지 않고 멈춘다", async () => {
+    mocks.client.getCalendarEvent.mockResolvedValue({ result: null });
+    await expect(
+      run(["calendar", "event", "edit", CALENDAR_ID, EVENT_ID, "--cc", MEMBER_ID]),
+    ).rejects.toMatchObject({ exitCode: EXIT_PARAM_ERROR, message: expect.stringContaining("기존 참석자를 읽지 못해") });
+    expect(mocks.client.updateCalendarEvent).not.toHaveBeenCalled();
+  });
+
   it("--repeat 없이 부속 옵션만 주면 설정을 읽기 전에 끝낸다", async () => {
     await expectParamErrorBeforeConfig(
       run(["calendar", "event", "edit", CALENDAR_ID, EVENT_ID, "--repeat-interval", "2"]),
@@ -564,6 +579,31 @@ describe("calendar event edit 의 반복 규칙 병합", () => {
     ]);
     expect(mocks.client.updateCalendarEvent).not.toHaveBeenCalled();
     expect(JSON.parse(out).recurrenceRule.byday).toBe("TH");
+  });
+
+  it("기존 규칙의 시간대를 유지한다", async () => {
+    withExistingRule({ ...existingRule, timezoneName: "America/New_York" });
+    await run(["calendar", "event", "edit", CALENDAR_ID, EVENT_ID, "--repeat", "monthly"]);
+    expect(mocks.client.updateCalendarEvent.mock.calls[0]![2].recurrenceRule.timezoneName).toBe(
+      "America/New_York",
+    );
+  });
+
+  it("응답의 주기 표기가 대문자여도 같은 주기로 보고 채운다", async () => {
+    withExistingRule({ ...existingRule, frequency: "MONTHLY" });
+    await run(["calendar", "event", "edit", CALENDAR_ID, EVENT_ID, "--repeat", "monthly"]);
+    expect(mocks.client.updateCalendarEvent.mock.calls[0]![2].recurrenceRule.byday).toBe("TH");
+    expect(warnings()).not.toContain("반복 규칙");
+  });
+
+  it("지워질 필드 경고는 스피너를 멈춘 뒤에 낸다", async () => {
+    withExistingRule(existingRule);
+    await run(["calendar", "event", "edit", CALENDAR_ID, EVENT_ID, "--repeat", "weekly"]);
+    const warnIndex = stderr.mock.calls.findIndex((c: unknown[]) => String(c[0]).includes("반복 규칙"));
+    expect(warnIndex).toBeGreaterThanOrEqual(0);
+    const warnOrder = stderr.mock.invocationCallOrder[warnIndex]!;
+    const lastStop = Math.max(...mocks.stopSpinner.mock.invocationCallOrder);
+    expect(warnOrder).toBeGreaterThan(lastStop);
   });
 
   it("--repeat 이 없으면 반복 규칙 때문에 상세를 조회하지 않는다", async () => {

@@ -144,10 +144,11 @@ export const calendarEventEditCommand = addEventFieldOptions(
     throw nothingToEdit();
   }
   const calendarLabel = formatCalendarLabel(calendar);
-  warnRecurrenceDropped(recurrenceDropped);
 
+  // 스피너가 stderr 에 그리는 동안 쓰면 경고가 지워질 수 있어, 스피너를 멈춘 뒤에 알린다.
   if (opts.dryRun) {
     stopSpinner(true, `dry-run: ${calendarLabel} 의 일정 ${eventId} 에 보낼 요청입니다. API 는 부르지 않았습니다.`);
+    warnRecurrenceDropped(recurrenceDropped);
     printJson(request);
     return;
   }
@@ -161,6 +162,7 @@ export const calendarEventEditCommand = addEventFieldOptions(
     throw e;
   }
   stopSpinner(true, "일정 수정 완료");
+  warnRecurrenceDropped(recurrenceDropped);
 
   if (globalOpts.json) {
     printJson(raw ?? null);
