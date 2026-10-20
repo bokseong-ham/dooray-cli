@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  addDays,
   DAY_END,
   DAY_START,
   expandLocalDate,
+  formatLocalDateWithOffset,
   isDateOnlyForm,
   localOffset,
   parseIsoInstant,
@@ -80,5 +82,39 @@ describe("서머타임이 있는 시간대", () => {
     expect(expandLocalDate({ year: 2026, month: 7, day: 15 }, DAY_END)).toBe(
       "2026-07-15T23:59:59-04:00",
     );
+  });
+});
+
+describe("addDays", () => {
+  it("월말을 넘기면 다음 달 1일이다", () => {
+    expect(addDays({ year: 2026, month: 1, day: 31 }, 1)).toEqual({ year: 2026, month: 2, day: 1 });
+  });
+
+  it("윤년 2월 28일 다음은 29일, 평년은 3월 1일이다", () => {
+    expect(addDays({ year: 2028, month: 2, day: 28 }, 1)).toEqual({ year: 2028, month: 2, day: 29 });
+    expect(addDays({ year: 2026, month: 2, day: 28 }, 1)).toEqual({ year: 2026, month: 3, day: 1 });
+  });
+
+  it("연말을 넘기면 다음 해다", () => {
+    expect(addDays({ year: 2026, month: 12, day: 31 }, 1)).toEqual({ year: 2027, month: 1, day: 1 });
+  });
+});
+
+describe("formatLocalDateWithOffset", () => {
+  const originalTz = process.env.TZ;
+  afterEach(() => {
+    if (originalTz == null) delete process.env.TZ;
+    else process.env.TZ = originalTz;
+  });
+
+  it("날짜에 그 날의 지역 offset 을 붙인다", () => {
+    process.env.TZ = "Asia/Seoul";
+    expect(formatLocalDateWithOffset({ year: 2026, month: 9, day: 18 })).toBe("2026-09-18+09:00");
+  });
+
+  it("서머타임 지역은 날짜마다 offset 이 다르다", () => {
+    process.env.TZ = "America/New_York";
+    expect(formatLocalDateWithOffset({ year: 2026, month: 1, day: 15 })).toBe("2026-01-15-05:00");
+    expect(formatLocalDateWithOffset({ year: 2026, month: 7, day: 15 })).toBe("2026-07-15-04:00");
   });
 });

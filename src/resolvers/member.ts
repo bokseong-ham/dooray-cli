@@ -213,3 +213,72 @@ export async function resolveMember(
   );
   return match.organizationMemberId;
 }
+
+/** 이름 검색을 몇 쪽까지 넘겨 볼지. 넘으면 이름이 너무 흔한 것이라 id·이메일을 요구한다. */
+const NAME_SEARCH_PAGE_SIZE = 100;
+const NAME_SEARCH_MAX_PAGES = 5;
+
+/**
+ * 프로젝트 스코프 없이 조직 멤버 하나를 organizationMemberId 로 해석한다. 캘린더 참석자처럼
+ * 프로젝트 멤버 목록을 쓸 수 없는 곳에서 쓴다.
+ *
+ * 1. `me` → 내 id
+ * 2. id·이메일 → `resolveMemberByIdOrEmail` (조직에 없는 이메일은 오류. 외부 주소로 보내지 않는다)
+ * 3. 그 밖 → 조직 전체 이름 검색에서 **이름 정확일치만** 인정한다.
+ *    조직 전체는 동명이인과 부분일치가 많아 프로젝트 resolver 의 부분일치 폴백을 쓰지 않는다.
+ *    0건이면 오류, 정확일치가 여럿이면 이름과 id 를 나열하고 오류로 끝낸다.
+ *    검색은 쪽 상한까지만 넘긴다. 상한에 닿으면 정확일치를 찾았어도 오류로 끝내고, 찾은 후보를 함께 보여준다.
+ */
+export async function resolveOrganizationMember(
+  client: DoorayApiClient,
+  input: string,
+  meId: () => Promise<string>,
+): Promise<string> {
+  if (input === "me") return meId();
+
+  const byIdOrEmail = await resolveMemberByIdOrEmail(client, input);
+  if (byIdOrEmail !== null) return byIdOrEmail;
+
+  const exact: { id: string; name: string }[] = [];
+  let seen = 0;
+  for (let page = 0; ; page++) {
+    if (page >= NAME_SEARCH_MAX_PAGES) {
+      // 보지 못한 쪽에 같은 이름의 사람이 더 있을 수 있다. 일정 초대는 상대에게 알림이 가서
+      // 틀린 사람을 고르면 되돌릴 수 없으므로, 정확일치를 찾았어도 고르지 않는다.
+      // 대신 찾은 후보를 보여줘 id 로 바로 다시 실행할 수 있게 한다.
+      const found =
+        exact.length > 0
+          ? `\n상한까지 찾은 정확일치 (이 밖에도 더 있을 수 있습니다):\n` +
+            exact.map((m) => `  - ${m.name} (${m.id})`).join("\n")
+          : "";
+      throw new DoorayCliError(
+        `이름 "${input}" 의 검색 결과가 너무 많아 끝까지 보지 못했습니다. organizationMemberId 나 이메일로 지정하세요 ` +
+          `(dooray member search 로 확인)${found}`,
+        EXIT_PARAM_ERROR,
+      );
+    }
+    const res = await client.searchMembers({ name: input, page, size: NAME_SEARCH_PAGE_SIZE });
+    const hits = res.result ?? [];
+    for (const m of hits) {
+      if (m.name === input) exact.push({ id: m.id, name: m.name });
+    }
+    seen += hits.length;
+    if (hits.length === 0 || seen >= (res.totalCount ?? seen)) break;
+  }
+
+  if (exact.length === 0) {
+    throw new DoorayCliError(
+      `이름이 정확히 "${input}" 인 멤버를 찾을 수 없습니다. ` +
+        `organizationMemberId 나 이메일로 지정하세요 (dooray member search 로 확인)`,
+      EXIT_PARAM_ERROR,
+    );
+  }
+  if (exact.length > 1) {
+    throw new DoorayCliError(
+      `이름이 "${input}" 인 멤버가 여럿입니다. organizationMemberId 나 이메일로 지정하세요:\n` +
+        exact.map((m) => `  - ${m.name} (${m.id})`).join("\n"),
+      EXIT_PARAM_ERROR,
+    );
+  }
+  return exact[0]!.id;
+}

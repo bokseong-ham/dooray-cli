@@ -19,7 +19,7 @@ NHN Dooray REST API 를 래핑한 CLI 다. 이 파일은 라우터이므로, 작
 | 워크플로우 판단 기준, 정형 task 자동화, 명령 체이닝 | [workflow.md](references/workflow.md) |
 | 메일 원본 선택, 답장 전 확인, 첨부 저장 | [mail.md](references/mail.md) |
 | 메신저 대화방 찾기, 메시지 읽기, 스레드 보고 | [messenger.md](references/messenger.md) |
-| 캘린더 기간 조회, 일정 상세, 참석자 | [calendar.md](references/calendar.md) |
+| 캘린더 기간 조회, 일정 상세, 참석자, 일정 생성·수정·삭제 | [calendar.md](references/calendar.md) |
 
 ## 대상 지정 방법
 
@@ -285,8 +285,11 @@ dooray post get <project> <number> --json --with-tag-names
 | 오늘 일정 | `dooray calendar event list` |
 | 기간 일정 | `dooray calendar event list --from <일시> --to <일시>` — `YYYY-MM-DD` 또는 `2026-09-20T09:00:00+09:00` |
 | 일정 상세 | `dooray calendar event get <calendar-id> <event-id>` — 두 id 가 모두 필요하다 |
+| 일정 생성 | `dooray calendar event create <calendar> --title "..." --start <날짜\|일시> [--end ...] [--to <멤버...>]` — 캘린더는 id 나 이름, 날짜만 주면 종일 |
+| 일정 수정 | `dooray calendar event edit <calendar> <event-id> [--title ...] [--start ... --end ...]` — 준 항목만 바뀐다. 반복 일정 회차 id 는 거부된다 |
+| 일정 삭제 | `dooray calendar event delete <calendar> <event-id> [--scope this\|from-this\|all] --yes` — non-TTY 는 `--yes` 필수 |
 
-일정을 조회하기 전에 [calendar.md](references/calendar.md) 를 읽는다. 기간 해석과 조회 상한, 참석자를 확인하는 방법이 거기 있다.
+일정을 조회하거나 만들기 전에 [calendar.md](references/calendar.md) 를 읽는다. 기간 해석과 조회 상한, 참석자를 확인하는 방법, 종일 일정의 `--end` 해석이 거기 있다.
 
 ## 옵션 이름
 
@@ -296,4 +299,5 @@ dooray post get <project> <number> --json --with-tag-names
 
 `--from`·`--to` 는 명령마다 뜻이 다르다.
 `post list` 에서는 등록자·담당자 **멤버** 필터이고, `calendar event list` 에서는 조회 기간의 시작·끝 **날짜**다.
+`calendar event create`·`edit` 의 `--to` 는 참석자이고, 일정 시각은 `--start`·`--end` 로 준다.
 업무를 기간으로 필터링하려면 `post list` 의 `--created`(등록)·`--updated`(수정)를 쓴다.

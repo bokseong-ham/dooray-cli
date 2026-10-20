@@ -114,3 +114,26 @@ export function expandLocalDate(date: LocalDate, time: DayTime): string {
     localOffset(at)
   );
 }
+
+/**
+ * 날짜를 `n` 일 옮긴다. 지역 시간대를 거치지 않으려고 UTC 자정으로 세워 계산한다.
+ * UTC 에는 서머타임이 없어 하루가 항상 24시간이고, 월말과 윤년은 `Date` 가 넘긴다.
+ */
+export function addDays(date: LocalDate, n: number): LocalDate {
+  const at = new Date(Date.UTC(date.year, date.month - 1, date.day));
+  at.setUTCDate(at.getUTCDate() + n);
+  return { year: at.getUTCFullYear(), month: at.getUTCMonth() + 1, day: at.getUTCDate() };
+}
+
+/** `YYYY-MM-DD`. */
+export function formatLocalDate(date: LocalDate): string {
+  return `${pad4(date.year)}-${pad2(date.month)}-${pad2(date.day)}`;
+}
+
+/**
+ * 시각 없이 날짜와 그 날짜의 지역 offset 만 붙인 `2026-09-18+09:00` 형태.
+ * 캘린더 종일 일정이 이 형태로 오가고, offset 은 그 날 00:00 의 것을 쓴다.
+ */
+export function formatLocalDateWithOffset(date: LocalDate): string {
+  return formatLocalDate(date) + localOffset(new Date(date.year, date.month - 1, date.day));
+}
