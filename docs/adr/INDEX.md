@@ -78,3 +78,4 @@ ADR-NNN 내용은 `docs/adr/NNN-*.md` (번호 glob) 또는 아래 목록 링크�
 - [ADR-067](067-attachment-file-name-decoding.md) — 첨부 다운로드 파일명을 `Content-Disposition` 에서 풀어 NFC 로 저장하고 실패하면 목록 이름, `<fileId>.<ext>` 순으로 대체한다 (fetch 의 Latin-1 헤더 mojibake·RFC 2047 확인). 단일 다운로드에 `--output-file` 을 둔다
 - [ADR-068](068-comment-add-rejects-empty-body.md) — `post comment add` 는 어느 입력 경로든 빈 본문·공백뿐인 본문을 API 호출 전에 거부한다 (`--allow-empty` 없음, `$EDITOR` 경로 종료 코드 0 → 3)
 - [ADR-070](070-calendar-event-write.md) — 캘린더 일정 생성·수정·삭제를 `event create`·`edit`·`delete` 로 둔다 (생성은 `users`·`body` 키가 없으면 500, 수정의 `users` 는 통째 교체라 한쪽만 주면 기존 값으로 채움, 회차 id 수정은 반복 전체가 바뀌어 거부, `bymonthday` 쉼표 목록 전개, 이름 검색 부분일치라 정확일치만 인정 실측. 종일 여부는 `--start` 형식, 종일 `--end` 는 마지막 날 포함)
+- [ADR-071](071-mail-attachment-download.md) — 메일 첨부는 `mail get` 이 보여 주는 순번으로 골라 `mail attachment` 로 저장하고, 기존 파일은 `--force` 없이 덮어쓰지 않으며, 대상 메일은 확인 없이 stderr 로 알린다 (Issue #222)
