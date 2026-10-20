@@ -128,3 +128,7 @@ dooray calendar event delete "팀 캘린더" <eventId> --scope all     # 반복 
 
 반복 일정은 `--scope` 로 지울 범위를 고른다. `this` 는 그 회차만(기본), `from-this` 는 그 회차부터 이후 전체,
 `all` 은 반복 전체다. 반복 일정의 한 회차 id(`<eventId>-20240228T013000Z` 형태)는 받은 그대로 넘긴다.
+
+반복 일정의 원본 id 에 `this` 를 주면 그 회차가 아니라 반복 전체가 지워진다. 그래서 원본 id 를 `--scope` 없이(또는 `--scope this` 로)
+지우려 하면 확인을 묻기 전에 종료 코드 3 으로 멈춘다. 한 회차만 지우려면 `calendar event list` 로 그 회차 id 를 찾아 넘기고,
+반복 전체를 지우려면 `--scope all` 을 준다.

@@ -635,6 +635,49 @@ describe("calendar event delete", () => {
     expect(mocks.client.deleteCalendarEvent).toHaveBeenCalledWith(CALENDAR_ID, EVENT_ID, "this");
   });
 
+  describe("반복 일정의 원본 id", () => {
+    beforeEach(() => {
+      mocks.client.getCalendarEvent.mockResolvedValue({
+        result: { id: EVENT_ID, subject: "주간 회의", recurrenceRule: { frequency: "weekly", interval: 1 } },
+      });
+    });
+
+    it("--scope 를 생략하면 반복 전체가 지워지므로 API 를 부르지 않고 거부한다", async () => {
+      await expect(
+        run(["calendar", "event", "delete", CALENDAR_ID, EVENT_ID, "-y"]),
+      ).rejects.toMatchObject({
+        exitCode: EXIT_PARAM_ERROR,
+        message: expect.stringContaining("--scope all"),
+      });
+      expect(mocks.client.getCalendarEvent).toHaveBeenCalledWith(CALENDAR_ID, EVENT_ID);
+      expect(mocks.client.deleteCalendarEvent).not.toHaveBeenCalled();
+    });
+
+    it("--scope all 은 조회하지 않고 지운다", async () => {
+      await run(["calendar", "event", "delete", CALENDAR_ID, EVENT_ID, "-y", "--scope", "all"]);
+      expect(mocks.client.getCalendarEvent).not.toHaveBeenCalled();
+      expect(mocks.client.deleteCalendarEvent).toHaveBeenCalledWith(CALENDAR_ID, EVENT_ID, "whole");
+    });
+
+    it("상세를 읽지 못하면 반복 여부를 모르므로 지우지 않는다", async () => {
+      mocks.client.getCalendarEvent.mockRejectedValue(new Error("network"));
+      await expect(run(["calendar", "event", "delete", CALENDAR_ID, EVENT_ID, "-y"])).rejects.toThrow("network");
+      expect(mocks.client.deleteCalendarEvent).not.toHaveBeenCalled();
+    });
+  });
+
+  it("반복이 아닌 일정의 원본 id 는 기본 범위로 지운다", async () => {
+    await run(["calendar", "event", "delete", CALENDAR_ID, EVENT_ID, "-y"]);
+    expect(mocks.client.getCalendarEvent).toHaveBeenCalledTimes(1);
+    expect(mocks.client.deleteCalendarEvent).toHaveBeenCalledWith(CALENDAR_ID, EVENT_ID, "this");
+  });
+
+  it("회차 id 는 반복 여부를 조회하지 않는다", async () => {
+    const instanceId = `${EVENT_ID}-20240228T013000Z`;
+    await run(["calendar", "event", "delete", CALENDAR_ID, instanceId, "-y"]);
+    expect(mocks.client.getCalendarEvent).not.toHaveBeenCalled();
+  });
+
   it("모르는 --scope 는 거부한다", async () => {
     await expect(
       run(["calendar", "event", "delete", CALENDAR_ID, EVENT_ID, "-y", "--scope", "future"]),
