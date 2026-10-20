@@ -44,6 +44,10 @@ cd <repo root> && npm publish --access public
 **`--otp=<code>` 를 안내하지 않는다.** 계정의 2단계 인증이 `auth-and-writes` 이면
 npm 이 브라우저 인증 URL 을 띄우고 ENTER 를 기다린다. 코드를 직접 입력하는 흐름이 아니다.
 
+게시가 `404 Not Found - PUT https://registry.npmjs.org/@bifos%2fdooray-cli` 로 실패하면 로그인이 만료된 것이다.
+registry 는 인증 없는 scoped 패키지의 PUT 에 401 대신 404 를 낸다. `npm whoami` 가 401 이면 이 경우다.
+사용자에게 `npm login` 을 요청하고 같은 명령으로 다시 게시한다. 태그와 Release 는 그대로 둔다.
+
 게시가 접수되면 npm 이 `Your package is being processed and may take a few minutes to become available.` 를 낸다.
 최신 버전은 몇 분 뒤에 바뀌고, 그 사이 `npm view` 는 이전 버전을 보여 준다.
 사용자가 게시했다고 하는데 이전 버전이 보이면 `~/.npm/_logs/` 에서 가장 최근 `publish` 로그를 연다.
