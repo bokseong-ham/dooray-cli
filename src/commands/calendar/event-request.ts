@@ -319,6 +319,7 @@ const RECURRENCE_ECHO_FIELDS = new Set(["frequency", "startedAt", "endedAt", "ti
  * 서버는 `recurrenceRule` 을 통째로 바꾼다(실측). `--repeat monthly --repeat-until <날짜>` 만 보내면
  * 간격이 1 로, `byday`·`bymonthday` 가 빈 값으로 바뀐다. `--repeat-until` 을 주지 않으면 종료일도 지워진다.
  * 주기가 기존과 같을 때만 채운다. 주기가 바뀌면 기존 세부 값이 새 주기와 맞지 않을 수 있어 채우지 않는다.
+ * 단 `until` 은 주기와 상관없는 값이라 주기가 바뀌어도 채운다. 지우면 반복이 끝없이 이어진다 (Issue #228).
  * `dropped` 는 이 수정으로 지워질 기존 필드다. 주기가 바뀌어 채우지 않은 필드와,
  * CLI 가 다루지 않아 다시 보낼 수 없는 `count`·`bysetpos` 같은 필드가 들어간다.
  */
@@ -335,12 +336,12 @@ export function mergeExistingRecurrence(
     merged.timezoneName = existing.timezoneName;
   }
   const dropped: string[] = [];
-  // 실측 응답은 소문자였다. 표기가 달라도 같은 주기를 바뀐 것으로 보지 않게 맞춰 견준다.
+  // 실측 응답은 소문자였다. 표기가 달라도 같은 주기를 바뀐 것으로 보지 않게 맞춰 비교한다.
   const sameFrequency = existing.frequency.toLowerCase() === rule.frequency.toLowerCase();
   for (const [field, option] of RECURRENCE_FILL_FIELDS) {
     const value = existing[field];
     if (value == null || given[option] != null) continue;
-    if (!sameFrequency) {
+    if (!sameFrequency && field !== "until") {
       // 간격 1 은 서버 기본값과 같아 지워져도 달라지는 것이 없다.
       if (field !== "interval" || value !== 1) dropped.push(field);
       continue;
