@@ -263,7 +263,10 @@ export async function resolveOrganizationMember(
       if (m.name === input) exact.push({ id: m.id, name: m.name });
     }
     seen += hits.length;
-    if (hits.length === 0 || seen >= (res.totalCount ?? seen)) break;
+    if (hits.length === 0) break;
+    // totalCount 가 없는 응답에서 첫 쪽만 보고 끝내면 다음 쪽의 동명이인을 놓친다.
+    // 그때는 쪽이 덜 찼을 때를 마지막 쪽으로 본다 (Issue #228).
+    if (res.totalCount != null ? seen >= res.totalCount : hits.length < NAME_SEARCH_PAGE_SIZE) break;
   }
 
   if (exact.length === 0) {

@@ -95,6 +95,43 @@ describe("resolveOrganizationMember", () => {
     expect(search).toHaveBeenCalledTimes(2);
   });
 
+  it("totalCount 가 없어도 첫 쪽이 꽉 찼으면 다음 쪽의 동명이인을 본다", async () => {
+    const search = vi
+      .fn()
+      .mockResolvedValueOnce({
+        result: [
+          { id: ID_A, name: "홍길동" },
+          ...Array.from({ length: 99 }, (_, i) => ({ id: String(i), name: `홍길동${i}` })),
+        ],
+      })
+      .mockResolvedValueOnce({ result: [{ id: ID_B, name: "홍길동" }] });
+    await expect(resolveOrganizationMember(mockClient(search), "홍길동", noMe)).rejects.toMatchObject({
+      exitCode: EXIT_PARAM_ERROR,
+      message: expect.stringMatching(new RegExp(`여럿.*${ID_A}.*${ID_B}`, "s")),
+    });
+    expect(search).toHaveBeenCalledTimes(2);
+  });
+
+  it("totalCount 가 없고 마지막 쪽이 꽉 찼으면 빈 다음 쪽에서 끝낸다", async () => {
+    const search = vi
+      .fn()
+      .mockResolvedValueOnce({
+        result: [
+          { id: ID_A, name: "홍길동" },
+          ...Array.from({ length: 99 }, (_, i) => ({ id: String(i), name: `홍길동${i}` })),
+        ],
+      })
+      .mockResolvedValueOnce({ result: [] });
+    expect(await resolveOrganizationMember(mockClient(search), "홍길동", noMe)).toBe(ID_A);
+    expect(search).toHaveBeenCalledTimes(2);
+  });
+
+  it("totalCount 가 없고 쪽이 덜 찼으면 그 쪽에서 끝낸다", async () => {
+    const search = vi.fn().mockResolvedValue({ result: [{ id: ID_A, name: "홍길동" }] });
+    expect(await resolveOrganizationMember(mockClient(search), "홍길동", noMe)).toBe(ID_A);
+    expect(search).toHaveBeenCalledTimes(1);
+  });
+
   describe("쪽 상한(5쪽)에 닿았을 때", () => {
     const filler = (page: number) =>
       Array.from({ length: 100 }, (_, i) => ({ id: `${page}-${i}`, name: `홍길동${i}` }));
