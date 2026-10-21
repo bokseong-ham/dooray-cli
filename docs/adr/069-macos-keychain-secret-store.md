@@ -110,7 +110,8 @@ config 경로가 계정 홈의 기본 경로가 아니면 account 에 경로 해
 - **오류 메시지에 비밀값을 넣지 않는다.** `security` 의 stderr 를 옮길 때 값과 이스케이프한 값을 `***` 로 가린다.
 - **`dooray-persona` 스킬 스크립트도 같은 항목을 읽는다.** 파일에 `apiKey` 가 없거나 빈 문자열일 때만
   `find-generic-password` 로 읽는다. 읽기는 argv 에 비밀값이 없다. 문자열이 아닌 `apiKey` 는 CLI 처럼 키체인으로 메우지 않고 실패한다.
-  account 계산은 스크립트가 따로 구현하므로, 두 구현이 같은 경로에 같은 값을 내는지 스크립트 테스트가 CLI 의 `keychainAccount` 와 비교한다.
+  account 계산은 스크립트가 따로 구현하므로, 두 구현이 같은 경로에 같은 값을 내는지 `src/config/secret-store.test.ts` 가 스크립트의 `keychainApiKeyAccount` 와 비교한다.
+  처음에는 스크립트 테스트가 `src` 를 import 해 비교했는데, 스킬 디렉터리만 복사해 테스트를 돌리면 깨져 저장소 쪽으로 옮겼다 (Issue #229).
 
 **테스트**: 실행 OS 에 따라 실제 키체인을 건드리지 않게 한다.
 기존 `store.test.ts`·`store.fs.test.ts` 는 `secret-store.js` 를 mock 해 `getSecretStore` 를 `null`(파일 모드)로 고정한다.
