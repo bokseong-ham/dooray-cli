@@ -7,6 +7,7 @@ import type { MessengerLog } from "../../api/types.js";
 import type { OutputOptions } from "../../formatters/table.js";
 import { output, printJson, truncate } from "../../formatters/table.js";
 import { formatSentAt } from "../../formatters/datetime.js";
+import { formatSize } from "../../utils/format-size.js";
 import { sanitizeForTerminal } from "../../utils/sanitize.js";
 import { startSpinner, stopSpinner } from "../../utils/spinner.js";
 import { DoorayCliError } from "../../utils/errors.js";
@@ -22,6 +23,25 @@ function senderId(log: MessengerLog): string | undefined {
   return log.sender?.member?.organizationMemberId;
 }
 
+// 파일 메시지는 text 가 파일명과 같아 그대로 두면 무엇이 파일인지 표에서 구분되지 않는다.
+// text 가 파일명과 다르면(REPLY 에 파일이 붙은 경우 등) 그 본문을 뒤에 잇는다.
+function contentOf(log: MessengerLog): string {
+  const text = log.text ?? "";
+  if (!log.file) return text;
+  const name = log.file.fileName ?? log.file.title ?? "";
+  const head = `[파일] ${name} (${formatSize(log.file.fileSize)})`;
+  return text.trim() !== "" && text !== name ? `${head} ${text}` : head;
+}
+
+// 다음 명령(file download, logs)에 그대로 넣을 id 라 자르지 않는다 (ADR-072).
+// 줄바꿈은 항목 구분자라 sanitize 를 항목마다 하고 나서 잇는다.
+function referenceOf(log: MessengerLog): string {
+  const refs: string[] = [];
+  if (log.file) refs.push(`파일 ${log.file.id}`);
+  if (log.thread) refs.push(`스레드(${log.thread.totalCount ?? "?"}) ${log.thread.channelId}`);
+  return refs.map(sanitizeForTerminal).join("\n");
+}
+
 // 더 오래된 메시지가 있어도 이 API 로는 갈 수 없다 (ADR-061). 데이터가 아니라 안내이므로 stderr.
 function warnHasMore(hasMore: boolean | undefined): void {
   if (hasMore !== true) return;
@@ -33,6 +53,7 @@ function warnHasMore(hasMore: boolean | undefined): void {
 export const messengerLogsCommand = new Command("logs")
   .description(
     "메신저 대화방 메시지 조회 (최근 N건, 최대 1000건). " +
+      "참조 칸의 스레드 channelId 를 다시 logs 에 넣으면 스레드 댓글을, 파일 id 는 file download 로 받는다. " +
       "공식 API 문서에 없는 endpoint 라 예고 없이 막힐 수 있다",
   )
   .argument("<channel>", "대화방 channelId 또는 이름 (부분일치)")
@@ -112,12 +133,13 @@ export const messengerLogsCommand = new Command("logs")
       return [
         formatSentAt(log.sentAt),
         sanitizeForTerminal(sender),
-        sanitizeForTerminal(truncate(log.text ?? "", TEXT_MAX_LEN)),
+        sanitizeForTerminal(truncate(contentOf(log), TEXT_MAX_LEN)),
+        referenceOf(log),
       ];
     });
 
     output(globalOpts, {
-      headers: ["시각", "보낸이", "내용"],
+      headers: ["시각", "보낸이", "내용", "참조"],
       rows,
       raw: ordered,
       ids: ordered.map((l) => l.id),
