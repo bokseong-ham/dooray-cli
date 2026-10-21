@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Command } from "commander";
 
 const mocks = vi.hoisted(() => ({
@@ -59,11 +59,12 @@ async function createCommandTree(): Promise<Command> {
 const baseArgs = ["node", "dooray", "messenger", "file", "download", "배포알림", FILE_ID, "-o", "/tmp/out"];
 
 let written: string;
+let stdoutSpy: ReturnType<typeof vi.spyOn>;
 
 beforeEach(() => {
   vi.clearAllMocks();
   written = "";
-  vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+  stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
     written += String(chunk);
     return true;
   });
@@ -79,6 +80,10 @@ beforeEach(() => {
   mocks.writeFile.mockResolvedValue(undefined);
   mocks.mkdir.mockResolvedValue(undefined);
   mocks.stat.mockRejectedValue(new Error("ENOENT"));
+});
+
+afterEach(() => {
+  stdoutSpy.mockRestore();
 });
 
 describe("messenger file download", () => {

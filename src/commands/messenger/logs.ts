@@ -17,6 +17,7 @@ import { EXIT_PARAM_ERROR } from "../../utils/exit-codes.js";
 export const MAX_LOG_COUNT = 1000;
 const DEFAULT_LOG_COUNT = 20;
 const TEXT_MAX_LEN = 60;
+const FILE_NAME_MAX_LEN = 30;
 
 function senderId(log: MessengerLog): string | undefined {
   // sender.type 이 member 가 아닌 경우(봇 등)엔 organizationMemberId 가 없을 수 있다.
@@ -25,12 +26,15 @@ function senderId(log: MessengerLog): string | undefined {
 
 // 파일 메시지는 text 가 파일명과 같아 그대로 두면 무엇이 파일인지 표에서 구분되지 않는다.
 // text 가 파일명과 다르면(REPLY 에 파일이 붙은 경우 등) 그 본문을 뒤에 잇는다.
+// 이름을 먼저 잘라 둬야 칸 전체를 자를 때 크기와 본문이 남는다.
 function contentOf(log: MessengerLog): string {
   const text = log.text ?? "";
   if (!log.file) return text;
-  const name = log.file.fileName ?? log.file.title ?? "";
-  const head = `[파일] ${name} (${formatSize(log.file.fileSize)})`;
-  return text.trim() !== "" && text !== name ? `${head} ${text}` : head;
+  const name = log.file.fileName ?? log.file.title ?? text;
+  const head = `[파일] ${truncate(name, FILE_NAME_MAX_LEN)} (${formatSize(log.file.fileSize)})`;
+  // macOS 에서 올린 파일은 NFD 로 올 수 있어 정규화한 뒤 비교한다.
+  const sameAsName = text.trim().normalize("NFC") === name.trim().normalize("NFC");
+  return text.trim() !== "" && !sameAsName ? `${head} ${text}` : head;
 }
 
 // 다음 명령(file download, logs)에 그대로 넣을 id 라 자르지 않는다 (ADR-072).

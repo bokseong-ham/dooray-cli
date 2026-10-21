@@ -338,6 +338,52 @@ describe("messenger logs", () => {
       expect(out).toContain(`파일 ${FILE_ID}`);
     });
 
+    it("파일명이 길어도 크기와 REPLY 본문은 잘리지 않는다", async () => {
+      const longName = "가".repeat(40) + ".xlsx";
+      stubLogs([
+        {
+          id: "log-l",
+          ...base,
+          type: "REPLY",
+          text: "확인",
+          file: { id: FILE_ID, fileName: longName, fileSize: 2048 },
+        },
+      ]);
+      const out = await run(["messenger", "logs", CHANNEL_ID]);
+      expect(out).toContain(`[파일] ${"가".repeat(30)}… (2.0KB) 확인`);
+    });
+
+    it("text 가 파일명과 공백·정규화만 다르면 같은 이름으로 보고 다시 붙이지 않는다", async () => {
+      const nfc = "보고서.pdf";
+      stubLogs([
+        {
+          id: "log-n",
+          ...base,
+          type: "FILE",
+          text: `${nfc.normalize("NFD")} `,
+          file: { id: FILE_ID, fileName: nfc, fileSize: 2048 },
+        },
+      ]);
+      const out = await run(["messenger", "logs", CHANNEL_ID]);
+      expect(out).toContain("[파일] 보고서.pdf (2.0KB)");
+      expect(out).not.toContain(`(2.0KB) ${nfc.normalize("NFD")}`);
+      expect(out).not.toContain(`(2.0KB) ${nfc}`);
+    });
+
+    it("파일 객체에 이름이 없으면 text 를 이름으로 쓴다", async () => {
+      stubLogs([
+        {
+          id: "log-x",
+          ...base,
+          type: "FILE",
+          text: "a.png",
+          file: { id: FILE_ID },
+        },
+      ]);
+      const out = await run(["messenger", "logs", CHANNEL_ID]);
+      expect(out).toContain("[파일] a.png (-)");
+    });
+
     it("스레드가 달린 메시지는 참조에 댓글 수와 스레드 channelId 를 보여준다", async () => {
       stubLogs([
         {
