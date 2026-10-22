@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   startSpinner: vi.fn(),
   stopSpinner: vi.fn(),
   ensureMe: vi.fn(),
+  confirm: vi.fn(),
   client: {
     getCalendars: vi.fn(),
     getCalendarEvent: vi.fn(),
@@ -32,6 +33,8 @@ vi.mock("../../utils/spinner.js", () => ({
   startSpinner: mocks.startSpinner,
   stopSpinner: mocks.stopSpinner,
 }));
+
+vi.mock("@inquirer/prompts", () => ({ confirm: mocks.confirm }));
 
 vi.mock("../../resolvers/me.js", () => ({
   ensureMe: mocks.ensureMe,
@@ -612,6 +615,14 @@ describe("calendar event edit 의 반복 규칙 병합", () => {
     expect(warnings()).toContain("wkst='MO it'\\''s?[31m' 은(는)");
   });
 
+  it("--repeat 으로 상세를 읽지 못하면 수정하지 않는다", async () => {
+    mocks.client.getCalendarEvent.mockRejectedValue(new Error("network"));
+    await expect(
+      run(["calendar", "event", "edit", CALENDAR_ID, EVENT_ID, "--repeat", "weekly"]),
+    ).rejects.toThrow("network");
+    expect(mocks.client.updateCalendarEvent).not.toHaveBeenCalled();
+  });
+
   it("반복이 아니던 일정은 준 규칙 그대로 보낸다", async () => {
     withExistingRule(null);
     await run(["calendar", "event", "edit", CALENDAR_ID, EVENT_ID, "--repeat", "monthly"]);
@@ -708,6 +719,33 @@ describe("calendar event delete", () => {
       await run(["calendar", "event", "delete", CALENDAR_ID, EVENT_ID, "-y", "--scope", "all"]);
       expect(mocks.client.getCalendarEvent).not.toHaveBeenCalled();
       expect(mocks.client.deleteCalendarEvent).toHaveBeenCalledWith(CALENDAR_ID, EVENT_ID, "whole");
+    });
+
+    describe("터미널에서 확인을 물을 때", () => {
+      const ttyBefore = process.stdin.isTTY;
+      beforeEach(() => {
+        Object.defineProperty(process.stdin, "isTTY", { value: true, configurable: true });
+      });
+      afterEach(() => {
+        Object.defineProperty(process.stdin, "isTTY", { value: ttyBefore, configurable: true });
+      });
+
+      it("확인 질문을 띄우기 전에 거부한다", async () => {
+        await expect(run(["calendar", "event", "delete", CALENDAR_ID, EVENT_ID])).rejects.toMatchObject({
+          exitCode: EXIT_PARAM_ERROR,
+        });
+        expect(mocks.confirm).not.toHaveBeenCalled();
+        expect(mocks.client.deleteCalendarEvent).not.toHaveBeenCalled();
+      });
+
+      it("반복이 아닌 일정은 확인을 물은 뒤 지운다", async () => {
+        mocks.client.getCalendarEvent.mockResolvedValue({ result: { id: EVENT_ID, subject: "회의" } });
+        mocks.confirm.mockResolvedValue(true);
+        await run(["calendar", "event", "delete", CALENDAR_ID, EVENT_ID]);
+        expect(mocks.confirm).toHaveBeenCalledTimes(1);
+        expect(mocks.client.getCalendarEvent).toHaveBeenCalledTimes(1);
+        expect(mocks.client.deleteCalendarEvent).toHaveBeenCalledWith(CALENDAR_ID, EVENT_ID, "this");
+      });
     });
 
     it("상세를 읽지 못하면 반복 여부를 모르므로 지우지 않는다", async () => {
