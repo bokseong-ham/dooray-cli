@@ -90,7 +90,7 @@ export function warnPersonalSettingsReset(opts: EventFieldOptions): void {
 /**
  * 반복 규칙 수정으로 지워질 기존 필드를 stderr 로 알린다.
  * 서버는 `recurrenceRule` 을 통째로 바꾼다(실측). 주기가 같으면 빠진 필드를 기존 값으로 채우지만,
- * 주기를 바꾸거나 CLI 가 다루지 않는 필드가 있으면 채우지 않는다.
+ * 주기를 바꾸면 `until` 밖의 세부 필드를, CLI 가 다루지 않는 필드는 주기와 상관없이 채우지 않는다.
  */
 export function warnRecurrenceDropped(dropped: string[]): void {
   if (dropped.length === 0) return;

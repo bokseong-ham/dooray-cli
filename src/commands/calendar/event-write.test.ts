@@ -544,15 +544,25 @@ describe("calendar event edit 의 반복 규칙 병합", () => {
     expect(rule.until).toBe("2027-06-30T23:59:59+09:00");
   });
 
-  it("주기를 바꾸면 채우지 않고 지워질 필드를 알린다", async () => {
+  it("주기를 바꾸면 종료일 밖의 세부 필드는 채우지 않고 지워질 필드를 알린다", async () => {
     withExistingRule(existingRule);
     await run(["calendar", "event", "edit", CALENDAR_ID, EVENT_ID, "--repeat", "weekly"]);
     expect(mocks.client.updateCalendarEvent.mock.calls[0]![2].recurrenceRule).toEqual({
       frequency: "weekly",
       interval: 1,
       timezoneName: "Asia/Seoul",
+      until: "2027-06-30T23:59:59+09:00",
     });
-    expect(warnings()).toContain("interval, until, byday, bymonthday 이(가) 지워집니다");
+    expect(warnings()).toContain("interval, byday, bymonthday 이(가) 지워집니다");
+    expect(warnings()).not.toContain("until");
+  });
+
+  it("주기를 바꾸며 --repeat-until 을 주면 준 종료일을 쓴다", async () => {
+    withExistingRule(existingRule);
+    await run([
+      "calendar", "event", "edit", CALENDAR_ID, EVENT_ID, "--repeat", "weekly", "--repeat-until", "2027-08-31",
+    ]);
+    expect(mocks.client.updateCalendarEvent.mock.calls[0]![2].recurrenceRule.until).toBe("2027-08-31T23:59:59+09:00");
   });
 
   it("CLI 가 다루지 않는 필드가 있으면 주기가 같아도 지워진다고 알린다", async () => {
