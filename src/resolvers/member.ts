@@ -169,14 +169,14 @@ export async function resolveMemberByIdOrEmail(
     const hits = res.result;
     if (hits.length === 0) {
       throw new DoorayCliError(
-        `이메일로 멤버를 찾을 수 없습니다: ${input}`,
+        `이메일로 멤버를 찾을 수 없습니다: ${sanitizeForTerminal(input)}`,
         EXIT_PARAM_ERROR,
       );
     }
     if (hits.length > 1) {
       // matchByName 의 모호 에러 포맷과 일치 — multi-line bullet 으로 통일.
       throw new DoorayCliError(
-        `복수의 멤버가 매칭됩니다(이메일): "${input}"\n` +
+        `복수의 멤버가 매칭됩니다(이메일): "${sanitizeForTerminal(input)}"\n` +
           hits.map((m) => `  - ${memberLabel(m.name, m.id)}`).join("\n"),
         EXIT_PARAM_ERROR,
       );
