@@ -348,7 +348,8 @@ export function mergeExistingRecurrence(
   const sameFrequency = existing.frequency.toLowerCase() === rule.frequency.toLowerCase();
   for (const [field, option, flag] of RECURRENCE_FILL_FIELDS) {
     const value = existing[field];
-    if (value == null || given[option] != null) continue;
+    // 서버는 보내지 않은 세부 필드를 빈 문자열로 둔다. 빈 값은 지워져도 달라지는 것이 없고, 되살릴 옵션도 만들 수 없다.
+    if (value == null || value === "" || given[option] != null) continue;
     if (!sameFrequency && field !== "until") {
       // 간격 1 은 서버 기본값과 같아 지워져도 달라지는 것이 없다.
       if (field !== "interval" || value !== 1) dropped.push({ field, value, flag });
@@ -360,7 +361,7 @@ export function mergeExistingRecurrence(
 
   const known = new Set<string>(RECURRENCE_FILL_FIELDS.map(([field]) => field));
   for (const [field, value] of Object.entries(existing)) {
-    if (value == null || known.has(field) || RECURRENCE_ECHO_FIELDS.has(field)) continue;
+    if (value == null || value === "" || known.has(field) || RECURRENCE_ECHO_FIELDS.has(field)) continue;
     dropped.push({ field, value });
   }
   return { rule: merged, dropped };

@@ -586,6 +586,13 @@ describe("calendar event edit 의 반복 규칙 병합", () => {
     expect(warnings()).not.toContain("지워집니다");
   });
 
+  it("빈 문자열인 세부 필드는 지워질 필드로 알리지 않는다", async () => {
+    withExistingRule({ ...existingRule, frequency: "weekly", interval: 1, byday: "", bymonthday: "" });
+    await run(["calendar", "event", "edit", CALENDAR_ID, EVENT_ID, "--repeat", "monthly"]);
+    expect(warnings()).not.toContain("지워집니다");
+    expect(warnings()).not.toContain("--repeat-byday");
+  });
+
   it("--dry-run 도 API 를 부르기 전에 원래 값과 함께 알린다", async () => {
     withExistingRule(existingRule);
     await run(["calendar", "event", "edit", CALENDAR_ID, EVENT_ID, "--repeat", "weekly", "--dry-run"]);
