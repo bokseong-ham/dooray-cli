@@ -110,6 +110,8 @@ dooray calendar event edit "내 캘린더" <eventId> --start 2026-09-25 --end 20
 주지 않은 `--repeat-interval`·`--repeat-until`·`--repeat-byday`·`--repeat-bymonth`·`--repeat-bymonthday` 는 지금 값을 유지한다.
 `--repeat monthly --repeat-until 2027-08-31` 은 간격과 요일 조건을 그대로 두고 종료일만 늦춘다.
 빈도를 바꾸면 종료일만 지금 값을 유지하고 나머지 세부 값은 유지하지 않으며, 지워질 항목을 경고로 알린다. 웹에서 정한 반복 횟수 같은 값도 지워진다고 알린다.
+경고에는 지워질 값을 그대로 다시 주는 옵션(예: `--repeat weekly --repeat-byday TH`)이 함께 나온다. 수정이 끝난 뒤에도 그 옵션으로 다시 실행하면 값을 되살린다.
+반복 횟수처럼 CLI 옵션이 없는 값은 원래 값만 알려 주므로 웹에서 다시 설정한다. 수정 전에 확인하려면 `--dry-run` 을 붙인다.
 
 반복 일정의 회차 id(`<eventId>-20261109T000000Z` 형태)로는 고칠 수 없다. 회차 하나만 고치는 방법이 없고,
 회차 id 로 고치면 남은 반복 전체가 바뀌기 때문에 종료 코드 3 으로 멈추고 원본 id 를 알려준다.

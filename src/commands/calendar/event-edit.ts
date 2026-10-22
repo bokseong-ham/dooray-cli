@@ -24,8 +24,10 @@ import {
 import { DoorayCliError } from "../../utils/errors.js";
 import { EXIT_PARAM_ERROR } from "../../utils/exit-codes.js";
 import { isDateOnlyForm } from "../../utils/local-date.js";
+import { sanitizeForTerminal } from "../../utils/sanitize.js";
 import { startSpinner, stopSpinner } from "../../utils/spinner.js";
 import {
+  type DroppedRecurrenceField,
   instanceOriginalId,
   isEmptyEventRequest,
   mergeExistingRecurrence,
@@ -87,17 +89,32 @@ export function warnPersonalSettingsReset(opts: EventFieldOptions): void {
   }
 }
 
+/** 서버 값을 옵션 인자로 붙여 넣을 수 있게 쓴다. 셸이 다르게 읽을 글자가 있으면 작은따옴표로 감싼다. */
+function shellArg(value: unknown): string {
+  const text = sanitizeForTerminal(typeof value === "string" ? value : JSON.stringify(value));
+  return /^[A-Za-z0-9,:+._-]+$/.test(text) ? text : `'${text.replace(/'/g, "'\\''")}'`;
+}
+
 /**
  * 반복 규칙 수정으로 지워질 기존 필드를 stderr 로 알린다.
  * 서버는 `recurrenceRule` 을 통째로 바꾼다(실측). 주기가 같으면 빠진 필드를 기존 값으로 채우지만,
  * 주기를 바꾸면 `until` 밖의 세부 필드를, CLI 가 다루지 않는 필드는 주기와 상관없이 채우지 않는다.
+ * 실제 수정에서는 이 경고가 수정이 끝난 뒤에 나오므로, 지워진 값을 되살릴 옵션을 원래 값과 함께 보여준다.
+ * `--repeat-*` 는 `--repeat` 없이 받지 않으므로 이번에 보낸 빈도를 앞에 붙여, 보여준 옵션을 그대로 다시 실행할 수 있게 한다.
  */
-export function warnRecurrenceDropped(dropped: string[]): void {
+export function warnRecurrenceDropped(dropped: DroppedRecurrenceField[], frequency: string | undefined): void {
   if (dropped.length === 0) return;
-  process.stderr.write(
-    `⚠  이 수정으로 기존 반복 규칙의 ${dropped.join(", ")} 이(가) 지워집니다. ` +
-      "--repeat-* 옵션이 있는 값은 함께 주면 유지됩니다.\n",
-  );
+  // 필드 이름도 서버 응답의 키라 제어 문자를 지운다.
+  const field = (d: DroppedRecurrenceField): string => sanitizeForTerminal(d.field);
+  const lines = [`⚠  이 수정으로 기존 반복 규칙의 ${dropped.map(field).join(", ")} 이(가) 지워집니다.`];
+  const restorable = dropped.filter((d) => d.flag != null).map((d) => `${d.flag} ${shellArg(d.value)}`);
+  if (restorable.length > 0) {
+    const repeat = frequency != null ? `--repeat ${shellArg(frequency)} ` : "";
+    lines.push(`   지금 값을 유지하려면 이 옵션으로 다시 실행합니다: ${repeat}${restorable.join(" ")}`);
+  }
+  const webOnly = dropped.filter((d) => d.flag == null).map((d) => `${field(d)}=${shellArg(d.value)}`);
+  if (webOnly.length > 0) lines.push(`   ${webOnly.join(", ")} 은(는) CLI 로 다시 줄 수 없어 웹에서 설정합니다.`);
+  process.stderr.write(lines.join("\n") + "\n");
 }
 
 export const calendarEventEditCommand = addEventFieldOptions(
@@ -120,7 +137,7 @@ export const calendarEventEditCommand = addEventFieldOptions(
   startSpinner(opts.dryRun ? "이름 해석 중..." : "일정 수정 중...");
   let calendar: ResolvedCalendar;
   let request: CalendarEventWriteRequest;
-  let recurrenceDropped: string[] = [];
+  let recurrenceDropped: DroppedRecurrenceField[] = [];
   try {
     calendar = await resolveWritableCalendar(client, calendarInput);
     request = await resolveEventRequest(client, prepared, "edit");
@@ -148,7 +165,7 @@ export const calendarEventEditCommand = addEventFieldOptions(
   // 스피너가 stderr 에 그리는 동안 쓰면 경고가 지워질 수 있어, 스피너를 멈춘 뒤에 알린다.
   if (opts.dryRun) {
     stopSpinner(true, `dry-run: ${calendarLabel} 의 일정 ${eventId} 에 보낼 요청입니다. API 는 부르지 않았습니다.`);
-    warnRecurrenceDropped(recurrenceDropped);
+    warnRecurrenceDropped(recurrenceDropped, request.recurrenceRule?.frequency);
     printJson(request);
     return;
   }
@@ -162,7 +179,7 @@ export const calendarEventEditCommand = addEventFieldOptions(
     throw e;
   }
   stopSpinner(true, "일정 수정 완료");
-  warnRecurrenceDropped(recurrenceDropped);
+  warnRecurrenceDropped(recurrenceDropped, request.recurrenceRule?.frequency);
 
   if (globalOpts.json) {
     printJson(raw ?? null);
