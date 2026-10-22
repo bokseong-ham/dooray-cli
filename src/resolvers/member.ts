@@ -5,6 +5,7 @@ import { MEMBERS_TTL_MS } from "../cache/types.js";
 import { matchByName } from "./match.js";
 import { DoorayCliError } from "../utils/errors.js";
 import { EXIT_API_ERROR, EXIT_PARAM_ERROR } from "../utils/exit-codes.js";
+import { sanitizeForTerminal } from "../utils/sanitize.js";
 
 const MEMBER_ID_RE = /^\d{15,}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -168,15 +169,15 @@ export async function resolveMemberByIdOrEmail(
     const hits = res.result;
     if (hits.length === 0) {
       throw new DoorayCliError(
-        `이메일로 멤버를 찾을 수 없습니다: ${input}`,
+        `이메일로 멤버를 찾을 수 없습니다: ${sanitizeForTerminal(input)}`,
         EXIT_PARAM_ERROR,
       );
     }
     if (hits.length > 1) {
       // matchByName 의 모호 에러 포맷과 일치 — multi-line bullet 으로 통일.
       throw new DoorayCliError(
-        `복수의 멤버가 매칭됩니다(이메일): "${input}"\n` +
-          hits.map((m) => `  - ${m.name} (${m.id})`).join("\n"),
+        `복수의 멤버가 매칭됩니다(이메일): "${sanitizeForTerminal(input)}"\n` +
+          hits.map((m) => `  - ${memberLabel(m.name, m.id)}`).join("\n"),
         EXIT_PARAM_ERROR,
       );
     }
@@ -184,6 +185,11 @@ export async function resolveMemberByIdOrEmail(
   }
 
   return null;
+}
+
+/** 오류에 싣는 멤버 표시. 이름과 id 는 서버 값이라 제어 문자를 지운다. */
+function memberLabel(name: string | undefined, id: string): string {
+  return sanitizeForTerminal(`${name} (${id})`);
 }
 
 /**
@@ -209,7 +215,7 @@ export async function resolveMember(
     members,
     input,
     "멤버",
-    (m) => `${m.name} (${m.organizationMemberId})`,
+    (m) => memberLabel(m.name, m.organizationMemberId),
   );
   return match.organizationMemberId;
 }
@@ -249,10 +255,10 @@ export async function resolveOrganizationMember(
       const found =
         exact.length > 0
           ? `\n상한까지 찾은 정확일치 (이 밖에도 더 있을 수 있습니다):\n` +
-            exact.map((m) => `  - ${m.name} (${m.id})`).join("\n")
+            exact.map((m) => `  - ${memberLabel(m.name, m.id)}`).join("\n")
           : "";
       throw new DoorayCliError(
-        `이름 "${input}" 의 검색 결과가 너무 많아 끝까지 보지 못했습니다. organizationMemberId 나 이메일로 지정하세요 ` +
+        `이름 "${sanitizeForTerminal(input)}" 의 검색 결과가 너무 많아 끝까지 보지 못했습니다. organizationMemberId 나 이메일로 지정하세요 ` +
           `(dooray member search 로 확인)${found}`,
         EXIT_PARAM_ERROR,
       );
@@ -271,15 +277,15 @@ export async function resolveOrganizationMember(
 
   if (exact.length === 0) {
     throw new DoorayCliError(
-      `이름이 정확히 "${input}" 인 멤버를 찾을 수 없습니다. ` +
+      `이름이 정확히 "${sanitizeForTerminal(input)}" 인 멤버를 찾을 수 없습니다. ` +
         `organizationMemberId 나 이메일로 지정하세요 (dooray member search 로 확인)`,
       EXIT_PARAM_ERROR,
     );
   }
   if (exact.length > 1) {
     throw new DoorayCliError(
-      `이름이 "${input}" 인 멤버가 여럿입니다. organizationMemberId 나 이메일로 지정하세요:\n` +
-        exact.map((m) => `  - ${m.name} (${m.id})`).join("\n"),
+      `이름이 "${sanitizeForTerminal(input)}" 인 멤버가 여럿입니다. organizationMemberId 나 이메일로 지정하세요:\n` +
+        exact.map((m) => `  - ${memberLabel(m.name, m.id)}`).join("\n"),
       EXIT_PARAM_ERROR,
     );
   }

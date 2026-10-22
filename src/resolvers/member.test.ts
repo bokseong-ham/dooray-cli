@@ -260,6 +260,23 @@ describe("resolveOrganizationMember", () => {
     });
   });
 
+  it("이메일로 찾지 못한 오류에 되돌려 보여주는 입력의 제어 문자를 지운다", async () => {
+    const client = searchClient(() => Promise.resolve({ result: [], totalCount: 0 }));
+    const error = await resolveOrganizationMember(client, "\u001b[31muser@example.com", noMe).catch((e) => e);
+    expect(error.message).toContain("?[31muser@example.com");
+    expect(error.message).not.toContain("\u001b");
+  });
+
+  it("오류에 되돌려 보여주는 이름의 제어 문자를 지운다", async () => {
+    const name = "\u001b[31m홍길동";
+    const client = searchClient(() =>
+      Promise.resolve({ result: [{ id: ID_A, name }, { id: ID_B, name }], totalCount: 2 }),
+    );
+    const error = await resolveOrganizationMember(client, name, noMe).catch((e) => e);
+    expect(error.message).toContain(`?[31m홍길동 (${ID_A})`);
+    expect(error.message).not.toContain("\u001b");
+  });
+
   it("동명이인이면 이름과 id 를 나열하고 거부한다", async () => {
     const client = searchClient(() =>
       Promise.resolve({
