@@ -8,6 +8,7 @@ import { fallbackFileName, parseContentDispositionFileName } from "../utils/cont
 import { EXIT_API_ERROR, EXIT_AUTH_ERROR } from "../utils/exit-codes.js";
 import { describeOrigin, fetchWithResponseTimeout, isTrustedFileHost } from "./file-redirect.js";
 import { createTokenBucket, parseRateLimitHeaders } from "./rate-limiter.js";
+import { apiPath } from "./api-path.js";
 import { parseJsonPreservingLargeIntegers } from "./json-large-integer.js";
 import { buildThreadRequest } from "./messenger-thread-request.js";
 import type {
@@ -77,9 +78,6 @@ import type {
   CalendarEventDeleteType,
   DeleteCalendarEventResponse,
 } from "./types.js";
-
-/** 경로에 넣는 식별자. `/`·`?` 가 섞인 입력이 다른 경로를 부르지 않게 한다. 지금은 첨부 다운로드·업로드 경로에만 쓴다 (ADR-074). */
-const enc = encodeURIComponent;
 
 export interface GetPostsParams {
   page?: number;
@@ -250,7 +248,7 @@ export class DoorayApiClient {
   async getPosts(projectId: string, params?: GetPostsParams): Promise<PostListResponse> {
     try {
       return await this.api
-        .get(`project/v1/projects/${projectId}/posts`, {
+        .get(apiPath`project/v1/projects/${projectId}/posts`, {
           searchParams: {
             ...(params?.page != null && { page: params.page }),
             ...(params?.size != null && { size: params.size }),
@@ -279,7 +277,7 @@ export class DoorayApiClient {
   async getPost(projectId: string, postId: string): Promise<PostDetailResponse> {
     try {
       return await this.api
-        .get(`project/v1/projects/${projectId}/posts/${postId}`)
+        .get(apiPath`project/v1/projects/${projectId}/posts/${postId}`)
         .json<PostDetailResponse>();
     } catch (e) {
       throw await toDoorayCliError(e);
@@ -289,7 +287,7 @@ export class DoorayApiClient {
   async getPostStandalone(postId: string): Promise<PostDetailResponse> {
     try {
       return await this.api
-        .get(`project/v1/posts/${postId}`)
+        .get(apiPath`project/v1/posts/${postId}`)
         .json<PostDetailResponse>();
     } catch (e) {
       throw await toDoorayCliError(e);
@@ -299,7 +297,7 @@ export class DoorayApiClient {
   async createPost(projectId: string, body: CreatePostRequest): Promise<CreatePostApiResponse> {
     try {
       return await this.api
-        .post(`project/v1/projects/${projectId}/posts`, { json: body })
+        .post(apiPath`project/v1/projects/${projectId}/posts`, { json: body })
         .json<CreatePostApiResponse>();
     } catch (e) {
       throw await toDoorayCliError(e);
@@ -309,7 +307,7 @@ export class DoorayApiClient {
   async updatePost(projectId: string, postId: string, body: UpdatePostRequest): Promise<UpdatePostResponse> {
     try {
       return await this.api
-        .put(`project/v1/projects/${projectId}/posts/${postId}`, { json: body })
+        .put(apiPath`project/v1/projects/${projectId}/posts/${postId}`, { json: body })
         .json<UpdatePostResponse>();
     } catch (e) {
       throw await toDoorayCliError(e);
@@ -319,7 +317,7 @@ export class DoorayApiClient {
   async setPostDone(projectId: string, postId: string): Promise<DoorayApiUnitResponse> {
     try {
       return await this.api
-        .post(`project/v1/projects/${projectId}/posts/${postId}/set-done`)
+        .post(apiPath`project/v1/projects/${projectId}/posts/${postId}/set-done`)
         .json<DoorayApiUnitResponse>();
     } catch (e) {
       throw await toDoorayCliError(e);
@@ -329,7 +327,7 @@ export class DoorayApiClient {
   async setPostWorkflow(projectId: string, postId: string, workflowId: string): Promise<DoorayApiUnitResponse> {
     try {
       return await this.api
-        .post(`project/v1/projects/${projectId}/posts/${postId}/set-workflow`, {
+        .post(apiPath`project/v1/projects/${projectId}/posts/${postId}/set-workflow`, {
           json: { workflowId } satisfies SetWorkflowRequest,
         })
         .json<DoorayApiUnitResponse>();
@@ -341,7 +339,7 @@ export class DoorayApiClient {
   async setPostParent(projectId: string, postId: string, parentPostId: string): Promise<DoorayApiUnitResponse> {
     try {
       return await this.api
-        .post(`project/v1/projects/${projectId}/posts/${postId}/set-parent-post`, {
+        .post(apiPath`project/v1/projects/${projectId}/posts/${postId}/set-parent-post`, {
           json: { parentPostId } satisfies SetParentPostRequest,
         })
         .json<DoorayApiUnitResponse>();
@@ -355,7 +353,7 @@ export class DoorayApiClient {
   async getPostComments(projectId: string, postId: string, params?: GetPostCommentsParams): Promise<PostCommentListResponse> {
     try {
       return await this.api
-        .get(`project/v1/projects/${projectId}/posts/${postId}/logs`, {
+        .get(apiPath`project/v1/projects/${projectId}/posts/${postId}/logs`, {
           searchParams: {
             ...(params?.page != null && { page: params.page }),
             ...(params?.size != null && { size: params.size }),
@@ -375,7 +373,7 @@ export class DoorayApiClient {
   ): Promise<PostCommentDetailResponse> {
     try {
       return await this.api
-        .get(`project/v1/projects/${projectId}/posts/${postId}/logs/${logId}`)
+        .get(apiPath`project/v1/projects/${projectId}/posts/${postId}/logs/${logId}`)
         .json<PostCommentDetailResponse>();
     } catch (e) {
       throw await toDoorayCliError(e);
@@ -385,7 +383,7 @@ export class DoorayApiClient {
   async createPostComment(projectId: string, postId: string, body: CreateCommentRequest): Promise<CreateCommentApiResponse> {
     try {
       return await this.api
-        .post(`project/v1/projects/${projectId}/posts/${postId}/logs`, { json: body })
+        .post(apiPath`project/v1/projects/${projectId}/posts/${postId}/logs`, { json: body })
         .json<CreateCommentApiResponse>();
     } catch (e) {
       throw await toDoorayCliError(e);
@@ -395,7 +393,7 @@ export class DoorayApiClient {
   async updatePostComment(projectId: string, postId: string, logId: string, body: UpdateCommentRequest): Promise<UpdateCommentResponse> {
     try {
       return await this.api
-        .put(`project/v1/projects/${projectId}/posts/${postId}/logs/${logId}`, { json: body })
+        .put(apiPath`project/v1/projects/${projectId}/posts/${postId}/logs/${logId}`, { json: body })
         .json<UpdateCommentResponse>();
     } catch (e) {
       throw await toDoorayCliError(e);
@@ -405,7 +403,7 @@ export class DoorayApiClient {
   async deletePostComment(projectId: string, postId: string, logId: string): Promise<DeleteCommentResponse> {
     try {
       return await this.api
-        .delete(`project/v1/projects/${projectId}/posts/${postId}/logs/${logId}`)
+        .delete(apiPath`project/v1/projects/${projectId}/posts/${postId}/logs/${logId}`)
         .json<DeleteCommentResponse>();
     } catch (e) {
       throw await toDoorayCliError(e);
@@ -417,7 +415,7 @@ export class DoorayApiClient {
   async getProjectMembers(projectId: string, params?: GetMembersParams): Promise<ProjectMemberListResponse> {
     try {
       return await this.api
-        .get(`project/v1/projects/${projectId}/members`, {
+        .get(apiPath`project/v1/projects/${projectId}/members`, {
           searchParams: {
             member: "me",
             ...(params?.page != null && { page: params.page }),
@@ -433,7 +431,7 @@ export class DoorayApiClient {
   async getMemberDetail(memberId: string): Promise<MemberDetailResponse> {
     try {
       return await this.api
-        .get(`common/v1/members/${memberId}`)
+        .get(apiPath`common/v1/members/${memberId}`)
         .json<MemberDetailResponse>();
     } catch (e) {
       throw await toDoorayCliError(e);
@@ -465,7 +463,7 @@ export class DoorayApiClient {
   async getProjectWorkflows(projectId: string): Promise<ProjectWorkflowListResponse> {
     try {
       return await this.api
-        .get(`project/v1/projects/${projectId}/workflows`)
+        .get(apiPath`project/v1/projects/${projectId}/workflows`)
         .json<ProjectWorkflowListResponse>();
     } catch (e) {
       throw await toDoorayCliError(e);
@@ -480,7 +478,7 @@ export class DoorayApiClient {
   ): Promise<TagListResponse> {
     try {
       return await this.api
-        .get(`project/v1/projects/${projectId}/tags`, {
+        .get(apiPath`project/v1/projects/${projectId}/tags`, {
           searchParams: {
             ...(params?.page != null && { page: params.page }),
             ...(params?.size != null && { size: params.size }),
@@ -495,7 +493,7 @@ export class DoorayApiClient {
   async createProjectTag(projectId: string, body: CreateTagRequest): Promise<CreateTagApiResponse> {
     try {
       return await this.api
-        .post(`project/v1/projects/${projectId}/tags`, { json: body })
+        .post(apiPath`project/v1/projects/${projectId}/tags`, { json: body })
         .json<CreateTagApiResponse>();
     } catch (e) {
       throw await toDoorayCliError(e);
@@ -509,7 +507,7 @@ export class DoorayApiClient {
   ): Promise<UpdateTagGroupResponse> {
     try {
       return await this.api
-        .put(`project/v1/projects/${projectId}/tag-groups/${tagGroupId}`, { json: body })
+        .put(apiPath`project/v1/projects/${projectId}/tag-groups/${tagGroupId}`, { json: body })
         .json<UpdateTagGroupResponse>();
     } catch (e) {
       throw await toDoorayCliError(e);
@@ -524,7 +522,7 @@ export class DoorayApiClient {
   ): Promise<MemberGroupListResponse> {
     try {
       return await this.api
-        .get(`project/v1/projects/${projectId}/member-groups`, {
+        .get(apiPath`project/v1/projects/${projectId}/member-groups`, {
           searchParams: {
             ...(params?.page != null && { page: params.page }),
             ...(params?.size != null && { size: params.size }),
@@ -544,7 +542,7 @@ export class DoorayApiClient {
   ): Promise<MilestoneListResponse> {
     try {
       return await this.api
-        .get(`project/v1/projects/${projectId}/milestones`, {
+        .get(apiPath`project/v1/projects/${projectId}/milestones`, {
           searchParams: {
             ...(params?.page != null && { page: params.page }),
             ...(params?.size != null && { size: params.size }),
@@ -576,7 +574,7 @@ export class DoorayApiClient {
   async getWikiPages(wikiId: string, parentPageId?: string): Promise<WikiPagesResponse> {
     try {
       return await this.api
-        .get(`wiki/v1/wikis/${wikiId}/pages`, {
+        .get(apiPath`wiki/v1/wikis/${wikiId}/pages`, {
           searchParams: {
             ...(parentPageId && { parentPageId }),
           },
@@ -616,7 +614,7 @@ export class DoorayApiClient {
   async getWikiPage(wikiId: string, pageId: string): Promise<WikiPageResponse> {
     try {
       return await this.api
-        .get(`wiki/v1/wikis/${wikiId}/pages/${pageId}`)
+        .get(apiPath`wiki/v1/wikis/${wikiId}/pages/${pageId}`)
         .json<WikiPageResponse>();
     } catch (e) {
       throw await toDoorayCliError(e);
@@ -626,7 +624,7 @@ export class DoorayApiClient {
   async getWikiPageStandalone(pageId: string): Promise<WikiPageResponse> {
     try {
       return await this.api
-        .get(`wiki/v1/pages/${pageId}`)
+        .get(apiPath`wiki/v1/pages/${pageId}`)
         .json<WikiPageResponse>();
     } catch (e) {
       throw await toDoorayCliError(e);
@@ -636,7 +634,7 @@ export class DoorayApiClient {
   async createWikiPage(wikiId: string, body: CreateWikiPageRequest): Promise<CreateWikiPageResponse> {
     try {
       return await this.api
-        .post(`wiki/v1/wikis/${wikiId}/pages`, { json: body })
+        .post(apiPath`wiki/v1/wikis/${wikiId}/pages`, { json: body })
         .json<CreateWikiPageResponse>();
     } catch (e) {
       throw await toDoorayCliError(e);
@@ -646,7 +644,7 @@ export class DoorayApiClient {
   async updateWikiPage(wikiId: string, pageId: string, body: UpdateWikiPageRequest): Promise<DoorayApiUnitResponse> {
     try {
       return await this.api
-        .put(`wiki/v1/wikis/${wikiId}/pages/${pageId}`, { json: body })
+        .put(apiPath`wiki/v1/wikis/${wikiId}/pages/${pageId}`, { json: body })
         .json<DoorayApiUnitResponse>();
     } catch (e) {
       throw await toDoorayCliError(e);
@@ -660,7 +658,7 @@ export class DoorayApiClient {
   ): Promise<DoorayApiUnitResponse> {
     try {
       return await this.api
-        .put(`wiki/v1/wikis/${wikiId}/pages/${pageId}/title`, { json: body })
+        .put(apiPath`wiki/v1/wikis/${wikiId}/pages/${pageId}/title`, { json: body })
         .json<DoorayApiUnitResponse>();
     } catch (e) {
       throw await toDoorayCliError(e);
@@ -674,7 +672,7 @@ export class DoorayApiClient {
   ): Promise<DoorayApiUnitResponse> {
     try {
       return await this.api
-        .put(`wiki/v1/wikis/${wikiId}/pages/${pageId}/content`, { json: body })
+        .put(apiPath`wiki/v1/wikis/${wikiId}/pages/${pageId}/content`, { json: body })
         .json<DoorayApiUnitResponse>();
     } catch (e) {
       throw await toDoorayCliError(e);
@@ -685,7 +683,7 @@ export class DoorayApiClient {
   async deleteWikiPage(wikiId: string, pageId: string): Promise<DoorayApiUnitResponse> {
     try {
       return await this.api
-        .delete(`wiki/v1/wikis/${wikiId}/pages/${pageId}`)
+        .delete(apiPath`wiki/v1/wikis/${wikiId}/pages/${pageId}`)
         .json<DoorayApiUnitResponse>();
     } catch (e) {
       throw await toDoorayCliError(e);
@@ -699,7 +697,7 @@ export class DoorayApiClient {
   ): Promise<DoorayApiUnitResponse> {
     try {
       return await this.api
-        .post(`wiki/v1/wikis/${wikiId}/pages/${pageId}/move`, { json: body })
+        .post(apiPath`wiki/v1/wikis/${wikiId}/pages/${pageId}/move`, { json: body })
         .json<DoorayApiUnitResponse>();
     } catch (e) {
       throw await toDoorayCliError(e);
@@ -711,7 +709,7 @@ export class DoorayApiClient {
   async getPostFiles(projectId: string, postId: string): Promise<PostFileListResponse> {
     try {
       return await this.api
-        .get(`project/v1/projects/${projectId}/posts/${postId}/files`)
+        .get(apiPath`project/v1/projects/${projectId}/posts/${postId}/files`)
         .json<PostFileListResponse>();
     } catch (e) {
       throw await toDoorayCliError(e);
@@ -721,7 +719,7 @@ export class DoorayApiClient {
   async getPostFileMeta(projectId: string, postId: string, fileId: string): Promise<PostFileMetaResponse> {
     try {
       return await this.api
-        .get(`project/v1/projects/${projectId}/posts/${postId}/files/${fileId}`, {
+        .get(apiPath`project/v1/projects/${projectId}/posts/${postId}/files/${fileId}`, {
           searchParams: { media: "meta" },
         })
         .json<PostFileMetaResponse>();
@@ -773,7 +771,7 @@ export class DoorayApiClient {
   ): Promise<{ buffer: ArrayBuffer; fileName: string }> {
     try {
       const res = await this.api
-        .get(`project/v1/projects/${enc(projectId)}/posts/${enc(postId)}/files/${enc(fileId)}`, {
+        .get(apiPath`project/v1/projects/${projectId}/posts/${postId}/files/${fileId}`, {
           searchParams: { media: "raw" },
           redirect: "manual",
           throwHttpErrors: false,
@@ -808,7 +806,7 @@ export class DoorayApiClient {
       const formData = new FormData();
       formData.append("file", new Blob([fileBuffer]), fileName);
 
-      const url = `${this.baseUrl}project/v1/projects/${enc(projectId)}/posts/${enc(postId)}/files`;
+      const url = this.baseUrl + apiPath`project/v1/projects/${projectId}/posts/${postId}/files`;
       const res = await fetch(url, {
         method: "POST",
         headers: { Authorization: this.authHeader },
@@ -838,7 +836,7 @@ export class DoorayApiClient {
   async deletePostFile(projectId: string, postId: string, fileId: string): Promise<DoorayApiUnitResponse> {
     try {
       return await this.api
-        .delete(`project/v1/projects/${projectId}/posts/${postId}/files/${fileId}`)
+        .delete(apiPath`project/v1/projects/${projectId}/posts/${postId}/files/${fileId}`)
         .json<DoorayApiUnitResponse>();
     } catch (e) {
       throw await toDoorayCliError(e);
@@ -865,7 +863,7 @@ export class DoorayApiClient {
         return fd;
       };
 
-      const url = `${this.baseUrl}wiki/v1/wikis/${enc(wikiId)}/pages/${enc(pageId)}/files`;
+      const url = this.baseUrl + apiPath`wiki/v1/wikis/${wikiId}/pages/${pageId}/files`;
       const res = await fetch(url, {
         method: "POST",
         headers: { Authorization: this.authHeader },
@@ -900,7 +898,7 @@ export class DoorayApiClient {
   ): Promise<{ buffer: ArrayBuffer; fileName: string }> {
     try {
       const res = await this.api
-        .get(`wiki/v1/wikis/${enc(wikiId)}/pages/${enc(pageId)}/files/${enc(fileId)}`, {
+        .get(apiPath`wiki/v1/wikis/${wikiId}/pages/${pageId}/files/${fileId}`, {
           redirect: "manual",
           throwHttpErrors: false,
         });
@@ -933,7 +931,7 @@ export class DoorayApiClient {
   ): Promise<DoorayApiUnitResponse> {
     try {
       return await this.api
-        .delete(`wiki/v1/wikis/${wikiId}/pages/${pageId}/files/${fileId}`)
+        .delete(apiPath`wiki/v1/wikis/${wikiId}/pages/${pageId}/files/${fileId}`)
         .json<DoorayApiUnitResponse>();
     } catch (e) {
       throw await toDoorayCliError(e);
@@ -949,7 +947,7 @@ export class DoorayApiClient {
   ): Promise<WikiCommentListResponse> {
     try {
       return await this.api
-        .get(`wiki/v1/wikis/${wikiId}/pages/${pageId}/comments`, {
+        .get(apiPath`wiki/v1/wikis/${wikiId}/pages/${pageId}/comments`, {
           searchParams: {
             ...(params?.page !== undefined && { page: params.page }),
             ...(params?.size !== undefined && { size: params.size }),
@@ -968,7 +966,7 @@ export class DoorayApiClient {
   ): Promise<WikiCommentDetailResponse> {
     try {
       return await this.api
-        .get(`wiki/v1/wikis/${wikiId}/pages/${pageId}/comments/${commentId}`)
+        .get(apiPath`wiki/v1/wikis/${wikiId}/pages/${pageId}/comments/${commentId}`)
         .json<WikiCommentDetailResponse>();
     } catch (e) {
       throw await toDoorayCliError(e);
@@ -982,7 +980,7 @@ export class DoorayApiClient {
   ): Promise<CreateWikiCommentApiResponse> {
     try {
       return await this.api
-        .post(`wiki/v1/wikis/${wikiId}/pages/${pageId}/comments`, { json: body })
+        .post(apiPath`wiki/v1/wikis/${wikiId}/pages/${pageId}/comments`, { json: body })
         .json<CreateWikiCommentApiResponse>();
     } catch (e) {
       throw await toDoorayCliError(e);
@@ -997,7 +995,7 @@ export class DoorayApiClient {
   ): Promise<DoorayApiUnitResponse> {
     try {
       return await this.api
-        .put(`wiki/v1/wikis/${wikiId}/pages/${pageId}/comments/${commentId}`, { json: body })
+        .put(apiPath`wiki/v1/wikis/${wikiId}/pages/${pageId}/comments/${commentId}`, { json: body })
         .json<DoorayApiUnitResponse>();
     } catch (e) {
       throw await toDoorayCliError(e);
@@ -1011,7 +1009,7 @@ export class DoorayApiClient {
   ): Promise<DoorayApiUnitResponse> {
     try {
       return await this.api
-        .delete(`wiki/v1/wikis/${wikiId}/pages/${pageId}/comments/${commentId}`)
+        .delete(apiPath`wiki/v1/wikis/${wikiId}/pages/${pageId}/comments/${commentId}`)
         .json<DoorayApiUnitResponse>();
     } catch (e) {
       throw await toDoorayCliError(e);
@@ -1026,7 +1024,7 @@ export class DoorayApiClient {
   ): Promise<TemplateListResponse> {
     try {
       return await this.api
-        .get(`project/v1/projects/${projectId}/templates`, {
+        .get(apiPath`project/v1/projects/${projectId}/templates`, {
           searchParams: {
             ...(params?.page != null && { page: params.page }),
             ...(params?.size != null && { size: params.size }),
@@ -1045,7 +1043,7 @@ export class DoorayApiClient {
   ): Promise<TemplateDetailResponse> {
     try {
       return await this.api
-        .get(`project/v1/projects/${projectId}/templates/${templateId}`, {
+        .get(apiPath`project/v1/projects/${projectId}/templates/${templateId}`, {
           searchParams: { interpolation: String(interpolation) },
         })
         .json<TemplateDetailResponse>();
@@ -1074,7 +1072,7 @@ export class DoorayApiClient {
   async sendChannelMessage(channelId: string, text: string): Promise<MessengerSendResponse> {
     try {
       return await this.api
-        .post(`messenger/v1/channels/${channelId}/logs`, {
+        .post(apiPath`messenger/v1/channels/${channelId}/logs`, {
           json: { text } satisfies ChannelLogRequest,
         })
         .json<MessengerSendResponse>();
@@ -1090,7 +1088,7 @@ export class DoorayApiClient {
   async getChannelLogs(channelId: string, size: number): Promise<MessengerLogListResponse> {
     try {
       return await this.api
-        .get(`messenger/v1/channels/${channelId}/logs`, {
+        .get(apiPath`messenger/v1/channels/${channelId}/logs`, {
           searchParams: { size },
         })
         .json<MessengerLogListResponse>();
@@ -1177,7 +1175,7 @@ export class DoorayApiClient {
   ): Promise<CalendarEventDetailResponse> {
     try {
       return await this.api
-        .get(`calendar/v1/calendars/${calendarId}/events/${eventId}`)
+        .get(apiPath`calendar/v1/calendars/${calendarId}/events/${eventId}`)
         .json<CalendarEventDetailResponse>();
     } catch (e) {
       throw await toDoorayCliError(e);
@@ -1190,7 +1188,7 @@ export class DoorayApiClient {
   ): Promise<CreateCalendarEventResponse> {
     try {
       return await this.api
-        .post(`calendar/v1/calendars/${calendarId}/events`, { json: body })
+        .post(apiPath`calendar/v1/calendars/${calendarId}/events`, { json: body })
         .json<CreateCalendarEventResponse>();
     } catch (e) {
       throw await toDoorayCliError(e);
@@ -1205,7 +1203,7 @@ export class DoorayApiClient {
   ): Promise<UpdateCalendarEventResponse> {
     try {
       return await this.api
-        .put(`calendar/v1/calendars/${calendarId}/events/${eventId}`, { json: body })
+        .put(apiPath`calendar/v1/calendars/${calendarId}/events/${eventId}`, { json: body })
         .json<UpdateCalendarEventResponse>();
     } catch (e) {
       throw await toDoorayCliError(e);
@@ -1223,7 +1221,7 @@ export class DoorayApiClient {
   ): Promise<DeleteCalendarEventResponse> {
     try {
       return await this.api
-        .post(`calendar/v1/calendars/${calendarId}/events/${eventId}/delete`, {
+        .post(apiPath`calendar/v1/calendars/${calendarId}/events/${eventId}/delete`, {
           json: { deleteType },
         })
         .json<DeleteCalendarEventResponse>();

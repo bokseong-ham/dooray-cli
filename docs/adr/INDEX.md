@@ -81,3 +81,4 @@ ADR-NNN 내용은 `docs/adr/NNN-*.md` (번호 glob) 또는 아래 목록 링크�
 - [ADR-070](070-calendar-event-write.md) — 캘린더 일정 생성·수정·삭제를 `event create`·`edit`·`delete` 로 둔다 (생성은 `users`·`body` 키가 없으면 500, 수정의 `users` 는 통째 교체라 한쪽만 주면 기존 값으로 채움, 회차 id 수정은 반복 전체가 바뀌어 거부, `bymonthday` 쉼표 목록 전개, 이름 검색 부분일치라 정확일치만 인정 실측. 종일 여부는 `--start` 형식, 종일 `--end` 는 마지막 날 포함)
 - [ADR-071](071-mail-attachment-download.md) — 메일 첨부는 `mail get` 이 보여 주는 순번으로 골라 `mail attachment` 로 저장하고, 기존 파일은 `--force` 없이 덮어쓰지 않으며, 대상 메일은 확인 없이 stderr 로 알린다 (Issue #222)
 - [ADR-074](074-file-redirect-hardening.md) — 첨부 다운로드·업로드의 307 은 API 주소와 같은 도메인의 https 주소에만 인증 헤더를 싣고 파일 서버의 연쇄 redirect 는 막으며, 다운로드는 첫 응답까지 30초로 끊고 307 이 아니면 따라가지 않으며, 첨부 경로의 id 를 인코딩한다 (Issue #232, `file-api.dooray.com` 실측)
+- [ADR-075](075-api-path-encoding.md) — `client.ts` 의 API 경로는 `apiPath` tagged template 으로 만들어 끼운 값을 모두 `encodeURIComponent` 로 인코딩한다. `baseUrl`·쿼리·리터럴은 helper 밖에 두고, 인벤토리 스크립트가 `apiPath` 태그를 읽는다 (Issue #240)
