@@ -7,6 +7,9 @@
     값마다 인코딩을 따로 적지 않아도 빠지지 않는다.
   - **ADR-074 의 `enc` 상수는 없앴다.** 첨부 다운로드·업로드 경로도 같은 helper 를 쓴다.
   - **메신저 스레드 생성 경로(`messenger-thread-request.ts`)도 helper 로 만든다.** `client.ts` 밖이지만 같은 `channelId`·`logId` 를 경로에 넣는다.
+  - **값이 `""`, `.`, `..` 이면 `DoorayCliError`(`EXIT_PARAM_ERROR`)로 거부한다.** `encodeURIComponent` 는 `.` 를 그대로 두고,
+    WHATWG URL 파서는 `%2e%2e` 도 dot segment 로 보고 정규화한다. `getPost("..", "1")` 이 `project/v1/posts/1` 을 부르는 것을
+    escape 로는 막을 수 없어서 거부한다. `a..b` 처럼 `..` 가 섞였을 뿐인 값은 segment 가 아니라 통과한다.
   - **helper 에 끼우지 않는 것**: 주소 앞부분(`this.baseUrl`), `searchParams` 로 넘기는 쿼리 값, 고정 경로 리터럴.
     업로드처럼 전체 URL 이 필요한 곳은 `this.baseUrl + apiPath` 로 잇는다.
     이미 인코딩된 값을 받는 호출은 없었다. 경로에 넣는 id 는 모두 호출한 쪽이 준 원문이다.

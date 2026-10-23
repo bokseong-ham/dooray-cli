@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
+import { EXIT_PARAM_ERROR } from "../utils/exit-codes.js";
+import { DoorayCliError } from "../utils/errors.js";
 import { apiPath } from "./api-path.js";
 import { DoorayApiClient } from "./client.js";
 import { buildThreadRequest } from "./messenger-thread-request.js";
@@ -22,6 +24,22 @@ describe("apiPath", () => {
 
   it("값이 없으면 고정 문자열을 그대로 낸다", () => {
     expect(apiPath`common/v1/members/me`).toBe("common/v1/members/me");
+  });
+
+  it.each(["", ".", ".."])("%j 는 파라미터 오류로 거부한다", (value) => {
+    let err: unknown;
+    try {
+      apiPath`project/v1/projects/${value}/posts/1`;
+    } catch (e) {
+      err = e;
+    }
+    expect(err).toBeInstanceOf(DoorayCliError);
+    expect((err as DoorayCliError).exitCode).toBe(EXIT_PARAM_ERROR);
+    expect((err as Error).message).toContain(JSON.stringify(value));
+  });
+
+  it("`..` 가 섞였지만 그 자체는 아닌 값은 통과한다", () => {
+    expect(apiPath`posts/${"a..b"}/${"..a"}/${"a."}`).toBe("posts/a..b/..a/a.");
   });
 });
 
