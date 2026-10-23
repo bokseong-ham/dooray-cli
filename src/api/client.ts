@@ -78,7 +78,7 @@ import type {
   DeleteCalendarEventResponse,
 } from "./types.js";
 
-/** 경로에 넣는 식별자. `/`·`?` 가 섞인 입력이 다른 경로를 부르지 않게 한다. 지금은 첨부 경로에만 쓴다 (ADR-074). */
+/** 경로에 넣는 식별자. `/`·`?` 가 섞인 입력이 다른 경로를 부르지 않게 한다. 지금은 첨부 다운로드·업로드 경로에만 쓴다 (ADR-074). */
 const enc = encodeURIComponent;
 
 export interface GetPostsParams {
