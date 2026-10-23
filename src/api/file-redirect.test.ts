@@ -37,7 +37,7 @@ describe("isTrustedFileHost", () => {
   it("api. 로 시작하지 않는 API 호스트는 그 호스트만 믿는다", () => {
     expect(isTrustedFileHost("https://dooray.com/x", "https://dooray.com")).toBe(true);
     expect(isTrustedFileHost("https://example.com/x", "https://dooray.com")).toBe(false);
-    // 앞 이름을 떼면 co.kr 전체를 믿게 된다
+    // 앞 이름을 떼면 com 전체를 믿게 된다
     expect(isTrustedFileHost("https://other.example.com/x", "https://example.com")).toBe(false);
   });
 
