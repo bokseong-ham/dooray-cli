@@ -546,6 +546,7 @@ describe("calendar event edit 의 반복 규칙 병합", () => {
     const rule = mocks.client.updateCalendarEvent.mock.calls[0]![2].recurrenceRule;
     expect(rule.timezoneName).toBe("America/New_York");
     expect(rule.until).toBe("2027-08-31T23:59:59-04:00");
+    expect(warnings()).not.toContain("읽지 못해");
   });
 
   it("일정의 시간대 이름을 읽지 못하면 장비 시간대로 넓힌 값을 그대로 보낸다", async () => {
@@ -554,6 +555,7 @@ describe("calendar event edit 의 반복 규칙 병합", () => {
       "calendar", "event", "edit", CALENDAR_ID, EVENT_ID, "--repeat", "monthly", "--repeat-until", "2027-08-31",
     ]);
     expect(mocks.client.updateCalendarEvent.mock.calls[0]![2].recurrenceRule.until).toBe("2027-08-31T23:59:59+09:00");
+    expect(warnings()).toContain("일정의 시간대 Not/AZone 를 읽지 못해");
   });
 
   it("시각까지 준 --repeat-until 은 시간대를 바꾸지 않는다", async () => {
