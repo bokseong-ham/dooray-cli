@@ -1,6 +1,6 @@
 # npm 게시
 
-경로가 둘이다. 저장소 변수 `NPM_TRUSTED_PUBLISHING` 이 어느 쪽으로 갈지 정한다.
+게시 경로는 아래와 같고, 저장소 변수 `NPM_TRUSTED_PUBLISHING` 이 어느 쪽으로 갈지 정한다.
 
 ```bash
 gh variable list | grep NPM_TRUSTED_PUBLISHING || echo "설정되지 않음"

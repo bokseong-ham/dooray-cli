@@ -27,7 +27,7 @@ Dooray 공식 API 문서: [https://helpdesk.dooray.com/share/pages/9wWo-xwiR66BO
 그 스크립트의 `KNOWN_UNDOCUMENTED` 로 옮긴다.
 
 **공식 문서에 없는 endpoint 는 기본으로 쓰지 않는다.** 쓰려면 읽기 전용이어야 하고
-확인·실측·등록·경고 네 가지를 모두 채워야 한다. 조건과 그 이유는
+확인·실측·등록·경고를 모두 채워야 한다. 조건과 그 이유는
 [ADR-062](docs/adr/062-undocumented-endpoint-policy.md)가 소유한다.
 
 ## 빌드 & 실행
