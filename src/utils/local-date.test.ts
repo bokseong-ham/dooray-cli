@@ -3,6 +3,7 @@ import {
   addDays,
   DAY_END,
   DAY_START,
+  expandDateInZone,
   expandLocalDate,
   formatLocalDateWithOffset,
   isDateOnlyForm,
@@ -61,6 +62,44 @@ describe("expandLocalDate", () => {
     expect(expandLocalDate(date, DAY_END)).toBe(
       `2026-09-01T23:59:59${localOffset(new Date(2026, 8, 1, 23, 59, 59))}`,
     );
+  });
+});
+
+describe("expandDateInZone", () => {
+  // 장비 시간대와 상관없이 지정한 시간대의 그 날짜 offset 을 붙인다.
+  it.each([
+    ["Asia/Seoul", { year: 2026, month: 12, day: 31 }, "2026-12-31T23:59:59+09:00"],
+    ["America/New_York", { year: 2026, month: 12, day: 31 }, "2026-12-31T23:59:59-05:00"],
+    ["America/New_York", { year: 2027, month: 7, day: 1 }, "2027-07-01T23:59:59-04:00"],
+    ["UTC", { year: 2026, month: 12, day: 31 }, "2026-12-31T23:59:59+00:00"],
+    ["Asia/Kolkata", { year: 2026, month: 12, day: 31 }, "2026-12-31T23:59:59+05:30"],
+    ["Asia/Kathmandu", { year: 2026, month: 12, day: 31 }, "2026-12-31T23:59:59+05:45"],
+  ])("%s 의 %o 는 %s", (zone, date, expected) => {
+    expect(expandDateInZone(date, DAY_END, zone)).toBe(expected);
+  });
+
+  it("서머타임이 시작하는 날도 그 시각의 offset 을 붙인다", () => {
+    // 2027-03-14 02:00 에 -05:00 에서 -04:00 으로 바뀐다.
+    expect(expandDateInZone({ year: 2027, month: 3, day: 14 }, DAY_START, "America/New_York")).toBe(
+      "2027-03-14T00:00:00-05:00",
+    );
+    expect(expandDateInZone({ year: 2027, month: 3, day: 14 }, DAY_END, "America/New_York")).toBe(
+      "2027-03-14T23:59:59-04:00",
+    );
+  });
+
+  it("서머타임이 끝나는 날도 그 시각의 offset 을 붙인다", () => {
+    // 2026-11-01 02:00 에 -04:00 에서 -05:00 으로 바뀐다.
+    expect(expandDateInZone({ year: 2026, month: 11, day: 1 }, DAY_START, "America/New_York")).toBe(
+      "2026-11-01T00:00:00-04:00",
+    );
+    expect(expandDateInZone({ year: 2026, month: 11, day: 1 }, DAY_END, "America/New_York")).toBe(
+      "2026-11-01T23:59:59-05:00",
+    );
+  });
+
+  it("시간대 이름이 잘못됐으면 null 이다", () => {
+    expect(expandDateInZone({ year: 2026, month: 12, day: 31 }, DAY_END, "Not/AZone")).toBeNull();
   });
 });
 
