@@ -6,6 +6,7 @@ import { DoorayCliError } from "../utils/errors.js";
 import { normalizeDoorayMessage } from "../utils/dooray-message.js";
 import { fallbackFileName, parseContentDispositionFileName } from "../utils/content-disposition.js";
 import { EXIT_API_ERROR, EXIT_AUTH_ERROR } from "../utils/exit-codes.js";
+import { describeOrigin, fetchWithResponseTimeout, isTrustedFileHost } from "./file-redirect.js";
 import { createTokenBucket, parseRateLimitHeaders } from "./rate-limiter.js";
 import { parseJsonPreservingLargeIntegers } from "./json-large-integer.js";
 import { buildThreadRequest } from "./messenger-thread-request.js";
@@ -76,6 +77,9 @@ import type {
   CalendarEventDeleteType,
   DeleteCalendarEventResponse,
 } from "./types.js";
+
+/** 경로에 넣는 식별자. `/`·`?` 가 섞인 입력이 다른 경로를 부르지 않게 한다. 지금은 첨부 경로에만 쓴다 (ADR-074). */
+const enc = encodeURIComponent;
 
 export interface GetPostsParams {
   page?: number;
@@ -726,6 +730,40 @@ export class DoorayApiClient {
     }
   }
 
+  /**
+   * 첨부 API 의 307 이 가리키는 파일 서버에 인증 헤더를 실어 요청한다 (ADR-015, ADR-074).
+   * API 주소와 같은 도메인의 https 주소가 아니면 인증 헤더를 보내지 않고 멈춘다. 파일 서버가 또 redirect 하면 따라가지 않는다.
+   * 응답 시간 제한은 본문이 없는 다운로드에만 건다. 업로드는 본문 전송이 끝나야 헤더가 와서 제한이 곧 전송 시간 제한이 된다.
+   */
+  private async requestFileServer(location: string | null, label: string, init: RequestInit = {}): Promise<Response> {
+    if (!location) {
+      throw new DoorayCliError(`${label} 리다이렉트 URL을 받지 못했습니다.`, EXIT_API_ERROR);
+    }
+    if (!isTrustedFileHost(location, this.baseUrl)) {
+      throw new DoorayCliError(
+        `${label} 리다이렉트가 예상하지 못한 주소(${describeOrigin(location)})를 가리켜 인증 정보를 보내지 않았습니다.`,
+        EXIT_API_ERROR,
+      );
+    }
+    const request: RequestInit = { ...init, headers: { Authorization: this.authHeader }, redirect: "manual" };
+    const res = init.body == null ? await fetchWithResponseTimeout(location, request, label) : await fetch(location, request);
+    if (res.status >= 300 && res.status < 400) {
+      throw new DoorayCliError(`${label} 실패: 파일 서버가 다른 주소로 다시 보냈습니다 (${res.status}).`, EXIT_API_ERROR);
+    }
+    if (!res.ok) {
+      throw new DoorayCliError(`${label} 실패 (${res.status})`, EXIT_API_ERROR);
+    }
+    return res;
+  }
+
+  /** 다운로드 경로는 항상 307 이다 (ADR-015). 다른 status 면 파일 서버를 부르지 않고 실패한다. */
+  private async followDownloadRedirect(res: Response, label: string): Promise<Response> {
+    if (res.status !== 307) {
+      throw new DoorayCliError(`${label} 실패 (예상 status 307, 실제 ${res.status})`, EXIT_API_ERROR);
+    }
+    return this.requestFileServer(res.headers.get("location"), label);
+  }
+
   // fileName 은 ADR-067 규칙으로 푼 안전한 저장 이름이다. knownName 은 호출자가 이미 가진 목록의 name 이다.
   async downloadPostFile(
     projectId: string,
@@ -735,24 +773,12 @@ export class DoorayApiClient {
   ): Promise<{ buffer: ArrayBuffer; fileName: string }> {
     try {
       const res = await this.api
-        .get(`project/v1/projects/${projectId}/posts/${postId}/files/${fileId}`, {
+        .get(`project/v1/projects/${enc(projectId)}/posts/${enc(postId)}/files/${enc(fileId)}`, {
           searchParams: { media: "raw" },
           redirect: "manual",
           throwHttpErrors: false,
         });
-
-      const location = res.headers.get("location");
-      if (!location) {
-        throw new DoorayCliError("파일 다운로드 리다이렉트 URL을 받지 못했습니다.", EXIT_API_ERROR);
-      }
-
-      const fileRes = await fetch(location, {
-        headers: { Authorization: this.authHeader },
-      });
-
-      if (!fileRes.ok) {
-        throw new DoorayCliError(`파일 다운로드 실패 (${fileRes.status})`, EXIT_API_ERROR);
-      }
+      const fileRes = await this.followDownloadRedirect(res, "파일 다운로드");
 
       const disposition = fileRes.headers.get("content-disposition");
       let fileName = parseContentDispositionFileName(disposition);
@@ -782,7 +808,7 @@ export class DoorayApiClient {
       const formData = new FormData();
       formData.append("file", new Blob([fileBuffer]), fileName);
 
-      const url = `${this.baseUrl}project/v1/projects/${projectId}/posts/${postId}/files`;
+      const url = `${this.baseUrl}project/v1/projects/${enc(projectId)}/posts/${enc(postId)}/files`;
       const res = await fetch(url, {
         method: "POST",
         headers: { Authorization: this.authHeader },
@@ -791,21 +817,10 @@ export class DoorayApiClient {
       });
 
       if (res.status === 307) {
-        const location = res.headers.get("location");
-        if (!location) {
-          throw new DoorayCliError("파일 업로드 리다이렉트 URL을 받지 못했습니다.", EXIT_API_ERROR);
-        }
-
-        const uploadRes = await fetch(location, {
+        const uploadRes = await this.requestFileServer(res.headers.get("location"), "파일 업로드", {
           method: "POST",
-          headers: { Authorization: this.authHeader },
           body: formData,
         });
-
-        if (!uploadRes.ok) {
-          throw new DoorayCliError(`파일 업로드 실패 (${uploadRes.status})`, EXIT_API_ERROR);
-        }
-
         return await uploadRes.json() as UploadFileResponse;
       }
 
@@ -850,7 +865,7 @@ export class DoorayApiClient {
         return fd;
       };
 
-      const url = `${this.baseUrl}wiki/v1/wikis/${wikiId}/pages/${pageId}/files`;
+      const url = `${this.baseUrl}wiki/v1/wikis/${enc(wikiId)}/pages/${enc(pageId)}/files`;
       const res = await fetch(url, {
         method: "POST",
         headers: { Authorization: this.authHeader },
@@ -859,19 +874,11 @@ export class DoorayApiClient {
       });
 
       if (res.status === 307) {
-        const location = res.headers.get("location");
-        if (!location) {
-          throw new DoorayCliError("위키 파일 업로드 리다이렉트 URL을 받지 못했습니다.", EXIT_API_ERROR);
-        }
         // 재시도 시에도 FormData 새로 빌드 (type → file 순서 보장)
-        const uploadRes = await fetch(location, {
+        const uploadRes = await this.requestFileServer(res.headers.get("location"), "위키 파일 업로드", {
           method: "POST",
-          headers: { Authorization: this.authHeader },
           body: buildFormData(),
         });
-        if (!uploadRes.ok) {
-          throw new DoorayCliError(`위키 파일 업로드 실패 (${uploadRes.status})`, EXIT_API_ERROR);
-        }
         return await uploadRes.json() as UploadWikiPageFileResponse;
       }
 
@@ -893,31 +900,11 @@ export class DoorayApiClient {
   ): Promise<{ buffer: ArrayBuffer; fileName: string }> {
     try {
       const res = await this.api
-        .get(`wiki/v1/wikis/${wikiId}/pages/${pageId}/files/${fileId}`, {
+        .get(`wiki/v1/wikis/${enc(wikiId)}/pages/${enc(pageId)}/files/${enc(fileId)}`, {
           redirect: "manual",
           throwHttpErrors: false,
         });
-
-      // ADR-015: 파일 다운로드 endpoint 는 항상 307 redirect 응답.
-      // 307 외 status 는 에러 (200 직접 응답 케이스는 Dooray 가 보장하지 않음).
-      if (res.status !== 307) {
-        throw new DoorayCliError(
-          `위키 파일 다운로드 실패 (예상 status 307, 실제 ${res.status})`,
-          EXIT_API_ERROR,
-        );
-      }
-
-      const location = res.headers.get("location");
-      if (!location) {
-        throw new DoorayCliError("위키 파일 다운로드 리다이렉트 URL을 받지 못했습니다.", EXIT_API_ERROR);
-      }
-
-      const fileRes = await fetch(location, {
-        headers: { Authorization: this.authHeader },
-      });
-      if (!fileRes.ok) {
-        throw new DoorayCliError(`위키 파일 다운로드 실패 (${fileRes.status})`, EXIT_API_ERROR);
-      }
+      const fileRes = await this.followDownloadRedirect(res, "위키 파일 다운로드");
 
       const disposition = fileRes.headers.get("content-disposition");
       let fileName = parseContentDispositionFileName(disposition);
