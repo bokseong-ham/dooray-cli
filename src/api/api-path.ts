@@ -20,7 +20,7 @@ export function apiPath(strings: TemplateStringsArray, ...values: Array<string |
     const text = String(value);
     if (text === "" || text === "." || text === "..") {
       throw new DoorayCliError(
-        `API 경로에 넣을 수 없는 값입니다: ${JSON.stringify(text)} (빈 값, "." , ".." 는 URL 정규화로 다른 경로를 부릅니다)`,
+        `API 경로에 넣을 수 없는 값입니다: ${JSON.stringify(text)} (빈 값, ".", ".." 는 URL 정규화로 다른 경로를 부릅니다)`,
         EXIT_PARAM_ERROR,
       );
     }
