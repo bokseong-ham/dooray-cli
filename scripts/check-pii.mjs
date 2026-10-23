@@ -38,6 +38,11 @@ export const OK_DOMAINS = [
   "dooray.com",
   "example.com",
   "example.dooray.com",
+  // 첨부 파일 서버. file-api.dooray.com 은 실측했고, 나머지는 같은 모양이라고 가정한 공개 주소다 (ADR-074).
+  "file-api.dooray.co.kr",
+  "file-api.dooray.com",
+  "file-api.gov-dooray.co.kr",
+  "file-api.gov-dooray.com",
   "github.com",
   "helpdesk.dooray.com",
   "my-org.dooray.com",
