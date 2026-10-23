@@ -1,8 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { fileURLToPath } from "node:url";
 import { DoorayApiClient } from "./client.js";
 
 // 첨부 다운로드·업로드가 307 을 따라갈 때 인증 헤더를 어디로 보내는지 확인한다 (ADR-074).
 const BASE = "https://api.dooray.com";
+// 업로드에 넘길 실제 파일. pathname 은 퍼센트 인코딩돼 공백·한글 경로나 Windows 에서 열리지 않는다.
+const THIS_FILE = fileURLToPath(import.meta.url);
 const TRUSTED = "https://file-api.dooray.com/downloads/x";
 const FOREIGN = "https://other.example.com/downloads/x?sig=secret";
 
@@ -95,7 +98,7 @@ describe("첨부 업로드의 redirect", () => {
       url.startsWith(BASE) ? new Response(null, { status: 307, headers: { location: FOREIGN } }) : new Response("{}"),
     );
     const c = new DoorayApiClient("key", BASE);
-    const error = await call(c, new URL(import.meta.url).pathname).catch((e) => e);
+    const error = await call(c, THIS_FILE).catch((e) => e);
     expect(error.message).toContain(`${label} 리다이렉트가 예상하지 못한 주소`);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0]![0]).toMatch(/^https:\/\/api\.dooray\.com\//);
@@ -108,7 +111,7 @@ describe("첨부 업로드의 redirect", () => {
         : new Response(JSON.stringify({ result: { id: "new" } })),
     );
     const c = new DoorayApiClient("key", BASE);
-    await c.uploadWikiPageFile("w/1", "p?2", new URL(import.meta.url).pathname, "general");
+    await c.uploadWikiPageFile("w/1", "p?2", THIS_FILE, "general");
     expect(fetchMock.mock.calls[0]![0]).toBe(`${BASE}/wiki/v1/wikis/w%2F1/pages/p%3F2/files`);
     // 업로드는 본문 전송이 끝나야 응답이 와서, 응답 시간 제한이 곧 전송 시간 제한이 된다
     for (const [, init] of fetchMock.mock.calls) expect(init?.signal).toBeUndefined();
@@ -121,7 +124,7 @@ describe("첨부 업로드의 redirect", () => {
         : new Response(JSON.stringify({ result: { id: "new" } })),
     );
     const c = new DoorayApiClient("key", BASE);
-    const res = await c.uploadPostFile("p", "post", new URL(import.meta.url).pathname);
+    const res = await c.uploadPostFile("p", "post", THIS_FILE);
     expect(res).toEqual({ result: { id: "new" } });
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(fetchMock.mock.calls[1]![0]).toBe(TRUSTED);
