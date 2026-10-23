@@ -25,14 +25,14 @@ NHN Dooray REST API 를 래핑한 CLI 다. 이 파일은 라우터이므로, 작
 
 `post get`/`edit`/`replace`/`done`/`workflow`, `post comment` 전체, `post file` 전체, `post comment file` 전체,
 `wiki page get` 과 `wiki page edit` 과 `wiki page replace`, `wiki page file` 과 `wiki page comment` 전체,
-그리고 `wiki page delete` 와 `wiki page move` 가 네 가지 형태를 모두 받는다.
+그리고 `wiki page delete` 와 `wiki page move` 가 아래 형태를 모두 받는다.
 
 - `<project> <number>` — 업무는 번호, 위키는 `<project> <page-id>`
 - `--id <postId>` / `--id <pageId>` — 위키는 `--project` 없이도 조회된다. 함께 주면 wikiId 를 해석하는 호출을 한 번 아낀다
 - `--url <url>`
 - 첫 인자에 Dooray URL 을 직접
 
-받아들이는 URL 형식은 셋이다.
+받아들이는 URL 형식은 다음과 같다.
 
 - `https://*.dooray.com/task/to/<postId>`
 - `https://*.dooray.com/task/<projectId>/<postId>` — 브라우저 주소창 복사본
@@ -69,7 +69,7 @@ NHN Dooray REST API 를 래핑한 CLI 다. 이 파일은 라우터이므로, 작
 
 ## 삭제 명령의 확인 동작
 
-여섯 삭제 명령은 같은 안전 확인 정책을 따른다.
+아래 삭제 명령은 같은 안전 확인 정책을 따른다.
 
 | 명령 | 확인 | 자동화 |
 | --- | --- | --- |

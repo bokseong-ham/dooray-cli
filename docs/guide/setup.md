@@ -85,7 +85,7 @@ dooray post --help
 dooray post create --help
 ```
 
-출력은 세 가지 모드다.
+출력 모드는 다음과 같다.
 
 | 플래그 | 출력 | 쓰는 곳 |
 | --- | --- | --- |

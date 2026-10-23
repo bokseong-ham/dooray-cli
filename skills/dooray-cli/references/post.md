@@ -66,7 +66,7 @@ dooray post list <project> --to user@example.com --all
 `--parent` 의 짧은 숫자는 이 프로젝트의 업무 번호로 본다. `post create --parent` 와 달리 postId 를 쓰려면 15자리 이상 숫자여야 한다.
 숫자도 `<project>/<number>` 도 아닌 값은 조회 전에 종료 코드 3 으로 끝난다.
 
-기간은 네 가지 형태다.
+기간 형태는 다음과 같다.
 
 | 형태 | 뜻 |
 | --- | --- |

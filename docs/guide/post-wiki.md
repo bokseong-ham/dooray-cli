@@ -185,7 +185,7 @@ dooray wiki page file download <project> <page-id> <file-id> --output-file ./가
 | 업무 | `dooray post comment delete`<br>`dooray post file delete`<br>`dooray post comment file delete` |
 | 위키 | `dooray wiki page delete`<br>`dooray wiki page file delete`<br>`dooray wiki page comment delete` |
 
-여섯 명령은 TTY에서 기본값이 아니오인 `y/N` 확인을 요청한다.
+위 명령은 TTY에서 기본값이 아니오인 `y/N` 확인을 요청한다.
 자동화·파이프 등 non-TTY 실행에서는 `-y` 또는 `--yes`로 확인을 생략해야 한다.
 플래그가 없으면 삭제 API를 호출하기 전에 종료 코드 3으로 끝난다.
 기존 삭제 자동화에는 명시적인 yes 플래그를 추가해야 한다.
