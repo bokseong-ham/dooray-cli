@@ -117,6 +117,15 @@ export function warnRecurrenceDropped(dropped: DroppedRecurrenceField[], frequen
   process.stderr.write(lines.join("\n") + "\n");
 }
 
+/** 일정의 반복 시간대를 읽지 못해 날짜만 준 종료일을 장비 시간대로 넓혔으면 stderr 로 알린다. */
+function warnUnreadableZone(zone: string | undefined): void {
+  if (zone == null) return;
+  process.stderr.write(
+    `⚠  일정의 시간대 ${sanitizeForTerminal(zone)} 를 읽지 못해 --repeat-until 을 이 컴퓨터의 시간대 기준으로 넓혔습니다. ` +
+      "마지막 날 회차를 맞추려면 --repeat-until 에 offset 이 붙은 시각을 줍니다.\n",
+  );
+}
+
 export const calendarEventEditCommand = addEventFieldOptions(
   new Command("edit")
     .description("일정 수정 (준 옵션의 필드만 바꾼다. 반복 일정 회차 id 는 받지 않는다)")
@@ -138,6 +147,7 @@ export const calendarEventEditCommand = addEventFieldOptions(
   let calendar: ResolvedCalendar;
   let request: CalendarEventWriteRequest;
   let recurrenceDropped: DroppedRecurrenceField[] = [];
+  let unreadableZone: string | undefined;
   try {
     calendar = await resolveWritableCalendar(client, calendarInput);
     request = await resolveEventRequest(client, prepared, "edit");
@@ -149,6 +159,7 @@ export const calendarEventEditCommand = addEventFieldOptions(
         const merged = mergeExistingRecurrence(request.recurrenceRule, opts, existing?.recurrenceRule);
         request = { ...request, recurrenceRule: merged.rule };
         recurrenceDropped = merged.dropped;
+        unreadableZone = merged.unreadableZone;
       }
     }
   } catch (e) {
@@ -166,6 +177,7 @@ export const calendarEventEditCommand = addEventFieldOptions(
   if (opts.dryRun) {
     stopSpinner(true, `dry-run: ${calendarLabel} 의 일정 ${eventId} 에 보낼 요청입니다. API 는 부르지 않았습니다.`);
     warnRecurrenceDropped(recurrenceDropped, request.recurrenceRule?.frequency);
+    warnUnreadableZone(unreadableZone);
     printJson(request);
     return;
   }
@@ -180,6 +192,7 @@ export const calendarEventEditCommand = addEventFieldOptions(
   }
   stopSpinner(true, "일정 수정 완료");
   warnRecurrenceDropped(recurrenceDropped, request.recurrenceRule?.frequency);
+  warnUnreadableZone(unreadableZone);
 
   if (globalOpts.json) {
     printJson(raw ?? null);

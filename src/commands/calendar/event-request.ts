@@ -19,6 +19,7 @@ import type {
 import { MARKDOWN_MIME } from "../../utils/body-input.js";
 import { DoorayCliError } from "../../utils/errors.js";
 import { EXIT_PARAM_ERROR } from "../../utils/exit-codes.js";
+import { DAY_END, expandDateInZone, parseLocalDate } from "../../utils/local-date.js";
 import type { EventSchedule } from "./event-schedule.js";
 import { resolveRepeatUntil } from "./event-schedule.js";
 
@@ -335,13 +336,20 @@ export function mergeExistingRecurrence(
   rule: CalendarEventRecurrenceRule,
   given: RepeatOptions,
   existing: CalendarEventRecurrenceRuleDetail | null | undefined,
-): { rule: CalendarEventRecurrenceRule; dropped: DroppedRecurrenceField[] } {
+): { rule: CalendarEventRecurrenceRule; dropped: DroppedRecurrenceField[]; unreadableZone?: string } {
   if (existing?.frequency == null) return { rule, dropped: [] };
 
   const merged: CalendarEventRecurrenceRule = { ...rule };
+  let unreadableZone: string | undefined;
   // 반복을 펼치는 기준 시간대는 일정에 속한다. 다른 시간대 장비에서 고쳐도 요일이 옮겨지지 않게 기존 값을 둔다.
   if (typeof existing.timezoneName === "string" && existing.timezoneName !== "") {
     merged.timezoneName = existing.timezoneName;
+    // 날짜만 준 종료일은 장비 시간대의 23:59:59 로 넓혀져 있다. 일정의 시간대가 다르면 마지막 날 회차가
+    // 빠지거나 다음 날 회차가 들어가므로 일정의 시간대로 다시 넓힌다. 시간대 이름을 못 읽으면 그대로 둔다.
+    const untilDate = given.repeatUntil != null ? parseLocalDate(given.repeatUntil) : null;
+    const zoned = untilDate != null ? expandDateInZone(untilDate, DAY_END, existing.timezoneName) : undefined;
+    if (zoned != null) merged.until = zoned;
+    else if (zoned === null) unreadableZone = existing.timezoneName;
   }
   const dropped: DroppedRecurrenceField[] = [];
   // 실측 응답은 소문자였다. 표기가 달라도 같은 주기를 바뀐 것으로 보지 않게 맞춰 비교한다.
@@ -364,7 +372,7 @@ export function mergeExistingRecurrence(
     if (value == null || value === "" || known.has(field) || RECURRENCE_ECHO_FIELDS.has(field)) continue;
     dropped.push({ field, value });
   }
-  return { rule: merged, dropped };
+  return { rule: merged, dropped, unreadableZone };
 }
 
 const INSTANCE_ID_RE = /^(.+)-(\d{8}T\d{6}Z)$/;

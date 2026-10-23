@@ -77,7 +77,7 @@ export function addEventFieldOptions(command: Command): Command {
     .option("--private", "비공개 일정으로 표시")
     .option("--repeat <frequency>", `반복 (${REPEAT_FREQUENCIES.join(", ")})`)
     .option("--repeat-interval <n>", "반복 간격 (기본 1)")
-    .option("--repeat-until <date|datetime>", "반복 종료 (날짜만 주면 그 날 23:59:59)")
+    .option("--repeat-until <date|datetime>", "반복 종료 (날짜만 주면 그 날 23:59:59. 반복 일정을 고칠 때는 그 일정의 시간대 기준)")
     .option("--repeat-byday <value>", "반복 요일 (예: TH, 1 MO, -1 WE)")
     .option("--repeat-bymonth <list>", "반복 월 (1-12, 쉼표 목록 가능)")
     .option(
