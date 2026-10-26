@@ -8,6 +8,7 @@ import { readBodyInput } from "../../utils/body-input.js";
 import { DoorayCliError } from "../../utils/errors.js";
 import { EXIT_PARAM_ERROR } from "../../utils/exit-codes.js";
 import { resolveMailAttachments } from "../../utils/mail-attach.js";
+import { saveSentCopy } from "./save-sent.js";
 
 export const mailSendCommand = new Command("send")
   .description("메일 발송")
@@ -19,6 +20,7 @@ export const mailSendCommand = new Command("send")
   .option("--bcc <addresses...>", "숨은참조")
   .option("--html", "본문을 HTML로 전송")
   .option("--attach <paths...>", "첨부 파일 경로 (복수 가능)")
+  .option("--no-save-sent", "보낸메일함에 저장하지 않음")
   .action(async (opts) => {
     const globalOpts = mailSendCommand.optsWithGlobals() as OutputOptions;
     const config = await getConfigOrThrow();
@@ -31,7 +33,7 @@ export const mailSendCommand = new Command("send")
     const attachments = await resolveMailAttachments(opts.attach);
 
     startSpinner("메일 발송 중...");
-    const result = await sendMail(config, {
+    const { raw, ...result } = await sendMail(config, {
       to: opts.to,
       cc: opts.cc,
       bcc: opts.bcc,
@@ -41,9 +43,10 @@ export const mailSendCommand = new Command("send")
       attachments,
     });
     stopSpinner(true, "메일 발송 완료");
+    const saved = await saveSentCopy(config, raw, opts.saveSent);
 
     if (globalOpts.json) {
-      printJson({ ...result, attachments: attachments.map((a) => a.filename) });
+      printJson({ ...result, attachments: attachments.map((a) => a.filename), ...saved });
     } else {
       process.stdout.write(
         `메일 발송 완료\n` +

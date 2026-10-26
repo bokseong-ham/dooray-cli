@@ -12,6 +12,7 @@ import { sanitizeFileName } from "../../utils/attachment-check.js";
 import { readBodyInput } from "../../utils/body-input.js";
 import { formatSize } from "../../utils/format-size.js";
 import { resolveMailAttachments } from "../../utils/mail-attach.js";
+import { saveSentCopy } from "./save-sent.js";
 
 function sanitizeReplyPreview(value: string): string {
   return sanitizeFileName(value).replace(/[\x80-\x9F\u2028\u2029]/g, "?");
@@ -25,6 +26,7 @@ export const mailReplyCommand = new Command("reply")
   .option("--cc <addresses...>", "참조")
   .option("--html", "본문을 HTML로 전송")
   .option("--attach <paths...>", "첨부 파일 경로 (복수 가능)")
+  .option("--no-save-sent", "보낸메일함에 저장하지 않음")
   .option("-y, --yes", "원본 메일 확인 생략 (자동화용)")
   .action(async (target, opts) => {
     const globalOpts = mailReplyCommand.optsWithGlobals() as OutputOptions;
@@ -102,9 +104,10 @@ export const mailReplyCommand = new Command("reply")
     }
 
     startSpinner("답장 발송 중...");
-    let result: Awaited<ReturnType<typeof sendMail>>;
+    let result: Omit<Awaited<ReturnType<typeof sendMail>>, "raw">;
+    let raw: Buffer;
     try {
-      result = await sendMail(config, {
+      ({ raw, ...result } = await sendMail(config, {
         to: [replyTo],
         cc: opts.cc,
         subject: original.subject.startsWith("Re: ")
@@ -115,15 +118,17 @@ export const mailReplyCommand = new Command("reply")
         attachments,
         inReplyTo: messageId ?? undefined,
         references: messageId ?? undefined,
-      });
+      }));
       stopSpinner(true, "답장 발송 완료");
     } catch (error) {
       stopSpinner(false);
       throw error;
     }
 
+    const saved = await saveSentCopy(config, raw, opts.saveSent);
+
     if (globalOpts.json) {
-      printJson({ ...result, attachments: attachments.map((a) => a.filename) });
+      printJson({ ...result, attachments: attachments.map((a) => a.filename), ...saved });
     } else {
       process.stdout.write(
         `답장 발송 완료\n` +
