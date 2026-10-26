@@ -14,6 +14,7 @@ export interface SendMailOptions {
   html?: boolean;
   inReplyTo?: string;
   references?: string;
+  attachments?: { filename: string; path: string }[];
 }
 
 export interface SendMailResult {
@@ -62,6 +63,10 @@ export async function sendMail(
 
   if (opts.cc?.length) mailOptions.cc = opts.cc.join(", ");
   if (opts.bcc?.length) mailOptions.bcc = opts.bcc.join(", ");
+
+  if (opts.attachments?.length) {
+    mailOptions.attachments = opts.attachments.map(({ filename, path }) => ({ filename, path }));
+  }
 
   if (opts.html) {
     mailOptions.html = opts.body;
