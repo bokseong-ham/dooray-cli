@@ -10,6 +10,8 @@ import { DoorayCliError } from "../../utils/errors.js";
 import { EXIT_PARAM_ERROR } from "../../utils/exit-codes.js";
 import { sanitizeFileName } from "../../utils/attachment-check.js";
 import { readBodyInput } from "../../utils/body-input.js";
+import { formatSize } from "../../utils/format-size.js";
+import { resolveMailAttachments } from "../../utils/mail-attach.js";
 
 function sanitizeReplyPreview(value: string): string {
   return sanitizeFileName(value).replace(/[\x80-\x9F\u2028\u2029]/g, "?");
@@ -22,6 +24,7 @@ export const mailReplyCommand = new Command("reply")
   .option("--body-file <path>", "답장 본문 파일 경로 (- 입력 시 stdin)")
   .option("--cc <addresses...>", "참조")
   .option("--html", "본문을 HTML로 전송")
+  .option("--attach <paths...>", "첨부 파일 경로 (복수 가능)")
   .option("-y, --yes", "원본 메일 확인 생략 (자동화용)")
   .action(async (target, opts) => {
     const globalOpts = mailReplyCommand.optsWithGlobals() as OutputOptions;
@@ -40,6 +43,11 @@ export const mailReplyCommand = new Command("reply")
     if (!body) {
       throw new DoorayCliError("--body 또는 --body-file을 지정하세요", EXIT_PARAM_ERROR);
     }
+
+    const attachments = await resolveMailAttachments(opts.attach);
+    const attachmentLines = attachments.map(
+      (a) => `  첨부: ${sanitizeReplyPreview(a.filename)} (${formatSize(a.size)})`,
+    );
 
     const spinner = startSpinner(
       mailTarget.kind === "mailId" ? "메일 찾는 중..." : "원본 메일 조회 중...",
@@ -78,6 +86,7 @@ export const mailReplyCommand = new Command("reply")
           `  보낸사람: ${sanitizeReplyPreview(original.from)}`,
           `  IMAP 도착 시각: ${original.internalDate?.toISOString() ?? "알 수 없음"}`,
           `  UID: ${original.uid}`,
+          ...attachmentLines,
           "이 메일에 답장할까요?",
         ].join("\n"),
         default: false,
@@ -86,6 +95,10 @@ export const mailReplyCommand = new Command("reply")
         process.stderr.write("취소되었습니다.\n");
         return;
       }
+    }
+
+    if (!needsConfirmation && attachmentLines.length) {
+      process.stderr.write(`${attachmentLines.join("\n")}\n`);
     }
 
     startSpinner("답장 발송 중...");
@@ -99,6 +112,7 @@ export const mailReplyCommand = new Command("reply")
           : `Re: ${original.subject}`,
         body,
         html: opts.html,
+        attachments,
         inReplyTo: messageId ?? undefined,
         references: messageId ?? undefined,
       });
@@ -109,12 +123,15 @@ export const mailReplyCommand = new Command("reply")
     }
 
     if (globalOpts.json) {
-      printJson(result);
+      printJson({ ...result, attachments: attachments.map((a) => a.filename) });
     } else {
       process.stdout.write(
         `답장 발송 완료\n` +
           `  To: ${replyTo}\n` +
-          `  Message-ID: ${result.messageId}\n`,
+          `  Message-ID: ${result.messageId}\n` +
+          (attachments.length
+            ? `  첨부: ${attachments.map((a) => sanitizeReplyPreview(a.filename)).join(", ")}\n`
+            : ""),
       );
     }
   });
