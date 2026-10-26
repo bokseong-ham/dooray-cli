@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   getMail: vi.fn(),
   resolveUidByMailId: vi.fn(),
   sendMail: vi.fn(),
+  saveToSent: vi.fn(),
   confirm: vi.fn(),
   startSpinner: vi.fn(() => ({ text: "" })),
   stopSpinner: vi.fn(),
@@ -34,6 +35,7 @@ vi.mock("../../api/imapClient.js", () => ({
   connectImapClient: mocks.connectImapClient,
   closeImapClient: mocks.closeImapClient,
   getImapConfigOrThrow: vi.fn(),
+  saveToSent: mocks.saveToSent,
 }));
 
 vi.mock("../../api/smtpClient.js", () => ({
@@ -90,7 +92,9 @@ beforeEach(() => {
     messageId: "<reply@example.com>",
     accepted: ["sender@example.com"],
     rejected: [],
+    raw: Buffer.from("RAW"),
   });
+  mocks.saveToSent.mockResolvedValue({ saved: true });
   mocks.client.getMailboxLock.mockResolvedValue({ release: mocks.release });
   mocks.client.fetchOne.mockResolvedValue({
     envelope: { messageId: "<original@example.com>" },
@@ -438,5 +442,45 @@ describe("mailReplyCommand --attach", () => {
     );
     const out = vi.mocked(process.stdout.write).mock.calls.map((c) => String(c[0])).join("");
     expect(JSON.parse(out).attachments).toEqual(["photo.jpg"]);
+  });
+});
+
+describe("mailReplyCommand 보낸메일함 저장", () => {
+  it("발송한 원문을 보낸메일함에 저장한다", async () => {
+    await runMailReply(["991", "--body", "답장", "--yes"]);
+
+    expect(mocks.saveToSent).toHaveBeenCalledWith(config, Buffer.from("RAW"));
+  });
+
+  it("--no-save-sent 면 IMAP 저장을 시도하지 않는다", async () => {
+    await runMailReply(["991", "--body", "답장", "--yes", "--no-save-sent"]);
+
+    expect(mocks.sendMail).toHaveBeenCalledTimes(1);
+    expect(mocks.saveToSent).not.toHaveBeenCalled();
+  });
+
+  it("저장이 실패해도 재발송하지 않고 경고만 내며 정상 종료한다", async () => {
+    mocks.saveToSent.mockResolvedValue({ saved: false, reason: "APPEND 거부" });
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    await expect(runMailReply(["991", "--body", "답장", "--yes"])).resolves.toBeUndefined();
+
+    expect(mocks.sendMail).toHaveBeenCalledTimes(1);
+    expect(stderr.mock.calls.map((c) => String(c[0])).join("")).toContain("APPEND 거부");
+  });
+
+  it("사용자가 확인을 거절하면 저장도 시도하지 않는다", async () => {
+    const original = Object.getOwnPropertyDescriptor(process.stdin, "isTTY");
+    Object.defineProperty(process.stdin, "isTTY", { value: true, configurable: true });
+    mocks.confirm.mockResolvedValue(false);
+    try {
+      await runMailReply(["991", "--body", "답장"]);
+    } finally {
+      if (original) Object.defineProperty(process.stdin, "isTTY", original);
+      else delete (process.stdin as { isTTY?: boolean }).isTTY;
+    }
+
+    expect(mocks.sendMail).not.toHaveBeenCalled();
+    expect(mocks.saveToSent).not.toHaveBeenCalled();
   });
 });

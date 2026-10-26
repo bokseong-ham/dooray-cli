@@ -20,7 +20,7 @@ vi.mock("imapflow", () => ({
   },
 }));
 
-import { getMail, getMailAttachments, resolveUidByMailId } from "./imapClient.js";
+import { getMail, getMailAttachments, resolveUidByMailId, saveToSent } from "./imapClient.js";
 
 const config: Config = {
   version: 1,
@@ -670,5 +670,74 @@ describe("메일 첨부", () => {
     const mail = await getMail(config, 1);
 
     expect(mail.attachments.map((a) => a.fileName)).toEqual(["a.crt", "a-2.crt"]);
+  });
+});
+
+describe("saveToSent", () => {
+  type Box = { path: string; specialUse?: string; specialUseSource?: string };
+  const raw = Buffer.from("RAW-MESSAGE");
+
+  function setup(boxes: Box[], append: unknown = { uid: 1 }) {
+    const fake = createFakeClient([]) as FakeClient & {
+      list: ReturnType<typeof vi.fn>;
+      append: ReturnType<typeof vi.fn>;
+    };
+    fake.list = vi.fn().mockResolvedValue(boxes);
+    fake.append = vi.fn().mockResolvedValue(append);
+    mockState.client = fake;
+    return fake;
+  }
+
+  it("\\Sent 특수 용도 메일함에 원문 그대로 \\Seen 과 함께 넣는다", async () => {
+    const fake = setup([
+      { path: "INBOX", specialUse: "\\Inbox", specialUseSource: "extension" },
+      { path: "Sent Items", specialUse: "\\Sent", specialUseSource: "extension" },
+    ]);
+
+    await expect(saveToSent(config, raw)).resolves.toEqual({ saved: true });
+
+    const [path, content, flags] = fake.append.mock.calls[0];
+    expect(path).toBe("Sent Items");
+    expect((content as Buffer).equals(raw)).toBe(true);
+    expect(flags).toEqual(["\\Seen"]);
+    expect(fake.logout).toHaveBeenCalled();
+  });
+
+  it("이름이 Sent 여도 특수 용도가 없으면 넣지 않고 사유를 돌려준다", async () => {
+    const fake = setup([{ path: "Sent" }, { path: "INBOX", specialUse: "\\Inbox" }]);
+
+    const result = await saveToSent(config, raw);
+
+    expect(result.saved).toBe(false);
+    expect(result.reason).toContain("\\Sent");
+    expect(fake.append).not.toHaveBeenCalled();
+  });
+
+  it("이름으로 추정한 특수 용도(name)는 인정하지 않는다", async () => {
+    const fake = setup([{ path: "Sent", specialUse: "\\Sent", specialUseSource: "name" }]);
+
+    expect((await saveToSent(config, raw)).saved).toBe(false);
+    expect(fake.append).not.toHaveBeenCalled();
+  });
+
+  it("APPEND 가 실패해도 던지지 않고 사유를 돌려준다", async () => {
+    setup([{ path: "Sent", specialUse: "\\Sent", specialUseSource: "extension" }]);
+    (mockState.client as unknown as { append: unknown }).append = vi
+      .fn()
+      .mockRejectedValue(new Error("quota exceeded"));
+
+    await expect(saveToSent(config, raw)).resolves.toEqual({
+      saved: false,
+      reason: "quota exceeded",
+    });
+  });
+
+  it("연결이 실패해도 던지지 않는다", async () => {
+    const fake = setup([]);
+    fake.connect.mockRejectedValue(new Error("refused"));
+
+    const result = await saveToSent(config, raw);
+
+    expect(result.saved).toBe(false);
   });
 });

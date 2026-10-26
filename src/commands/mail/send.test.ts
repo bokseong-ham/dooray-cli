@@ -9,6 +9,7 @@ import { EXIT_PARAM_ERROR } from "../../utils/exit-codes.js";
 const mocks = vi.hoisted(() => ({
   getConfigOrThrow: vi.fn(),
   sendMail: vi.fn(),
+  saveToSent: vi.fn(),
   startSpinner: vi.fn(),
   stopSpinner: vi.fn(),
 }));
@@ -17,6 +18,7 @@ vi.mock("../../config/store.js", () => ({
   getConfigOrThrow: mocks.getConfigOrThrow,
 }));
 vi.mock("../../api/smtpClient.js", () => ({ sendMail: mocks.sendMail }));
+vi.mock("../../api/imapClient.js", () => ({ saveToSent: mocks.saveToSent }));
 vi.mock("../../utils/spinner.js", () => ({
   startSpinner: mocks.startSpinner,
   stopSpinner: mocks.stopSpinner,
@@ -53,7 +55,9 @@ beforeEach(() => {
     messageId: "<sent@example.com>",
     accepted: ["user@example.com"],
     rejected: [],
+    raw: Buffer.from("RAW"),
   });
+  mocks.saveToSent.mockResolvedValue({ saved: true });
   vi.spyOn(process.stdout, "write").mockImplementation(() => true);
   vi.spyOn(process.stderr, "write").mockImplementation(() => true);
 });
@@ -161,5 +165,47 @@ describe("mailSendCommand --attach", () => {
       runMailSend(["--body", "본문", "--attach", dir]),
     ).rejects.toMatchObject({ exitCode: EXIT_PARAM_ERROR });
     expect(mocks.sendMail).not.toHaveBeenCalled();
+  });
+});
+
+describe("mailSendCommand 보낸메일함 저장", () => {
+  it("발송한 원문 그대로 보낸메일함에 저장한다", async () => {
+    await runMailSend(["--body", "본문"]);
+
+    expect(mocks.saveToSent).toHaveBeenCalledWith(config, Buffer.from("RAW"));
+  });
+
+  it("--no-save-sent 면 IMAP 을 열지 않는다", async () => {
+    await runMailSend(["--body", "본문", "--no-save-sent"]);
+
+    expect(mocks.sendMail).toHaveBeenCalledTimes(1);
+    expect(mocks.saveToSent).not.toHaveBeenCalled();
+  });
+
+  it("저장이 실패해도 재발송하지 않고 경고만 내며 정상 종료한다", async () => {
+    mocks.saveToSent.mockResolvedValue({ saved: false, reason: "APPEND 거부" });
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    await expect(runMailSend(["--body", "본문"])).resolves.toBeUndefined();
+
+    expect(mocks.sendMail).toHaveBeenCalledTimes(1);
+    expect(stderr.mock.calls.map((c) => String(c[0])).join("")).toContain("APPEND 거부");
+  });
+
+  it("--json 에 저장 결과를 더하고 원문 raw 는 싣지 않는다", async () => {
+    mocks.saveToSent.mockResolvedValue({ saved: false, reason: "권한 없음" });
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const { Command } = await import("commander");
+    vi.resetModules();
+    const { mailSendCommand } = await import("./send.js");
+    const program = new Command().option("--json").addCommand(mailSendCommand);
+    await program.parseAsync(
+      ["--json", "send", "--to", "user@example.com", "--subject", "제목", "--body", "본문"],
+      { from: "user" },
+    );
+
+    const out = JSON.parse(stdout.mock.calls.map((c) => String(c[0])).join(""));
+    expect(out).toMatchObject({ savedToSent: false, saveSentError: "권한 없음" });
+    expect(out).not.toHaveProperty("raw");
   });
 });

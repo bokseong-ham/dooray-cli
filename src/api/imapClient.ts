@@ -101,6 +101,44 @@ export async function closeImapClient(
   }
 }
 
+export interface SaveToSentResult {
+  saved: boolean;
+  reason?: string;
+}
+
+// 발송은 이미 끝난 뒤라 어떤 실패도 던지지 않고 결과로 돌려준다 (ADR-077).
+// 보낸메일함은 이름으로 추측하지 않고 서버가 \Sent 특수 용도로 알린 메일함만 쓴다.
+export async function saveToSent(config: Config, raw: Buffer): Promise<SaveToSentResult> {
+  let client: ImapFlow;
+  try {
+    client = createImapClient(config);
+  } catch (error) {
+    return { saved: false, reason: errorMessage(error) };
+  }
+
+  try {
+    await connectImapClient(client, config);
+    const boxes = await client.list();
+    const sent = boxes.find((box) => box.specialUse === "\\Sent" && box.specialUseSource !== "name");
+    if (!sent) {
+      return { saved: false, reason: "서버가 \\Sent 특수 용도 메일함을 알리지 않았습니다" };
+    }
+    const result = await client.append(sent.path, raw, ["\\Seen"], new Date());
+    if (!result) {
+      return { saved: false, reason: `${sent.path} 에 저장하지 못했습니다` };
+    }
+    return { saved: true };
+  } catch (error) {
+    return { saved: false, reason: errorMessage(error) };
+  } finally {
+    await closeImapClient(client);
+  }
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export async function listMails(
   config: Config,
   opts: { unread?: boolean; search?: string; limit?: number },
