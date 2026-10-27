@@ -19,6 +19,7 @@ import type {
 import { MARKDOWN_MIME } from "../../utils/body-input.js";
 import { DoorayCliError } from "../../utils/errors.js";
 import { EXIT_PARAM_ERROR } from "../../utils/exit-codes.js";
+import { DAY_END, expandDateInZone, parseLocalDate } from "../../utils/local-date.js";
 import type { EventSchedule } from "./event-schedule.js";
 import { resolveRepeatUntil } from "./event-schedule.js";
 
@@ -301,14 +302,21 @@ export function needsExistingUsers(req: CalendarEventWriteRequest): boolean {
   return users != null && (users.to != null) !== (users.cc != null);
 }
 
-/** 기존 규칙에서 채울 수 있는 세부 필드와 그 값을 준 옵션. */
+/** 기존 규칙에서 채울 수 있는 세부 필드와 그 값을 주는 옵션. */
 const RECURRENCE_FILL_FIELDS = [
-  ["interval", "repeatInterval"],
-  ["until", "repeatUntil"],
-  ["byday", "repeatByday"],
-  ["bymonth", "repeatBymonth"],
-  ["bymonthday", "repeatBymonthday"],
+  ["interval", "repeatInterval", "--repeat-interval"],
+  ["until", "repeatUntil", "--repeat-until"],
+  ["byday", "repeatByday", "--repeat-byday"],
+  ["bymonth", "repeatBymonth", "--repeat-bymonth"],
+  ["bymonthday", "repeatBymonthday", "--repeat-bymonthday"],
 ] as const;
+
+/** 수정으로 지워질 기존 반복 필드. `flag` 가 있으면 그 옵션으로 지금 값을 다시 줄 수 있다. */
+export interface DroppedRecurrenceField {
+  field: string;
+  value: unknown;
+  flag?: string;
+}
 
 /** 상세 응답에만 있고 CLI 가 보내지 않는 필드. 응답 형태를 다시 담는 `startedAt`·`endedAt`·`timezoneName` 은 뺀다. */
 const RECURRENCE_ECHO_FIELDS = new Set(["frequency", "startedAt", "endedAt", "timezoneName"]);
@@ -319,30 +327,40 @@ const RECURRENCE_ECHO_FIELDS = new Set(["frequency", "startedAt", "endedAt", "ti
  * 서버는 `recurrenceRule` 을 통째로 바꾼다(실측). `--repeat monthly --repeat-until <날짜>` 만 보내면
  * 간격이 1 로, `byday`·`bymonthday` 가 빈 값으로 바뀐다. `--repeat-until` 을 주지 않으면 종료일도 지워진다.
  * 주기가 기존과 같을 때만 채운다. 주기가 바뀌면 기존 세부 값이 새 주기와 맞지 않을 수 있어 채우지 않는다.
- * `dropped` 는 이 수정으로 지워질 기존 필드다. 주기가 바뀌어 채우지 않은 필드와,
+ * 단 `until` 은 주기와 상관없는 값이라 주기가 바뀌어도 채운다. 지우면 반복이 끝없이 이어진다 (Issue #228).
+ * `dropped` 는 이 수정으로 지워질 기존 필드와 그 값이다. 주기가 바뀌어 채우지 않은 필드와,
  * CLI 가 다루지 않아 다시 보낼 수 없는 `count`·`bysetpos` 같은 필드가 들어간다.
+ * 값을 함께 두는 것은 수정이 끝난 뒤에도 경고만 보고 지워진 값을 되살릴 수 있게 하려는 것이다.
  */
 export function mergeExistingRecurrence(
   rule: CalendarEventRecurrenceRule,
   given: RepeatOptions,
   existing: CalendarEventRecurrenceRuleDetail | null | undefined,
-): { rule: CalendarEventRecurrenceRule; dropped: string[] } {
+): { rule: CalendarEventRecurrenceRule; dropped: DroppedRecurrenceField[]; unreadableZone?: string } {
   if (existing?.frequency == null) return { rule, dropped: [] };
 
   const merged: CalendarEventRecurrenceRule = { ...rule };
+  let unreadableZone: string | undefined;
   // 반복을 펼치는 기준 시간대는 일정에 속한다. 다른 시간대 장비에서 고쳐도 요일이 옮겨지지 않게 기존 값을 둔다.
   if (typeof existing.timezoneName === "string" && existing.timezoneName !== "") {
     merged.timezoneName = existing.timezoneName;
+    // 날짜만 준 종료일은 장비 시간대의 23:59:59 로 넓혀져 있다. 일정의 시간대가 다르면 마지막 날 회차가
+    // 빠지거나 다음 날 회차가 들어가므로 일정의 시간대로 다시 넓힌다. 시간대 이름을 못 읽으면 그대로 둔다.
+    const untilDate = given.repeatUntil != null ? parseLocalDate(given.repeatUntil) : null;
+    const zoned = untilDate != null ? expandDateInZone(untilDate, DAY_END, existing.timezoneName) : undefined;
+    if (zoned != null) merged.until = zoned;
+    else if (zoned === null) unreadableZone = existing.timezoneName;
   }
-  const dropped: string[] = [];
-  // 실측 응답은 소문자였다. 표기가 달라도 같은 주기를 바뀐 것으로 보지 않게 맞춰 견준다.
+  const dropped: DroppedRecurrenceField[] = [];
+  // 실측 응답은 소문자였다. 표기가 달라도 같은 주기를 바뀐 것으로 보지 않게 맞춰 비교한다.
   const sameFrequency = existing.frequency.toLowerCase() === rule.frequency.toLowerCase();
-  for (const [field, option] of RECURRENCE_FILL_FIELDS) {
+  for (const [field, option, flag] of RECURRENCE_FILL_FIELDS) {
     const value = existing[field];
-    if (value == null || given[option] != null) continue;
-    if (!sameFrequency) {
+    // 서버는 보내지 않은 세부 필드를 빈 문자열로 둔다. 빈 값은 지워져도 달라지는 것이 없고, 되살릴 옵션도 만들 수 없다.
+    if (value == null || value === "" || given[option] != null) continue;
+    if (!sameFrequency && field !== "until") {
       // 간격 1 은 서버 기본값과 같아 지워져도 달라지는 것이 없다.
-      if (field !== "interval" || value !== 1) dropped.push(field);
+      if (field !== "interval" || value !== 1) dropped.push({ field, value, flag });
       continue;
     }
     if (field === "interval") merged.interval = value as number;
@@ -351,10 +369,10 @@ export function mergeExistingRecurrence(
 
   const known = new Set<string>(RECURRENCE_FILL_FIELDS.map(([field]) => field));
   for (const [field, value] of Object.entries(existing)) {
-    if (value == null || known.has(field) || RECURRENCE_ECHO_FIELDS.has(field)) continue;
-    dropped.push(field);
+    if (value == null || value === "" || known.has(field) || RECURRENCE_ECHO_FIELDS.has(field)) continue;
+    dropped.push({ field, value });
   }
-  return { rule: merged, dropped };
+  return { rule: merged, dropped, unreadableZone };
 }
 
 const INSTANCE_ID_RE = /^(.+)-(\d{8}T\d{6}Z)$/;

@@ -25,14 +25,14 @@ NHN Dooray REST API 를 래핑한 CLI 다. 이 파일은 라우터이므로, 작
 
 `post get`/`edit`/`replace`/`done`/`workflow`, `post comment` 전체, `post file` 전체, `post comment file` 전체,
 `wiki page get` 과 `wiki page edit` 과 `wiki page replace`, `wiki page file` 과 `wiki page comment` 전체,
-그리고 `wiki page delete` 와 `wiki page move` 가 네 가지 형태를 모두 받는다.
+그리고 `wiki page delete` 와 `wiki page move` 가 아래 형태를 모두 받는다.
 
 - `<project> <number>` — 업무는 번호, 위키는 `<project> <page-id>`
 - `--id <postId>` / `--id <pageId>` — 위키는 `--project` 없이도 조회된다. 함께 주면 wikiId 를 해석하는 호출을 한 번 아낀다
 - `--url <url>`
 - 첫 인자에 Dooray URL 을 직접
 
-받아들이는 URL 형식은 셋이다.
+받아들이는 URL 형식은 다음과 같다.
 
 - `https://*.dooray.com/task/to/<postId>`
 - `https://*.dooray.com/task/<projectId>/<postId>` — 브라우저 주소창 복사본
@@ -69,7 +69,7 @@ NHN Dooray REST API 를 래핑한 CLI 다. 이 파일은 라우터이므로, 작
 
 ## 삭제 명령의 확인 동작
 
-여섯 삭제 명령은 같은 안전 확인 정책을 따른다.
+아래 삭제 명령은 같은 안전 확인 정책을 따른다.
 
 | 명령 | 확인 | 자동화 |
 | --- | --- | --- |
@@ -259,8 +259,8 @@ dooray post get <project> <number> --json --with-tag-names
 | 제목 검색 | `dooray mail list --search "<keyword>"` |
 | 메일 상세 | `dooray mail get <uid\|url\|mail-id>` — `mail list` 의 UID, 메일 웹 주소, 그 주소의 19자리 id 를 모두 받는다. 첨부가 있으면 1부터 시작하는 순번과 함께 목록을 보여 주고, `--json` 은 `attachments` 배열을 준다 |
 | 메일 첨부 저장 | `dooray mail attachment <uid\|url\|mail-id> [--id <순번>]... [-o <dir>] [--force]` — 순번은 `mail get` 이 보여 준 값이고, 주지 않으면 모두 저장한다. 같은 이름의 파일이 있으면 그 첨부는 실패하고 `--force` 일 때만 덮어쓴다 |
-| 메일 발송 | `dooray mail send --to "..." --subject "..." --body "..."` — 숨은참조는 `--bcc`, HTML 본문은 `--html` |
-| 메일 답장 | `dooray mail reply <uid\|url\|mail-id> --body "..."` — HTML 본문은 `--html` |
+| 메일 발송 | `dooray mail send --to "..." --subject "..." --body "..."` — 숨은참조는 `--bcc`, HTML 본문은 `--html`, 파일 첨부는 `--attach <path>...`, 보낸메일함 저장 생략은 `--no-save-sent` |
+| 메일 답장 | `dooray mail reply <uid\|url\|mail-id> --body "..."` — HTML 본문은 `--html`, 파일 첨부는 `--attach <path>...`, 보낸메일함 저장 생략은 `--no-save-sent` |
 | 저장된 인증정보 제거 | `dooray mail logout` (비대화형 환경은 `--yes`) |
 
 답장하거나 메일 웹 주소로 원본을 고르거나 첨부를 저장할 때는 [mail.md](references/mail.md) 를 먼저 읽는다.

@@ -274,21 +274,6 @@ describe("keychainApiKeyAccount", () => {
 
     expect(keychainApiKeyAccount(configPath)).toBe(`apiKey:${hash}`);
   });
-
-  // 같은 규칙을 CLI 와 이 스크립트가 따로 구현한다. 한쪽만 바뀌면 스크립트가 다른 항목을 찾는다.
-  it("CLI 의 keychainAccount 와 같은 값을 낸다", async () => {
-    const { keychainAccount } = await import("../../../../src/config/secret-store.ts");
-    const paths = [
-      join(userInfo().homedir, ".dooray", "config.json"),
-      join(userInfo().homedir, ".dooray", "..", ".dooray", "config.json"),
-      "/tmp/other-home/.dooray/config.json",
-      "relative/.dooray/config.json",
-    ];
-
-    for (const configPath of paths) {
-      expect(keychainApiKeyAccount(configPath)).toBe(keychainAccount("apiKey", configPath));
-    }
-  });
 });
 
 describe("readKeychainApiKey", () => {

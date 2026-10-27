@@ -29,7 +29,7 @@ cp -R skills/dooray-persona ~/.claude/skills/
 `skills/dooray-persona/references/bootstrap.md`에 붙여넣기용 프롬프트가 있다.
 그 블록을 복사해 전달하면 받는 사람은 Claude Code에 한 번 붙여넣는 것으로 CLI 설치, 인증 설정, 스킬 연결, 수집, 문서 생성, 주입까지 진행한다.
 
-받는 사람이 직접 해야 하는 것은 둘이다. Claude Code 설치와 Dooray 개인 인증 토큰 발급이다.
+받는 사람이 직접 해야 하는 것은 Claude Code 설치와 Dooray 개인 인증 토큰 발급이다.
 토큰 발급은 웹 로그인이 필요해 자동화할 수 없고, 프롬프트가 발급 화면 주소까지만 안내한다.
 
 Claude 데스크톱 앱은 사용자 컴퓨터의 파일과 명령을 기본 상태로 다루지 못한다.
