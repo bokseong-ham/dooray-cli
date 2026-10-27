@@ -125,7 +125,10 @@ describe("downloadMessengerFile", () => {
       "messenger/v1/channels/c/files/f1",
       expect.objectContaining({ redirect: "manual", throwHttpErrors: false }),
     );
-    expect(fetchMock).toHaveBeenCalledWith(LOCATION, { headers: { Authorization: "dooray-api key" } });
+    expect(fetchMock).toHaveBeenCalledWith(
+      LOCATION,
+      expect.objectContaining({ headers: { Authorization: "dooray-api key" }, redirect: "manual" }),
+    );
     expect(fileName).toBe("보고서.pdf");
     expect(buffer.byteLength).toBe(5);
   });
